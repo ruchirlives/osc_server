@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="k80e4I" name="OSCDawServer" projectType="guiapp" useAppConfig="0"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" defines="JUCE_MODAL_LOOPS_PERMITTED=1"
+              bundleIdentifier="com.ruchirlives.OSCDawServer" binaryDataNamespace="BinaryData">
+  <MAINGROUP id="pN3WCX" name="OSCDawServer">
+    <GROUP id="{AA5004D7-8BC2-FCC1-C271-B3AAE1415B2A}" name="Source">
+      <FILE id="GRNlv0" name="HostPlayHead.h" compile="0" resource="0" file="Source/HostPlayHead.h"/>
+      <FILE id="FkV1NB" name="RenamePluginDialog.cpp" compile="1" resource="0"
+            file="Source/RenamePluginDialog.cpp"/>
+      <FILE id="iYp9d2" name="RenamePluginDialog.h" compile="0" resource="0"
+            file="Source/RenamePluginDialog.h"/>
+      <FILE id="BKyjDH" name="VST3Visitor.h" compile="0" resource="0" file="Source/VST3Visitor.h"/>
+      <FILE id="NXGLRy" name="VST3Visitor.cpp" compile="1" resource="0" file="Source/VST3Visitor.cpp"/>
+      <FILE id="rgf4kF" name="Conductor.cpp" compile="1" resource="0" file="Source/Conductor.cpp"/>
+      <FILE id="w0ijQR" name="Conductor.h" compile="0" resource="0" file="Source/Conductor.h"/>
+      <FILE id="K5Stlq" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
+      <FILE id="PSxzCs" name="MidiManager.cpp" compile="1" resource="0" file="Source/MidiManager.cpp"/>
+      <FILE id="dqtEFh" name="MidiManager.h" compile="0" resource="0" file="Source/MidiManager.h"/>
+      <FILE id="pEq17W" name="PluginManager.cpp" compile="1" resource="0"
+            file="Source/PluginManager.cpp"/>
+      <FILE id="olQo9R" name="PluginManager.h" compile="0" resource="0" file="Source/PluginManager.h"/>
+      <FILE id="dS1Dt1" name="PluginWindow.cpp" compile="1" resource="0"
+            file="Source/PluginWindow.cpp"/>
+      <FILE id="OGH4VA" name="PluginWindow.h" compile="0" resource="0" file="Source/PluginWindow.h"/>
+      <FILE id="vCHErj" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
+      <FILE id="CqDNgS" name="MainComponent.cpp" compile="1" resource="0"
+            file="Source/MainComponent.cpp"/>
+    </GROUP>
+    <FILE id="ZCiG4M" name="icon.png" compile="0" resource="1" file="icon.png"/>
+  </MAINGROUP>
+  <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_midi_ci" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_osc" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_PLUGINHOST_VST3="1" JUCE_USE_WINRT_MIDI="1"
+               JUCE_WASAPI="1"/>
+  <EXPORTFORMATS>
+    <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="ZCiG4M" bigIcon="ZCiG4M"
+            extraDefs="JUCE_USE_WINRT_MIDI=0">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="DAWSERVER"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="DAWSERVER"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_core" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_midi_ci" path="F:/JUCE/modules"/>
+        <MODULEPATH id="juce_osc" path="F:/JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2022>
+  </EXPORTFORMATS>
+</JUCERPROJECT>
