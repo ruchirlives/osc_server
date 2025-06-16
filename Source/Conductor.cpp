@@ -785,15 +785,7 @@ void OrchestraTableModel::sendTags(int row)
 	if (row >= 0 && row < orchestraData.size())
 	{
 		const InstrumentInfo& instrument = orchestraData[row];
-
-		// Assuming `MyParentComponent` has a conductor method:
-		auto* parent = dynamic_cast<MainComponent*>(table.getParentComponent());
-		if (parent != nullptr)
-		{
-			parent->getConductor().sendOSCMessage(instrument.tags);
-		}
-
-
+		mainComponent->getConductor().sendOSCMessage(instrument.tags);
 	}
 }
 

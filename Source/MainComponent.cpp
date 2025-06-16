@@ -490,7 +490,8 @@ void MainComponent::getFolder()
 
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colours::black);
+	g.setColour(juce::Colours::lightgrey.darker(0.8f));  // near-black but not pure
+	g.fillAll();
 }
 
 

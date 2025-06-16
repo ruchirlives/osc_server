@@ -23,6 +23,20 @@ public:
 		g.drawRoundedRectangle(textEditor.getLocalBounds().toFloat(), 6.0f, 1.5f);
 	}
 
+	void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
+		bool isMouseOverButton, bool isButtonDown) override
+	{
+		auto bounds = button.getLocalBounds().toFloat();
+
+		// Draw drop shadow
+		juce::DropShadow shadow(juce::Colours::black.withAlpha(0.3f), 5, { 2, 2 });
+		shadow.drawForRectangle(g, bounds.toNearestInt());
+
+		// Rounded button background
+		g.setColour(backgroundColour);
+		g.fillRoundedRectangle(bounds, 6.0f);
+	}
+
 	void fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override
 	{
 		auto bg = textEditor.findColour(juce::TextEditor::backgroundColourId);
