@@ -23,7 +23,7 @@ class Conductor : public juce::OSCReceiver,
 {
 public:
     // Constructor: takes a reference to PluginManager
-    Conductor(PluginManager& pm, MidiManager& mm);
+    Conductor(PluginManager& pm, MidiManager& mm, MainComponent* mainComponentRef);
 
     // Destructor
     ~Conductor() override;
@@ -83,6 +83,7 @@ private:
     void handleIncomingNote(juce::String messageType, int channel, int note, int velocity, const juce::String& pluginId, juce::int64& timestamp);
     void handleIncomingProgramChange(int channel, int programNumber, const juce::String& pluginId, juce::int64& timestamp);
     void handleIncomingControlChange(int channel, int controllerNumber, int controllerValue, const juce::String& pluginId, juce::int64& timestamp);
+    MainComponent* mainComponent;  // Reference to the MainComponent object
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Conductor)

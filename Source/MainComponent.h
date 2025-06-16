@@ -5,6 +5,58 @@
 #include "PluginManager.h"
 #include "Conductor.h"
 
+class GlobalLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+	GlobalLookAndFeel()
+	{
+		// Customize colours globally here if desired
+		setColour(juce::TextEditor::backgroundColourId, juce::Colours::darkgrey);
+		setColour(juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha(0.3f));
+		setColour(juce::TextEditor::textColourId, juce::Colours::white);
+	}
+
+	void drawTextEditorOutline(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override
+	{
+		auto outlineColour = textEditor.findColour(juce::TextEditor::outlineColourId);
+		g.setColour(outlineColour);
+		g.drawRoundedRectangle(textEditor.getLocalBounds().toFloat(), 6.0f, 1.5f);
+	}
+
+	void fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override
+	{
+		auto bg = textEditor.findColour(juce::TextEditor::backgroundColourId);
+		g.setColour(bg);
+		g.fillRoundedRectangle(textEditor.getLocalBounds().toFloat(), 6.0f);
+	}
+
+	// You can also override button drawing, sliders, etc. here
+};
+
+class RoundedTableWrapper : public juce::Component
+{
+public:
+	RoundedTableWrapper(juce::TableListBox& tableRef) : table(tableRef)
+	{
+		addAndMakeVisible(table);
+	}
+
+	void resized() override
+	{
+		table.setBounds(getLocalBounds().reduced(1));
+	}
+
+	void paint(juce::Graphics& g) override
+	{
+		g.setColour(juce::Colours::darkgrey);
+		g.fillRoundedRectangle(getLocalBounds().toFloat(), 3.0f);
+	}
+
+private:
+	juce::TableListBox& table;
+};
+
+
 class MainComponent :   public juce::Component, 
                         public juce::ComboBox::Listener
 {
@@ -13,7 +65,6 @@ public:
     ~MainComponent() override;
 
 	void moveSelectedRowsToEnd();
-
 	void updateProjectNameLabel(juce::String projectName);
 
     void paint(juce::Graphics& g) override;
@@ -94,10 +145,13 @@ private:
 	juce::Label projectNameLabel{ "Project Name", "Project Name" }; // Label for the project name
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
-	Conductor conductor{ pluginManager, midiManager }; // Create an instance of the Conductor class
+	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class
 
 	OrchestraTableModel orchestraTableModel{ conductor.orchestra, orchestraTable, this }; // Create an instance of the OrchestraTableModel class
 	// create a similar instance of the PluginTableModel class here and initialize it with pluginManager.pluginList
+
+	GlobalLookAndFeel globalLNF;  // Not static
+	RoundedTableWrapper orchestraTableWrapper{ orchestraTable };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

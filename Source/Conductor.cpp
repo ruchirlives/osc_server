@@ -3,8 +3,8 @@
 
 
 // Constructor: takes a reference to PluginManager and passes it
-Conductor::Conductor(PluginManager& pm, MidiManager& mm )
-	: pluginManager(pm), midiManager(mm)
+Conductor::Conductor(PluginManager& pm, MidiManager& mm, MainComponent* mainComponentRef)
+	: pluginManager(pm), midiManager(mm), mainComponent(mainComponentRef)
 {
 	// Add this instance as an OSC listener
 	addListener(this, "/midi/message");
@@ -111,6 +111,12 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 			else if (messageType == "restore_project")
 			{
 				restoreAllData("projectData.dat", "projectPlugins.dat", "projectMeta.xml");
+			}
+			else if (messageType == "restore_from_file")
+			{
+				DBG("Received restore from file request for file: ");
+				mainComponent->restoreProject(false); // false means do not append, just restore
+
 			}
 			else if (messageType == "request_tags")
 			{

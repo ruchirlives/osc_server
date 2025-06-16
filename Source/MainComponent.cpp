@@ -2,20 +2,24 @@
 
 
 MainComponent::MainComponent()
-{
-	setSize(600, 400);
-	
+{	
+	setSize(600, 800);
 	resized();
+	juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
 
 	// Initialise the Orchestra TableListBox
-	initOrchestraTable();
+	addAndMakeVisible(orchestraTableWrapper);
+	initOrchestraTable();  // still needed
 	addDataToTable();
+
+
 
 	// Initialize the BPM editor
 	addAndMakeVisible(bpmEditor);
 	bpmEditor.setText("120"); // Default BPM
 	bpmEditor.setJustification(juce::Justification::centred);
 	bpmEditor.setInputRestrictions(5, "0123456789."); // Allow only numbers and a decimal point
+	
 
 	// Initialize the plugins
 	initPlugins();
@@ -79,32 +83,63 @@ MainComponent::MainComponent()
 
 void MainComponent::resized()
 {
-	getTopLevelComponent()->setTopLeftPosition(1600, 100);
-	// Layout your components here
-	pluginBox.setBounds(10, 300, 150, 30);
-	midiInputList.setBounds(170, 300, 150, 30);
-	ScanButton.setBounds(10, 250, 150, 30);
-	updateButton.setBounds(170, 250, 150, 30);
-	getRecordedButton.setBounds(330, 250, 150, 30);
-	orchestraTable.setBounds(10, 10, 800, 200);
-	listPluginInstancesButton.setBounds(330, 300, 150, 30);
-	sendTestNoteButton.setBounds(490, 250, 150, 30);
-	openPluginButton.setBounds(490, 300, 150, 30);
-	addInstrumentButton.setBounds(650, 250, 150, 30);
-	addNewInstrumentButton.setBounds(490, 350, 150, 30);
-	removeInstrumentButton.setBounds(650, 300, 150, 30);
-	saveButton.setBounds(10, 350, 150, 30);
-	restoreButton.setBounds(170, 350, 150, 30);
-	startRecordingButton.setBounds(330, 350, 150, 30);
-	projectNameLabel.setBounds(10, 215, 150, 30);
-	moveToEndButton.setBounds(650, 350, 150, 30);
-	// Position the BPM editor
-	bpmEditor.setBounds(170, 215, 75, 30); // Adjust size and position as needed
+	// --- Adjustable layout constants ---
+	const int margin = 10;
+	const int buttonWidth = 150;
+	const int buttonHeight = 30;
+	const int spacingX = 10;
+	const int spacingY = 20;
+	const int labelHeight = 30;
+	const int numButtonRows = 3;
 
-	// Update the BPM in the PluginManager whenever the text changes
-	bpmEditor.onTextChange = [this]()
-		{
-			pluginManager.setBpm(getBpm());
+	const int windowWidth = getWidth();
+	const int windowHeight = getHeight();
+
+	// Set main window position (if needed)
+	getTopLevelComponent()->setTopLeftPosition(1600, 100);
+
+	// --- Top controls ---
+	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);
+	bpmEditor.setBounds(projectNameLabel.getRight() + spacingX, margin, 75, labelHeight);
+
+	// --- Reserved space at bottom for buttons ---
+	const int totalButtonHeight = numButtonRows * buttonHeight + (numButtonRows - 1) * spacingY;
+	const int buttonAreaTop = windowHeight - totalButtonHeight - margin;
+
+	// --- Table area: from bottom of top controls to top of button area ---
+	const int tableTop = projectNameLabel.getBottom() + spacingY;
+	const int tableHeight = buttonAreaTop - tableTop - spacingY;  // extra spacing between table and buttons
+	orchestraTableWrapper.setBounds(margin, tableTop, windowWidth - 2 * margin, tableHeight);
+
+	// --- Button rows, starting from bottom upward ---
+
+	// Row 1 (bottom row)
+	int row1Y = windowHeight - margin - buttonHeight;
+	ScanButton.setBounds(margin, row1Y, buttonWidth, buttonHeight);
+	updateButton.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	getRecordedButton.setBounds(updateButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	sendTestNoteButton.setBounds(getRecordedButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	addInstrumentButton.setBounds(sendTestNoteButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+
+	// Row 2
+	int row2Y = row1Y - buttonHeight - spacingY;
+	pluginBox.setBounds(margin, row2Y, buttonWidth, buttonHeight);
+	midiInputList.setBounds(pluginBox.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	listPluginInstancesButton.setBounds(midiInputList.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	openPluginButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	removeInstrumentButton.setBounds(openPluginButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+
+	// Row 3 (top row of buttons)
+	int row3Y = row2Y - buttonHeight - spacingY;
+	saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
+	restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	addNewInstrumentButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+
+	// --- BPM Sync handler ---
+	bpmEditor.onTextChange = [this]() {
+		pluginManager.setBpm(getBpm());
 		};
 }
 
@@ -113,7 +148,9 @@ MainComponent::~MainComponent()
 	// Ensure all resources are cleaned up
 	pluginManager.releaseResources();
 	midiManager.closeMidiInput();
+
 	// Add any additional cleanup logic here
+	juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
 
 
@@ -305,7 +342,6 @@ void MainComponent::openPlugins(juce::TableListBox& table)
 
 void MainComponent::initOrchestraTable()
 {
-	addAndMakeVisible(orchestraTable);
 	// Set the model for the TableListBox to the orchestraTableModel
 	orchestraTable.setModel(&orchestraTableModel);
 	orchestraTable.setMultipleSelectionEnabled(true);
