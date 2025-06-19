@@ -5,6 +5,50 @@
 #include "PluginManager.h"
 #include "Conductor.h"
 
+#pragma once
+#include <JuceHeader.h>
+
+class AudioUdpStreamer
+{
+public:
+	AudioUdpStreamer(const juce::String& ip, int port)
+		: targetIp(ip), targetPort(port)
+	{
+		socket = std::make_unique<juce::DatagramSocket>();
+	}
+
+	void sendAudio(const juce::AudioBuffer<float>& buffer)
+	{
+		const int numSamples = buffer.getNumSamples();
+		const int numChannels = buffer.getNumChannels();
+		tempBuffer.setSize(numChannels, numSamples, false, false, true);
+		tempBuffer.makeCopyOf(buffer);
+
+		std::vector<uint8_t> bytes;
+		bytes.reserve(numSamples * numChannels * 2); // 2 bytes per sample
+
+		for (int i = 0; i < numSamples; ++i)
+		{
+			for (int ch = 0; ch < numChannels; ++ch)
+			{
+				float sample = tempBuffer.getSample(ch, i);
+				int16_t s16 = static_cast<int16_t>(juce::jlimit(-1.0f, 1.0f, sample) * 32767);
+				bytes.push_back(static_cast<uint8_t>(s16 & 0xFF));
+				bytes.push_back(static_cast<uint8_t>((s16 >> 8) & 0xFF));
+			}
+		}
+
+		socket->write(targetIp, targetPort, bytes.data(), static_cast<int>(bytes.size()));
+	}
+
+private:
+	juce::String targetIp;
+	int targetPort;
+	std::unique_ptr<juce::DatagramSocket> socket;
+	juce::AudioBuffer<float> tempBuffer;
+};
+
+
 class GlobalLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
@@ -166,6 +210,7 @@ private:
 
 	GlobalLookAndFeel globalLNF;  // Not static
 	RoundedTableWrapper orchestraTableWrapper{ orchestraTable };
+	std::unique_ptr<AudioUdpStreamer> audioStreamer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

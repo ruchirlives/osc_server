@@ -113,6 +113,7 @@ public:
 	juce::AudioDeviceManager& getDeviceManager() { return deviceManager; }
 
     void renamePluginInstance(const juce::String& oldId, const juce::String& newId);
+    std::function<void(const juce::AudioBuffer<float>&)> audioTapCallback;
 
 
 private:

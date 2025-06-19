@@ -3,6 +3,14 @@
 
 MainComponent::MainComponent()
 {	
+	audioStreamer = std::make_unique<AudioUdpStreamer>("127.0.0.1", 10000);
+
+	pluginManager.audioTapCallback = [this](const juce::AudioBuffer<float>& buffer)
+		{
+			if (audioStreamer)
+				audioStreamer->sendAudio(buffer);
+		};
+
 	setSize(600, 800);
 	resized();
 	juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
@@ -11,8 +19,6 @@ MainComponent::MainComponent()
 	addAndMakeVisible(orchestraTableWrapper);
 	initOrchestraTable();  // still needed
 	addDataToTable();
-
-
 
 	// Initialize the BPM editor
 	addAndMakeVisible(bpmEditor);
