@@ -163,10 +163,6 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         // f) run the plugin
         pluginInstance->processBlock(tempBuffer, matchingMessages);
 
-        // TAP audio for UDP streaming
-        if (audioTapCallback != nullptr)
-            audioTapCallback(tempBuffer); // Pass final output buffer
-
         // g) mix plugin output back into the host buffer
         for (int ch = 0; ch < bufferToFill.buffer->getNumChannels(); ++ch)
         {
@@ -179,6 +175,11 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                 bufferToFill.numSamples);
         }
     }
+
+    // TAP audio for UDP streaming
+// Tap the final mixed audio buffer once per callback
+    if (audioTapCallback != nullptr)
+        audioTapCallback(*bufferToFill.buffer);
 
     // clear incoming MIDI and advance the host clock
     incomingMidi.clear();

@@ -26,6 +26,11 @@ MainComponent::MainComponent()
 	bpmEditor.setJustification(juce::Justification::centred);
 	bpmEditor.setInputRestrictions(5, "0123456789."); // Allow only numbers and a decimal point
 	
+	// Initialise the audio streaming port editor
+	addAndMakeVisible(audioStreamingPortLabel);
+	audioStreamingPortLabel.setText("Audio Streaming Port", juce::dontSendNotification);
+	addAndMakeVisible(audioStreamingPortEditor);
+	audioStreamingPortEditor.setText("10000"); // Default port
 
 	// Initialize the plugins
 	initPlugins();
@@ -108,6 +113,12 @@ void MainComponent::resized()
 	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);
 	bpmEditor.setBounds(projectNameLabel.getRight() + spacingX, margin, 75, labelHeight);
 
+	audioStreamingPortLabel.setBounds(bpmEditor.getRight() + spacingX, margin, 150, labelHeight);
+	audioStreamingPortEditor.setBounds(audioStreamingPortLabel.getRight() + spacingX, margin, 75, labelHeight);
+
+	bpmEditor.setJustification(juce::Justification::centred);
+	audioStreamingPortEditor.setJustification(juce::Justification::centred);
+
 	// --- Reserved space at bottom for buttons ---
 	const int totalButtonHeight = numButtonRows * buttonHeight + (numButtonRows - 1) * spacingY;
 	const int buttonAreaTop = windowHeight - totalButtonHeight - margin;
@@ -147,7 +158,37 @@ void MainComponent::resized()
 	bpmEditor.onTextChange = [this]() {
 		pluginManager.setBpm(getBpm());
 		};
+
+	// --- Audio Streaming Port handler ---
+	audioStreamingPortEditor.onFocusLost = [this]() {
+		handleAudioPortChange();
+		};
+
+	audioStreamingPortEditor.onReturnKey = [this]() {
+		handleAudioPortChange();
+		};
 }
+
+void MainComponent::handleAudioPortChange()
+{
+	juce::String portText = audioStreamingPortEditor.getText();
+	int port = portText.getIntValue();
+
+	if (port > 0 && port < 65536)
+	{
+		if (audioStreamer)
+		{
+			audioStreamer->setPort(port);
+			DBG("Audio Streaming Port set to: " + juce::String(port));
+		}
+	}
+	else
+	{
+		DBG("Invalid Audio Streaming Port: " + portText);
+		audioStreamingPortEditor.setText("10000", juce::dontSendNotification); // Reset to default
+	}
+}
+
 
 MainComponent::~MainComponent()
 {

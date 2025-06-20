@@ -41,6 +41,20 @@ public:
 		socket->write(targetIp, targetPort, bytes.data(), static_cast<int>(bytes.size()));
 	}
 
+	void setPort(int port)
+	{
+		targetPort = port;
+		if (socket)
+		{
+			socket->bindToPort(targetPort);
+		}
+		else
+		{
+			socket = std::make_unique<juce::DatagramSocket>();
+			socket->bindToPort(targetPort);
+		}
+	}
+
 private:
 	juce::String targetIp;
 	int targetPort;
@@ -128,6 +142,8 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+	void handleAudioPortChange();
+
 	// Add a TextEditor for BPM input
 	juce::TextEditor bpmEditor;
 
@@ -201,6 +217,11 @@ private:
 
 	// Label for the Project Name
 	juce::Label projectNameLabel{ "Project Name", "Project Name" }; // Label for the project name
+
+	// Create a label and text editor for audio streaming port
+	juce::Label audioStreamingPortLabel{ "Audio Streaming Port", "Audio Streaming Port" }; // Label for the audio streaming port
+	juce::TextEditor audioStreamingPortEditor; // Text editor for the audio streaming port
+
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class
