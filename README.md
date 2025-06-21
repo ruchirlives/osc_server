@@ -1,4 +1,6 @@
 # OSC_Server
+VST3 plugin host which communicates via OSC with a VST3 Plugin client that can be dropped into another DAW.
+Several DAWs can use the same Server this way.
 
 Copyright (c) 2024 Ruchir Shah
 
@@ -11,6 +13,13 @@ Run the .exe
 
 Load the VST3 plugin in your VST DAW application.
 
+## Operating the OSCDawServer
+1. On first open, Press `Scan` to scan for VST files which might take some time.
+2. Highlight the first entry or `Add New Instrument`.
+3. `Select a Plugin` menu to place a plugin in the highlighted entry. Then press `Update`. You can click `Open Plugin` to make sure it is loaded.
+4. Make sure your MIDI controller is selected in the drop down menu with MIDI input names. You can now preview the highlighted instrument
+5. Right click on Tags to select new Tags which you can match in the VST3 Client Plugin to send to this instrument.
+6. Right click on the other columns of the entry for various other features and options.
 
 ## Compiling
 
