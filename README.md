@@ -5,8 +5,11 @@ Copyright (c) 2024 Ruchir Shah
 This software is provided for non-commercial use only. Commercial use is strictly prohibited without explicit written permission from the author.
 
 ## Installation
-Grab the latest release: [Releases](https://github.com/ruchirlives/OSC_Server/releases)
+Grab the latest release of the server .exe and the VST plugin .vst3: [Releases](https://github.com/ruchirlives/OSC_Server/releases)
+Put the VST3 plugin in your VST3 plugins folder.
+Run the .exe
 
+Load the VST3 plugin in your VST DAW application.
 
 
 ## Compiling
