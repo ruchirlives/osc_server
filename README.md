@@ -5,6 +5,7 @@ Several DAWs can use the same Server this way.
 Copyright (c) 2024 Ruchir Shah
 
 This software is provided for non-commercial use only. Commercial use is strictly prohibited without explicit written permission from the author.
+The VST3 Plugin client is also available at [OSC_Client](https://github.com/ruchirlives/OSC_Client)
 
 ## Installation
 Grab the latest release of the server .exe and the VST plugin .vst3: [Releases](https://github.com/ruchirlives/OSC_Server/releases)
