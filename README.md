@@ -5,7 +5,8 @@ Copyright (c) 2024 Ruchir Shah
 This software is provided for non-commercial use only. Commercial use is strictly prohibited without explicit written permission from the author.
 
 ## Installation
-Grab the latest release from the [Release section]([url](https://github.com/ruchirlives/OSC_Server/releases)).
+Grab the latest release:
+[https://github.com/ruchirlives/OSC_Server/releases](url)
 
 
 ## Compiling
