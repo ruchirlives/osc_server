@@ -12,6 +12,7 @@ Put the VST3 plugin in your VST3 plugins folder.
 Run the .exe
 
 Load the VST3 plugin in your VST DAW application.
+The VST3 Server and plugin use PORTS 8000 and 9000 to communicate using OSC protocol.
 
 ## Operating the OSCDawServer
 1. On first open, Press `Scan` to scan for VST files which might take some time.
