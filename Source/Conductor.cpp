@@ -238,6 +238,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 			for (const auto& [pluginId, channel] : pluginIdsAndChannels)
 			{
 				handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
+				DBG("Received note on for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with note: " + juce::String(note) + " and velocity: " + juce::String(velocity) + " at time " + juce::String(timestamp));
 			}
 		}
 		else if (messageType == "note_off")
@@ -274,6 +275,32 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		{
 			handleIncomingControlChange(channel, controllerNumber, controllerValue, pluginId, timestamp);
 		}
+	}
+    else if (messageType == "pitchbend")
+    {
+        int pitchBendValue = message[1].getInt32();
+        juce::int64 timestamp = adjustTimestamp(message[2]);
+        
+        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+        
+        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+        {
+            handleIncomingPitchBend(channel, pitchBendValue, pluginId, timestamp);
+            DBG("Received pitch bend for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with value: " + juce::String(pitchBendValue) + " at time " + juce::String(timestamp));
+        }
+    }
+	else if (messageType == "program_change")
+	{
+		int programNumber = message[1].getInt32();
+		juce::int64 timestamp = adjustTimestamp(message[2]);
+		// Extract pluginIds and channels using tags starting from index 3
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+		{
+			handleIncomingProgramChange(channel, programNumber, pluginId, timestamp);
+			DBG("Received program change for plugin: " + pluginId + " on channel: " + juce::String(channel) + " to program: " + juce::String(programNumber));
+		}
+
 	}
 	else if (messageType == "save_plugin_data")
 	{
@@ -483,6 +510,15 @@ void Conductor::handleIncomingControlChange(int channel, int controllerNumber, i
 	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
 }
 
+// Add this method to handle pitch bend messages
+void Conductor::handleIncomingPitchBend(int channel, int pitchBendValue, const juce::String& pluginId, juce::int64& timestamp)
+{
+    // Create a MIDI Pitch Bend message
+    juce::MidiMessage midiMessage = juce::MidiMessage::pitchWheel(channel + 1, pitchBendValue);
+    
+    // Pass the message to PluginManager
+    pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
+}
 // Sync the orchestra list with PluginManager
 void Conductor::syncOrchestraWithPluginManager()
 {
