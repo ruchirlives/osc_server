@@ -314,20 +314,16 @@ void PluginManager::resetPlugin(const juce::String& pluginId)
 {
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
-        // Check if there is an associated editor and safely delete it
-        if (auto* editor = pluginInstances[pluginId]->getActiveEditor())
-        {
-            editor->setVisible(false); // Hide the editor before deletion to avoid UI-related issues
-            delete editor;
-            editor = nullptr; // Ensure dangling pointers are set to nullptr
-        }
+        // Destroy the plugin window first which also deletes the editor
+        pluginWindows.erase(pluginId);
 
-        // delete plugin instance
+        // Release and reset the plugin instance
+        pluginInstances[pluginId]->releaseResources();
         pluginInstances[pluginId].reset();
 
-        // Erase entries from maps after safely resetting the plugin
+        // Remove instance entry from map
         pluginInstances.erase(pluginId);
-        pluginWindows.erase(pluginId);
+
         DBG("Plugin reset: " << pluginId);
     }
 }
