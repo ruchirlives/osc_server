@@ -454,6 +454,11 @@ void MainComponent::addInstrument()
 	}
 
 	// Set the tag for the new instrument from the text on the Windows clipboard
+	pasteClipboard(newRow);
+}
+
+void MainComponent::pasteClipboard(int newRow)
+{
 	juce::String clipboardText = juce::SystemClipboard::getTextFromClipboard();
 	DBG("ClipboardText: " << clipboardText);
 	if (!clipboardText.isEmpty() && newRow >= 0)
@@ -481,6 +486,9 @@ void MainComponent::addNewInstrument()
 	newRow = conductor.orchestra.size() - 1;
 	// Update and select the last row
 	UpdateAndSelect(newRow);
+
+	// Set the tag for the new instrument from the text on the Windows clipboard
+	pasteClipboard(newRow);
 }
 
 
