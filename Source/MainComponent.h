@@ -159,6 +159,7 @@ public:
 
 	// Add methods for add and remove instrument buttons
 	void addInstrument();
+	void pasteClipboard(int newRow);
 	void addNewInstrument();
 	void UpdateAndSelect(int row);
 	void basicInstrument(InstrumentInfo& instrument);
