@@ -67,11 +67,12 @@ PluginManager::~PluginManager()
 
 void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
+    currentSampleRate = sampleRate;
     for (auto& [pluginId, pluginInstance] : pluginInstances)
     {
         if (pluginInstance != nullptr)
         {
-			pluginInstance->prepareToPlay(sampleRate, samplesPerBlockExpected);
+                        pluginInstance->prepareToPlay(sampleRate, samplesPerBlockExpected);
 
         }
     }
