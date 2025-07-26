@@ -971,6 +971,7 @@ void EditableTextCustomComponent::showContextMenu_name()
 	// Add menu options - you can customize these as per your requirements
 	contextMenu.addItem("Save Selected", [this] {save_selection(); });
 	contextMenu.addItem("Insert from File", [this] {owner.mainComponent->restoreProject(true); });
+	contextMenu.addItem("Prefix Instance Name", [this] {prefixInstanceName(); });
 
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);
@@ -1044,6 +1045,69 @@ std::vector<juce::String> presetTags = {
 	"Lofi Synth",
 	"Chiptune Synth"
 };
+
+void EditableTextCustomComponent::prefixInstanceName()
+{
+	// Get the set of selected rows
+	juce::SparseSet<int> selectedRows = owner.table.getSelectedRows();
+	if (selectedRows.size() == 0)
+	{
+		juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+			"Prefix Instance Name",
+			"No rows are selected.");
+		return;
+	}
+	// Prompt the user for a prefix
+	juce::AlertWindow prefixWindow("Prefix Instance Name",
+		"Enter a prefix for the selected rows:",
+		juce::AlertWindow::NoIcon);
+	prefixWindow.addTextEditor("prefix", "", "Prefix:");
+	prefixWindow.addButton("OK", 1);
+	prefixWindow.addButton("Cancel", 0);
+	if (prefixWindow.runModalLoop() == 1) // If "OK" is pressed
+	{
+		juce::String prefix = prefixWindow.getTextEditor("prefix")->getText();
+		if (prefix.isEmpty())
+		{
+			juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+				"Prefix Instance Name",
+				"Prefix cannot be empty.");
+			return;
+		}
+		for (int i = 0; i < selectedRows.size(); ++i)
+		{
+			int selectedRow = selectedRows[i];
+			if (selectedRow >= 0 && selectedRow < owner.orchestraData.size())
+			{
+				auto& instrument = owner.orchestraData[selectedRow];
+				juce::String oldId = instrument.pluginInstanceId;
+				juce::String newName;
+				// Replace everything up to the "_" with the prefix. If there is not "_" in the pluginInstanceId, just prepend the prefix followed by "_"
+				if (instrument.pluginInstanceId.contains("_"))
+				{
+					// Replace everything up to the first "_" with the prefix
+					newName = prefix + instrument.pluginInstanceId.substring(instrument.pluginInstanceId.indexOf("_"));
+				}
+				else
+				{
+					// Prepend the prefix followed by "_"
+					newName = prefix + "_" + instrument.pluginInstanceId;
+				}
+				// Update the pluginInstanceId in the orchestra and in the PluginManager
+				instrument.pluginInstanceId = newName;
+				// Optionally, you can also add the prefix to the instrument name
+				instrument.instrumentName = prefix;
+				// Update the PluginManager mapping
+				if (owner.mainComponent->getPluginManager().hasPluginInstance(oldId))
+				{
+					owner.mainComponent->getPluginManager().renamePluginInstance(oldId, newName);
+				}
+			}
+		}
+		// Refresh the table to reflect the changes
+		owner.table.updateContent();
+	}
+}
 
 
 void EditableTextCustomComponent::showContextMenu_pluginInstances()

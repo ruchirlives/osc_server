@@ -136,7 +136,9 @@ public:
 	void showContextMenu_name();
 	void save_selection();
     void showContextMenu_tags();
-    void getTagsPresetList(std::function<void(const juce::String&, int)> callback);    void showContextMenu_pluginInstances();
+    void getTagsPresetList(std::function<void(const juce::String&, int)> callback);
+    void prefixInstanceName();
+    void showContextMenu_pluginInstances();
     void renameReferencesForSelectedRows();
     void iterate_pluginInstances();
     void showContextMenu_midiChannels();
