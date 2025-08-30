@@ -278,6 +278,32 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 				" controller: " + juce::String(controllerNumber) + " value: " + juce::String(controllerValue) + " at time " + juce::String(timestamp));
 		}
 	}
+    else if (messageType == "pitchbend")
+    {
+        int pitchBendValue = message[1].getInt32();
+        juce::int64 timestamp = adjustTimestamp(message[2]);
+        
+        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+        
+        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+        {
+            handleIncomingPitchBend(channel, pitchBendValue, pluginId, timestamp);
+            DBG("Received pitch bend for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with value: " + juce::String(pitchBendValue) + " at time " + juce::String(timestamp));
+        }
+    }
+	else if (messageType == "program_change")
+	{
+		int programNumber = message[1].getInt32();
+		juce::int64 timestamp = adjustTimestamp(message[2]);
+		// Extract pluginIds and channels using tags starting from index 3
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+		{
+			handleIncomingProgramChange(channel, programNumber, pluginId, timestamp);
+			DBG("Received program change for plugin: " + pluginId + " on channel: " + juce::String(channel) + " to program: " + juce::String(programNumber));
+		}
+
+	}
 
     else if (messageType == "poly_aftertouch")
     {

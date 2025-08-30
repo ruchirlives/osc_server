@@ -67,11 +67,12 @@ PluginManager::~PluginManager()
 
 void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
+    currentSampleRate = sampleRate;
     for (auto& [pluginId, pluginInstance] : pluginInstances)
     {
         if (pluginInstance != nullptr)
         {
-			pluginInstance->prepareToPlay(sampleRate, samplesPerBlockExpected);
+                        pluginInstance->prepareToPlay(sampleRate, samplesPerBlockExpected);
 
         }
     }
@@ -94,6 +95,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     pos.setPpqPosition(playbackSamplePosition
         * (currentBpm / 60.0)
         / currentSampleRate);
+    pos.setIsPlaying(true);
     
 	//// client side pointer check of hostPlayHead.positionInfo
 	//double bpm = hostPlayHead.positionInfo.getBpm() ? *hostPlayHead.positionInfo.getBpm() : 0.0;
@@ -547,9 +549,10 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
 
 void PluginManager::resetPlayback()
 {
-	playbackSamplePosition = 0;
-	// Also clear the taggedMidiBuffer
-	taggedMidiBuffer.clear();
+        playbackSamplePosition = 0;
+        hostPlayHead.positionInfo.setIsPlaying(false);
+        // Also clear the taggedMidiBuffer
+        taggedMidiBuffer.clear();
 	// And stop any currently playing notes
 	//for (const auto& [pluginId, pluginInstance] : pluginInstances)
 	//{
