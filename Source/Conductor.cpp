@@ -274,8 +274,28 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
 		{
 			handleIncomingControlChange(channel, controllerNumber, controllerValue, pluginId, timestamp);
+			DBG("Received control change for plugin: " + pluginId + " on channel: " + juce::String(channel) +
+				" controller: " + juce::String(controllerNumber) + " value: " + juce::String(controllerValue) + " at time " + juce::String(timestamp));
 		}
 	}
+
+    else if (messageType == "poly_aftertouch")
+    {
+        int note = message[1].getInt32();
+        int value = message[2].getInt32();
+        juce::int64 timestamp = adjustTimestamp(message[3]);
+
+        // Extract pluginIds and channels using tags starting from index 4
+        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
+
+        // Send a message to each pluginId with its respective channel
+        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+        {
+            handleIncomingPolyAftertouch(channel, note, value, pluginId, timestamp);
+            DBG("Received poly aftertouch for plugin: " + pluginId + " on channel: " + juce::String(channel) +
+                " note: " + juce::String(note) + " value: " + juce::String(value) + " at time " + juce::String(timestamp));
+        }
+    }
     else if (messageType == "pitchbend")
     {
         int pitchBendValue = message[1].getInt32();
@@ -507,6 +527,16 @@ void Conductor::handleIncomingControlChange(int channel, int controllerNumber, i
 	juce::MidiMessage midiMessage = juce::MidiMessage::controllerEvent(channel + 1, controllerNumber, controllerValue);
 
 	// Pass the message and tags to PluginManager
+	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
+}
+
+// Add this method to handle polyphonic aftertouch messages
+void Conductor::handleIncomingPolyAftertouch(int channel, int note, int value, const juce::String& pluginId, juce::int64& timestamp)
+{
+	// Create a MIDI Polyphonic Aftertouch message
+	juce::MidiMessage midiMessage = juce::MidiMessage::aftertouchChange(channel + 1, note, (juce::uint8)value);
+
+	// Pass the message to PluginManager
 	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
 }
 

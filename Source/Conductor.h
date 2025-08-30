@@ -85,6 +85,7 @@ private:
     void handleIncomingNote(juce::String messageType, int channel, int note, int velocity, const juce::String& pluginId, juce::int64& timestamp);
     void handleIncomingProgramChange(int channel, int programNumber, const juce::String& pluginId, juce::int64& timestamp);
     void handleIncomingControlChange(int channel, int controllerNumber, int controllerValue, const juce::String& pluginId, juce::int64& timestamp);
+    void handleIncomingPolyAftertouch(int channel, int note, int value, const juce::String& pluginId, juce::int64& timestamp);
     MainComponent* mainComponent;  // Reference to the MainComponent object
 
 
