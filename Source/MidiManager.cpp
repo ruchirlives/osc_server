@@ -14,33 +14,38 @@
 
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
-	// DBG("MIDI Message Received: " + message.getDescription() + " from " + source->getName());
-	// Forward the MIDI message to the buffee is their is a plugin instance
+        // DBG("MIDI Message Received: " + message.getDescription() + " from " + source->getName());
+        // Forward the MIDI message to the buffer if there is a plugin instance
 
-	const juce::ScopedLock sl(midiCriticalSection); // Use the custom CriticalSection for thread safety
+        const juce::ScopedLock sl(midiCriticalSection); // Use the custom CriticalSection for thread safety
 
-	// Always record MIDI events while the plugin is active
-	if (midiInput != nullptr)
-	{
-		//const juce::ScopedLock sl(midiCriticalSection); // Ensure thread safety while accessing recordBuffer
+        // Log polyphonic aftertouch messages for debugging
+        if (message.isAftertouch())
+        {
+                DBG("Aftertouch message - note: " + juce::String(message.getNoteNumber()) +
+                    ", value: " + juce::String(message.getAfterTouchValue()));
+        }
 
-		// Use high-resolution ticks for accurate MIDI event timing
-		juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks()-recordStartTime;
-		DBG("Current Time Ticks: " + juce::String(currentTimeTicks));
+        // Always record MIDI events while the plugin is active
+        if (midiInput != nullptr)
+        {
+                // Use high-resolution ticks for accurate MIDI event timing
+                juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks() - recordStartTime;
+                DBG("Current Time Ticks: " + juce::String(currentTimeTicks));
 
-		// Get the current midi channel from selected row in the table from MainComponent
-		int midiChannel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel(); // Get the selected MIDI channel from the table
+                // Get the current midi channel from selected row in the table from MainComponent
+                int midiChannel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel(); // Get the selected MIDI channel from the table
 
-		DBG("MIDI Channel: " + juce::String(midiChannel));
+                DBG("MIDI Channel: " + juce::String(midiChannel));
 
-		// Create a new MIDI message with the selected MIDI channel
-		juce::MidiMessage messageWithChannel = message;
-		messageWithChannel.setChannel(midiChannel);
-		incomingMidi.addEvent(messageWithChannel, 0);
+                // Create a new MIDI message with the selected MIDI channel
+                juce::MidiMessage messageWithChannel = message;
+                messageWithChannel.setChannel(midiChannel);
+                incomingMidi.addEvent(messageWithChannel, 0);
 
-		// Stamp the MIDI message with high-resolution ticks directly
-		recordBuffer.addEvent(messageWithChannel, currentTimeTicks);
-	}
+                // Stamp the MIDI message with high-resolution ticks directly
+                recordBuffer.addEvent(messageWithChannel, currentTimeTicks);
+        }
 }
 
 void MidiManager::openMidiInput(juce::String midiInputName)
@@ -196,7 +201,7 @@ void MidiManager::processRecordedMidi()
 		}
 	}
 
-	// --- Debug dump of what we’ll save ------------------
+	// --- Debug dump of what well save ------------------
 	for (int i = 0; i < recordedMidi.getNumEvents(); ++i)
 	{
 		auto& e = recordedMidi.getEventPointer(i)->message;

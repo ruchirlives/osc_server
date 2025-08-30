@@ -258,8 +258,8 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		}
 		
 	}
-	else if (messageType == "controller")
-	{
+    else if (messageType == "controller")
+    {
 		// Handle control_change messages
 		// Extract the control change parameters
 
@@ -289,8 +289,22 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
             DBG("Received pitch bend for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with value: " + juce::String(pitchBendValue) + " at time " + juce::String(timestamp));
         }
     }
-	else if (messageType == "program_change")
-	{
+    else if (messageType == "aftertouch")
+    {
+        int note = message[1].getInt32();
+        int aftertouchValue = message[2].getInt32();
+        juce::int64 timestamp = adjustTimestamp(message[3]);
+
+        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
+
+        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+        {
+            handleIncomingAftertouch(channel, note, aftertouchValue, pluginId, timestamp);
+            DBG("Received aftertouch for plugin: " + pluginId + " on channel: " + juce::String(channel) + " note: " + juce::String(note) + " value: " + juce::String(aftertouchValue) + " at time " + juce::String(timestamp));
+        }
+    }
+    else if (messageType == "program_change")
+    {
 		int programNumber = message[1].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[2]);
 		// Extract pluginIds and channels using tags starting from index 3
@@ -515,8 +529,14 @@ void Conductor::handleIncomingPitchBend(int channel, int pitchBendValue, const j
 {
     // Create a MIDI Pitch Bend message
     juce::MidiMessage midiMessage = juce::MidiMessage::pitchWheel(channel + 1, pitchBendValue);
-    
+
     // Pass the message to PluginManager
+    pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
+}
+
+void Conductor::handleIncomingAftertouch(int channel, int noteNumber, int aftertouchValue, const juce::String& pluginId, juce::int64& timestamp)
+{
+    juce::MidiMessage midiMessage = juce::MidiMessage::aftertouchChange(channel + 1, noteNumber, aftertouchValue);
     pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
 }
 // Sync the orchestra list with PluginManager

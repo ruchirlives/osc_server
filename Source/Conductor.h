@@ -62,6 +62,7 @@ public:
     std::vector<InstrumentInfo> orchestra;
 
     void handleIncomingPitchBend(int channel, int pitchBendValue, const juce::String& pluginId, juce::int64& timestamp);
+    void handleIncomingAftertouch(int channel, int noteNumber, int aftertouchValue, const juce::String& pluginId, juce::int64& timestamp);
 
     // Synchronize the orchestra with the PluginManager
     void syncOrchestraWithPluginManager();
