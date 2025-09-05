@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include "VST3Visitor.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <algorithm>
 
 HostPlayHead hostPlayHead;
 bool PluginManager::playStartIssued = false;
@@ -104,78 +105,105 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     bufferToFill.clearActiveBufferRegion();
 
     const juce::ScopedLock sl(midiCriticalSection);
-    double sampleRate = deviceManager.getCurrentAudioDevice()->getCurrentSampleRate();
 
-    // 2) Process each plugin once, in a single loop
-    for (auto& [pluginId, pluginInstance] : pluginInstances)
+    // Guard against missing audio device
+    if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
     {
-        if (!pluginInstance)
-            continue;
+        double sampleRate = audioDevice->getCurrentSampleRate();
 
-        // d) prepare a per-plugin tempBuffer with correct channel count
-        int numOut = pluginInstance->getTotalNumOutputChannels();
-        juce::AudioBuffer<float> tempBuffer(numOut, bufferToFill.numSamples);
-        tempBuffer.clear();
+        // Purge MIDI messages for non-existent plugins
+        taggedMidiBuffer.erase(
+            std::remove_if(taggedMidiBuffer.begin(), taggedMidiBuffer.end(),
+                [this](const MyMidiMessage& m)
+                {
+                    return pluginInstances.find(m.pluginId) == pluginInstances.end();
+                }),
+            taggedMidiBuffer.end());
 
-        // e) gather tagged MIDI for this plugin
-        juce::MidiBuffer matchingMessages;
-        bool isStartingPlayback = (playbackSamplePosition == 0);
-        const int graceWindow = bufferToFill.numSamples; // One buffer's worth
+        // Cap buffer growth
+        const std::size_t maxBufferSize = 1024;
+        if (taggedMidiBuffer.size() > maxBufferSize)
+            taggedMidiBuffer.erase(taggedMidiBuffer.begin(),
+                taggedMidiBuffer.begin() + (taggedMidiBuffer.size() - maxBufferSize));
 
-        for (auto it = taggedMidiBuffer.begin(); it != taggedMidiBuffer.end();)
+        // 2) Process each plugin once, in a single loop
+        for (auto& [pluginId, pluginInstance] : pluginInstances)
         {
-            const auto& tm = *it;
-            if (tm.pluginId == pluginId)
+            if (!pluginInstance)
+                continue;
+
+            // d) prepare a per-plugin tempBuffer with correct channel count
+            int numOut = pluginInstance->getTotalNumOutputChannels();
+            juce::AudioBuffer<float> tempBuffer(numOut, bufferToFill.numSamples);
+            tempBuffer.clear();
+
+            // e) gather tagged MIDI for this plugin
+            juce::MidiBuffer matchingMessages;
+            bool isStartingPlayback = (playbackSamplePosition == 0);
+            const int graceWindow = bufferToFill.numSamples; // One buffer's worth
+
+            for (auto it = taggedMidiBuffer.begin(); it != taggedMidiBuffer.end();)
             {
-                int offset = 0;
-
-                // Immediate message (no timestamp)
-                if (tm.timestamp == 0)
+                const auto& tm = *it;
+                if (tm.pluginId == pluginId)
                 {
-                    matchingMessages.addEvent(tm.message, 0);
-                    it = taggedMidiBuffer.erase(it);
-                    continue;
+                    int offset = 0;
+
+                    // Immediate message (no timestamp)
+                    if (tm.timestamp == 0)
+                    {
+                        matchingMessages.addEvent(tm.message, 0);
+                        it = taggedMidiBuffer.erase(it);
+                        continue;
+                    }
+
+                    // Convert ms to absolute sample position
+                    auto absPos = static_cast<juce::int64>((tm.timestamp / 1000.0) * sampleRate);
+                    offset = static_cast<int>(absPos - playbackSamplePosition);
+
+                    // Handle early notes gracefully if at playback start
+                    if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
+                        || (offset >= 0 && offset < bufferToFill.numSamples))
+                    {
+                        matchingMessages.addEvent(tm.message, juce::jmax(0, offset)); // Clamp offset to 0 if early
+                        it = taggedMidiBuffer.erase(it);
+                        continue;
+                    }
                 }
 
-                // Convert ms to absolute sample position
-                auto absPos = static_cast<juce::int64>((tm.timestamp / 1000.0) * sampleRate);
-                offset = static_cast<int>(absPos - playbackSamplePosition);
-
-                // Handle early notes gracefully if at playback start
-                if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
-                    || (offset >= 0 && offset < bufferToFill.numSamples))
-                {
-                    matchingMessages.addEvent(tm.message, juce::jmax(0, offset)); // Clamp offset to 0 if early
-                    it = taggedMidiBuffer.erase(it);
-                    continue;
-                }
+                ++it; // Keep unscheduled messages
             }
 
-            ++it; // Keep unscheduled messages
+            // merge in live incoming MIDI if this is the selected plugin
+            if (pluginId == mainComponent->getOrchestraTableModel().getSelectedPluginId())
+                matchingMessages.addEvents(incomingMidi,
+                    0,
+                    bufferToFill.numSamples,
+                    bufferToFill.startSample);
+
+
+            // f) run the plugin
+            pluginInstance->processBlock(tempBuffer, matchingMessages);
+
+            // g) mix plugin output back into the host buffer
+            for (int ch = 0; ch < bufferToFill.buffer->getNumChannels(); ++ch)
+            {
+                int outCh = ch < tempBuffer.getNumChannels() ? ch : tempBuffer.getNumChannels() - 1;
+                bufferToFill.buffer->addFrom(ch,
+                    bufferToFill.startSample,
+                    tempBuffer,
+                    outCh,
+                    0,
+                    bufferToFill.numSamples);
+            }
         }
-
-        // merge in live incoming MIDI if this is the selected plugin
-        if (pluginId == mainComponent->getOrchestraTableModel().getSelectedPluginId())
-            matchingMessages.addEvents(incomingMidi,
-                0,
-                bufferToFill.numSamples,
-                bufferToFill.startSample);
-
-
-        // f) run the plugin
-        pluginInstance->processBlock(tempBuffer, matchingMessages);
-
-        // g) mix plugin output back into the host buffer
-        for (int ch = 0; ch < bufferToFill.buffer->getNumChannels(); ++ch)
-        {
-            int outCh = ch < tempBuffer.getNumChannels() ? ch : tempBuffer.getNumChannels() - 1;
-            bufferToFill.buffer->addFrom(ch,
-                bufferToFill.startSample,
-                tempBuffer,
-                outCh,
-                0,
-                bufferToFill.numSamples);
-        }
+    }
+    else
+    {
+        // If the device is missing, clear buffers and skip processing
+        bufferToFill.clearActiveBufferRegion();
+        incomingMidi.clear();
+        return;
     }
 
     // TAP audio for UDP streaming
