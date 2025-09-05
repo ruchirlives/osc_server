@@ -278,32 +278,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 				" controller: " + juce::String(controllerNumber) + " value: " + juce::String(controllerValue) + " at time " + juce::String(timestamp));
 		}
 	}
-    else if (messageType == "pitchbend")
-    {
-        int pitchBendValue = message[1].getInt32();
-        juce::int64 timestamp = adjustTimestamp(message[2]);
-        
-        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
-        
-        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
-        {
-            handleIncomingPitchBend(channel, pitchBendValue, pluginId, timestamp);
-            DBG("Received pitch bend for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with value: " + juce::String(pitchBendValue) + " at time " + juce::String(timestamp));
-        }
-    }
-	else if (messageType == "program_change")
-	{
-		int programNumber = message[1].getInt32();
-		juce::int64 timestamp = adjustTimestamp(message[2]);
-		// Extract pluginIds and channels using tags starting from index 3
-		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
-		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
-		{
-			handleIncomingProgramChange(channel, programNumber, pluginId, timestamp);
-			DBG("Received program change for plugin: " + pluginId + " on channel: " + juce::String(channel) + " to program: " + juce::String(programNumber));
-		}
-
-	}
 	else if (messageType == "channel_aftertouch")
 	{
 		int value = message[1].getInt32();
@@ -1405,11 +1379,11 @@ void EditableTextCustomComponent::actionContextSelection(const juce::String& tex
 				juce::StringArray tagsArray;
 				tagsArray.addTokens(text, ",", "");
 				instrument.tags.clear();
-				for (int i = 0; i < tagsArray.size(); i++)
-				{
-					juce::String stripped = tagsArray[i].trim();
-					instrument.tags.push_back(stripped);
-				}
+                                for (int j = 0; j < tagsArray.size(); j++)
+                                {
+                                        juce::String stripped = tagsArray[j].trim();
+                                        instrument.tags.push_back(stripped);
+                                }
 				break;
 			}
 			default:
