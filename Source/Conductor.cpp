@@ -98,12 +98,12 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 			{
 				oscAddInstrumentCommand(message);
 			}
-			else if (messageType == "get_recorded")
-			{
-				// activate get_recorded method
-				DBG("Received get_recorded command");
-				 midiManager.getRecorded();
-			}
+                        else if (messageType == "get_recorded")
+                        {
+                                // save the accumulated recording
+                                DBG("Received get_recorded command");
+                                midiManager.saveRecording();
+                        }
 			else if (messageType == "save_project")
 			{
 				saveAllData("projectData.dat", "projectPlugins.dat", "projectMeta.xml");
