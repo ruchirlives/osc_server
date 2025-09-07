@@ -24,9 +24,9 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 	{
 		//const juce::ScopedLock sl(midiCriticalSection); // Ensure thread safety while accessing recordBuffer
 
-		// Use high-resolution ticks for accurate MIDI event timing
-		juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks()-recordStartTime;
-		DBG("Current Time Ticks: " + juce::String(currentTimeTicks));
+                // Use high-resolution ticks for accurate MIDI event timing
+                juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks();
+                DBG("Current Time Ticks: " + juce::String(currentTimeTicks - recordStartTime));
 
 		// Get the current midi channel from selected row in the table from MainComponent
 		int midiChannel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel(); // Get the selected MIDI channel from the table
@@ -38,9 +38,9 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 		messageWithChannel.setChannel(midiChannel);
 		incomingMidi.addEvent(messageWithChannel, 0);
 
-		// Stamp the MIDI message with high-resolution ticks directly
-		recordBuffer.addEvent(messageWithChannel, currentTimeTicks);
-	}
+                // Stamp the MIDI message with high-resolution ticks directly
+                recordBuffer.addEvent(messageWithChannel, currentTimeTicks);
+        }
 }
 
 void MidiManager::openMidiInput(juce::String midiInputName)
@@ -85,27 +85,13 @@ void MidiManager::closeMidiInput()
 }
 
 
-
-void MidiManager::getRecorded()
-{
-	// Lock the MIDI critical section
-	const juce::ScopedLock sl(midiCriticalSection);
-
-	processRecordedMidi();
-
-	recordBuffer.clear();
-	recordStartTime = juce::Time::getHighResolutionTicks();
-
-}
-
 void MidiManager::startRecording()
 {
-	// Lock the MIDI critical section
-	const juce::ScopedLock sl(midiCriticalSection);
+        // Lock the MIDI critical section
+        const juce::ScopedLock sl(midiCriticalSection);
 
-	// Clear the record buffer and set the start time
-	recordBuffer.clear();
-	recordStartTime = juce::Time::getHighResolutionTicks();
+        // Mark the start time of this pass without clearing previous data
+        recordStartTime = juce::Time::getHighResolutionTicks();
 }
 
 void MidiManager::sendTestNote()
@@ -131,84 +117,52 @@ void MidiManager::sendTestNote()
 		});
 }
 
-void MidiManager::processRecordedMidi()
+void MidiManager::overdubPass()
 {
-	// Lock the MIDI critical section
-	const juce::ScopedLock sl(midiCriticalSection);
+        const juce::ScopedLock sl(midiCriticalSection);
 
-	// Bail out if nothing was recorded
-	if (recordBuffer.getNumEvents() == 0)
-		return;
+        if (recordBuffer.getNumEvents() == 0)
+                return;
 
-	// This will hold the events we actually want to keep
-	juce::MidiMessageSequence recordedMidi;
+        juce::MidiBuffer::Iterator it(recordBuffer);
+        juce::MidiMessage msg;
+        int samplePosition;
+        juce::MidiMessageSequence passSequence;
 
-	// Timebase conversion setup
-	juce::int64 ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
-	double       ticksPerQuarterNote = 960.0;
-	double       bpm = 120.0;
-	double       tickConversionFactor = (ticksPerQuarterNote * bpm) / (ticksPerSecond * 60.0);
+        juce::int64 ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+        double ticksPerQuarterNote = 960.0;
+        double bpm = mainComponent->getBpm();
+        double tickConversionFactor = (ticksPerQuarterNote * bpm) / (ticksPerSecond * 60.0);
 
-	// Define a 5-second gap in high-res ticks
-	juce::int64 bigGapThreshold = static_cast<juce::int64>(5.0 * ticksPerSecond);
+        while (it.getNextEvent(msg, samplePosition))
+        {
+                juce::int64 ts = msg.getTimeStamp();
+                if (ts >= recordStartTime)
+                {
+                        double timeDiff = (ts - recordStartTime) * tickConversionFactor;
+                        msg.setTimeStamp(timeDiff);
+                        passSequence.addEvent(msg);
+                }
+        }
 
-	// --- First pass: find the start of the *last* note-group -------------
-	juce::int64 lastNoteOnTime = 0;
-	juce::int64 startTime = 0;
-	bool         foundBigGap = false;
+        trackSequence.addSequence(passSequence, 0.0);
+        trackSequence.updateMatchedPairs();
 
-	juce::MidiBuffer::Iterator it(recordBuffer);
-	juce::MidiMessage           msg;
-	int                         samplePosition;
-
-	while (it.getNextEvent(msg, samplePosition))
-	{
-		if (msg.isNoteOn())
-		{
-			juce::int64 ts = msg.getTimeStamp();
-			if (lastNoteOnTime != 0 && (ts - lastNoteOnTime) > bigGapThreshold)
-			{
-				startTime = ts;
-				foundBigGap = true;
-			}
-			lastNoteOnTime = ts;
-		}
-	}
-
-	// If we never saw a big gap between Note-Ons, start from the very beginning
-	if (!foundBigGap)
-		startTime = 0;
-
-	// --- Second pass: copy everything from startTime onward -------------
-	juce::MidiBuffer::Iterator it2(recordBuffer);
-	while (it2.getNextEvent(msg, samplePosition))
-	{
-		juce::int64 ts = msg.getTimeStamp();
-		if (ts >= startTime)
-		{
-			double timeDiff = (ts - startTime) * tickConversionFactor;
-			if (timeDiff < 0.0)
-				timeDiff = 0.0;
-
-			DBG("Metadata Time: " + juce::String(ts));
-			msg.setTimeStamp(timeDiff);
-			recordedMidi.addEvent(msg);
-		}
-	}
-
-	// --- Debug dump of what we’ll save ------------------
-	for (int i = 0; i < recordedMidi.getNumEvents(); ++i)
-	{
-		auto& e = recordedMidi.getEventPointer(i)->message;
-		DBG("Recorded MIDI Event: " + e.getDescription()
-			+ " at time " + juce::String(e.getTimeStamp()));
-	}
-
-	// Finally, write out to your MIDI file
-	saveToMidiFile(recordedMidi);
+        recordStartTime = juce::Time::getHighResolutionTicks();
 }
 
+void MidiManager::saveRecording()
+{
+        const juce::ScopedLock sl(midiCriticalSection);
 
+        if (trackSequence.getNumEvents() == 0)
+                return;
+
+        saveToMidiFile(trackSequence);
+        trackSequence.clear();
+        recordBuffer.clear();
+        recordStartTime = juce::Time::getHighResolutionTicks();
+}
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {

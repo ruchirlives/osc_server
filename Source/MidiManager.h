@@ -24,13 +24,11 @@ public:
 	void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
 	void openMidiInput(juce::String midiInputName);
 	
-	void closeMidiInput();
-	void getRecorded();
-	void startRecording();
-	void sendTestNote();
-
-	// Declaration of the function to process recorded MIDI
-	void processRecordedMidi();
+        void closeMidiInput();
+        void startRecording();
+        void overdubPass();
+        void saveRecording();
+        void sendTestNote();
 
 	// Access to the MIDI buffer
 	juce::MidiBuffer& getMidiBuffer() { return incomingMidi; }
@@ -43,10 +41,11 @@ public:
 
 
 private:
-	// MIDI Input
-	std::unique_ptr<juce::MidiInput> midiInput; // MIDI Input object
-	juce::MidiBuffer recordBuffer; // MIDI Buffer to store recorded MIDI messages
-	juce::int64 recordStartTime; // Start time for recording MIDI messages
+        // MIDI Input
+        std::unique_ptr<juce::MidiInput> midiInput; // MIDI Input object
+        juce::MidiBuffer recordBuffer; // MIDI Buffer to store recorded MIDI messages
+        juce::MidiMessageSequence trackSequence; // Accumulated MIDI takes
+        juce::int64 recordStartTime; // Start time for recording MIDI messages
 
 	juce::CriticalSection& midiCriticalSection; // Critical section to protect the MIDI buffer
 	juce::MidiBuffer& incomingMidi; // MIDI Buffer to store incoming MIDI messages

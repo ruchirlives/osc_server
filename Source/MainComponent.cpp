@@ -44,9 +44,9 @@ MainComponent::MainComponent()
 	addAndMakeVisible(updateButton);
 	updateButton.onClick = [this]() { conductor.syncOrchestraWithPluginManager(); }; // Use lambda for button click handling
 
-	// Initialize the "Get Recorded" button
-	addAndMakeVisible(getRecordedButton);
-	getRecordedButton.onClick = [this]() { midiManager.getRecorded(); }; // Use lambda for button click handling
+        // Initialize the "Overdub" button
+        addAndMakeVisible(overdubButton);
+        overdubButton.onClick = [this]() { midiManager.overdubPass(); }; // Use lambda for button click handling
 
 	// Initialize the "List Plugin Instances" button
 	addAndMakeVisible(listPluginInstancesButton);
@@ -79,9 +79,12 @@ MainComponent::MainComponent()
 	addAndMakeVisible(restoreButton);
 	restoreButton.onClick = [this]() { restoreProject(); }; // Use lambda for button click handling
 
-	// Add recording buttons
-	addAndMakeVisible(startRecordingButton);
-	startRecordingButton.onClick = [this]() { midiManager.startRecording(); }; // Use lambda for button click handling
+        // Add recording buttons
+        addAndMakeVisible(startRecordingButton);
+        startRecordingButton.onClick = [this]() { midiManager.startRecording(); }; // Use lambda for button click handling
+
+        addAndMakeVisible(saveRecordingButton);
+        saveRecordingButton.onClick = [this]() { midiManager.saveRecording(); }; // Use lambda for button click handling
 
 	// Add Project name label
 	addAndMakeVisible(projectNameLabel);
@@ -134,8 +137,8 @@ void MainComponent::resized()
 	int row1Y = windowHeight - margin - buttonHeight;
 	ScanButton.setBounds(margin, row1Y, buttonWidth, buttonHeight);
 	updateButton.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	getRecordedButton.setBounds(updateButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	sendTestNoteButton.setBounds(getRecordedButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+        overdubButton.setBounds(updateButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+        sendTestNoteButton.setBounds(overdubButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 	addInstrumentButton.setBounds(sendTestNoteButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 
 	// Row 2
@@ -150,9 +153,10 @@ void MainComponent::resized()
 	int row3Y = row2Y - buttonHeight - spacingY;
 	saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
 	restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	addNewInstrumentButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+        startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+        saveRecordingButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+        addNewInstrumentButton.setBounds(saveRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+        moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 
 	// --- BPM Sync handler ---
 	bpmEditor.onTextChange = [this]() {
