@@ -28,6 +28,8 @@ public:
     // Destructor
     ~Conductor() override;
 
+    void shutdown();
+
     // Initialize OSC Sender with a specific host and port
     void initializeOSCSender(const juce::String& host, int port);
     void sendOSCMessage(const std::vector<juce::String>& tags);

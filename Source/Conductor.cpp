@@ -25,6 +25,14 @@ Conductor::~Conductor()
 	OSCReceiver::disconnect();
 }
 
+void Conductor::shutdown()
+{
+	removeListener(this);
+	OSCReceiver::disconnect(); // stop OSC listening thread
+	OSCSender::disconnect();   // close socket
+}
+
+
 // Initialise OSC Sender with a specific host and port
 void Conductor::initializeOSCSender(const juce::String& host, int port)
 {

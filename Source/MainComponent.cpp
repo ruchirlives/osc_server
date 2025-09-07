@@ -192,11 +192,9 @@ void MainComponent::handleAudioPortChange()
 
 MainComponent::~MainComponent()
 {
-	// Ensure all resources are cleaned up
 	pluginManager.releaseResources();
 	midiManager.closeMidiInput();
-
-	// Add any additional cleanup logic here
+	conductor.shutdown(); // <--- important for clean exit
 	juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
 
