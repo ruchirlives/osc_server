@@ -85,7 +85,7 @@ void MidiManager::closeMidiInput()
 }
 
 
-void MidiManager::startRecording()
+void MidiManager::newRecording()
 {
         // Lock the MIDI critical section
         const juce::ScopedLock sl(midiCriticalSection);
@@ -129,6 +129,8 @@ void MidiManager::overdubPass()
         int samplePosition;
         juce::MidiMessageSequence passSequence;
 
+        juce::int64 passStart = recordStartTime;
+
         juce::int64 ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
         double ticksPerQuarterNote = 960.0;
         double bpm = mainComponent->getBpm();
@@ -148,6 +150,44 @@ void MidiManager::overdubPass()
         trackSequence.addSequence(passSequence, 0.0);
         trackSequence.updateMatchedPairs();
 
+        overdubPasses.push_back({ passSequence, passStart });
+
+        recordStartTime = juce::Time::getHighResolutionTicks();
+}
+
+void MidiManager::undoLastOverdub()
+{
+        const juce::ScopedLock sl(midiCriticalSection);
+
+        if (overdubPasses.empty())
+                return;
+
+        auto lastPass = overdubPasses.back();
+        overdubPasses.pop_back();
+
+        trackSequence.clear();
+        for (const auto& pass : overdubPasses)
+                trackSequence.addSequence(pass.sequence, 0.0);
+        trackSequence.updateMatchedPairs();
+
+        juce::MidiBuffer newBuffer;
+        juce::MidiBuffer::Iterator it(recordBuffer);
+        juce::MidiMessage msg;
+        int samplePosition;
+        while (it.getNextEvent(msg, samplePosition))
+        {
+                if ((juce::int64)samplePosition < lastPass.startTime)
+                        newBuffer.addEvent(msg, samplePosition);
+        }
+        recordBuffer.swapWith(newBuffer);
+
+        recordStartTime = lastPass.startTime;
+}
+
+void MidiManager::replay()
+{
+        undoLastOverdub();
+        const juce::ScopedLock sl(midiCriticalSection);
         recordStartTime = juce::Time::getHighResolutionTicks();
 }
 

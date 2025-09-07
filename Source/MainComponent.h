@@ -189,7 +189,9 @@ private:
 	juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
 
         juce::TextButton overdubButton{ "Overdub" }; // Button to commit the last pass
-        juce::TextButton startRecordingButton{ "Start Recording" }; // Button to zero the recording offset
+        juce::TextButton undoOverdubButton{ "Undo Overdub" }; // Button to undo the last pass
+        juce::TextButton replayButton{ "Replay" }; // Button to replay without the last pass
+        juce::TextButton newRecordingButton{ "New Recording" }; // Button to zero the recording offset
         juce::TextButton saveRecordingButton{ "Save Recording" }; // Button to save all recorded MIDI
 
 	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
