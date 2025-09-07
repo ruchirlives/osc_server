@@ -223,6 +223,22 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
         juce::MidiFile midiFile;
         midiFile.setTicksPerQuarterNote(960);
 
+        // Helper to add a MIDI meta text event (track/instrument name)
+        auto addMetaTextEvent = [](juce::MidiMessageSequence& seq, double time, juce::uint8 metaType, const juce::String& text)
+            {
+                juce::MemoryBlock data;
+                data.append(&metaType, 1); // meta event type (0x03 or 0x04)
+                auto utf8 = text.toRawUTF8();
+                juce::uint8 len = (juce::uint8)text.getNumBytesAsUTF8();
+                data.append(&len, 1);      // length of text
+                data.append(utf8, len);    // text bytes
+
+                // The raw MIDI meta event: 0xFF <metaType> <len> <data>
+                juce::MidiMessage m((const void*)data.getData(), (int)data.getSize(), 0.0);
+                seq.addEvent(m, time);
+            };
+
+
         // Map MIDI channels to their corresponding tag strings
         std::map<int, juce::String> channelTags;
         for (const auto& instrument : mainComponent->getConductor().orchestra)
@@ -247,8 +263,9 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
                 juce::String name = entry.first;
                 auto& seq = entry.second;
 
-                seq.addEvent(juce::MidiMessage::createTrackNameEvent(name), 0.0);
-                seq.addEvent(juce::MidiMessage::createInstrumentNameEvent(name), 0.0);
+                addMetaTextEvent(seq, 0.0, 0x03, name); // Track name
+                addMetaTextEvent(seq, 0.0, 0x04, name); // Instrument name
+
                 seq.sort();
                 seq.updateMatchedPairs();
                 midiFile.addTrack(seq);
