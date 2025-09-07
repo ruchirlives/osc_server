@@ -41,8 +41,8 @@ public:
 	// Lock access for thread safety
 	juce::CriticalSection& getCriticalSection() { return midiCriticalSection; }
 
-	// Save to MIDI file
-	void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
+        // Save to a MIDI file, grouping events by instrument tags into separate tracks
+        void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
 
 
 private:

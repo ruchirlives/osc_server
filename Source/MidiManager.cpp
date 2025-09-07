@@ -11,6 +11,7 @@
 #include "MidiManager.h"
 #include "MainComponent.h"
 #include "PluginManager.h"
+#include <map>
 
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
@@ -219,29 +220,51 @@ void MidiManager::saveRecording()
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-	juce::MidiFile midiFile;  // Create a MidiFile object
-	midiFile.setTicksPerQuarterNote(960);  // Set the ticks per quarter note (can adjust based on your needs)
+        juce::MidiFile midiFile;
+        midiFile.setTicksPerQuarterNote(960);
 
-	// Add the recorded MIDI events to the MidiFile object
-	midiFile.addTrack(recordedMIDI);
+        // Map MIDI channels to tag strings
+        std::map<int, juce::String> channelTags;
+        for (const auto& instrument : mainComponent->getConductor().orchestra)
+        {
+                juce::String tagsString = OrchestraTableModel::convertVectorToString(instrument.tags);
+                channelTags[instrument.midiChannel] = tagsString;
+        }
 
-	// Create a file to save the MIDI data
-	juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
+        // Split events into tracks per channel
+        std::map<int, juce::MidiMessageSequence> channelSequences;
+        for (int i = 0; i < recordedMIDI.getNumEvents(); ++i)
+        {
+                const auto& msg = recordedMIDI.getEventPointer(i)->message;
+                channelSequences[msg.getChannel()].addEvent(msg);
+        }
 
-	// If you want to ensure the file is fresh, delete it if it exists before proceeding
-	if (midiFileToSave.existsAsFile())
-	{
-		midiFileToSave.deleteFile();  // Delete the existing file
-	}
+        for (auto& entry : channelSequences)
+        {
+                int channel = entry.first;
+                auto& seq = entry.second;
 
-	juce::FileOutputStream stream(midiFileToSave);
+                juce::String name = channelTags.count(channel) ? channelTags[channel]
+                        : juce::String("Channel ") + juce::String(channel);
 
-	// Save the MIDI data to the file
-	midiFile.writeTo(stream);
+                seq.addEvent(juce::MidiMessage::createTrackNameEvent(name), 0.0);
+                seq.addEvent(juce::MidiMessage::createInstrumentNameEvent(name), 0.0);
+                seq.sort();
+                seq.updateMatchedPairs();
+                midiFile.addTrack(seq);
+        }
 
-	stream.flush();
+        juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
 
-	DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
+        if (midiFileToSave.existsAsFile())
+        {
+                midiFileToSave.deleteFile();
+        }
 
+        juce::FileOutputStream stream(midiFileToSave);
+        midiFile.writeTo(stream);
+        stream.flush();
+
+        DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
 }
 
