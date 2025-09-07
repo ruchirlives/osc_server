@@ -205,28 +205,35 @@ void MainComponent::moveSelectedRowsToEnd()
 {
 	// Collect the selected rows
 	auto selectedRows = orchestraTable.getSelectedRows();
-	std::vector<InstrumentInfo> instrumentsToMove; // Replace InstrumentType with the actual type of your instruments
+	std::vector<InstrumentInfo> instrumentsToMove;
 
-	// Collect the instruments to move in the order of selected rows
+	// Convert SparseSet to vector and sort in descending order
+	std::vector<int> sortedRows;
 	for (int i = 0; i < selectedRows.size(); ++i)
 	{
-		int row = selectedRows[i];
-		instrumentsToMove.push_back(conductor.orchestra[row]);
+		sortedRows.push_back(selectedRows[i]);
+	}
+	std::sort(sortedRows.rbegin(), sortedRows.rend()); // Sort in descending order
+
+	// Collect the instruments to move (in reverse order to maintain original selection order)
+	for (int row : sortedRows)
+	{
+		instrumentsToMove.insert(instrumentsToMove.begin(), conductor.orchestra[row]);
 	}
 
-	// Remove the instruments from the orchestra in reverse order to avoid shifting
-	for (int i = selectedRows.size() - 1; i >= 0; --i)
+	// Remove the instruments from the orchestra in descending order
+	for (int row : sortedRows)
 	{
-		int row = selectedRows[i];
 		conductor.orchestra.erase(conductor.orchestra.begin() + row);
 	}
 
-	// Append the collected instruments to the end of the orchestra in the original selection order
+	// Append the collected instruments to the end of the orchestra
 	conductor.orchestra.insert(conductor.orchestra.end(), instrumentsToMove.begin(), instrumentsToMove.end());
 
 	// Update the orchestra table
 	orchestraTable.updateContent();
 }
+
 
 
 
@@ -619,10 +626,10 @@ void MainComponent::initMidiInputs()
 		id++;
 	}
 
-	// Set the first item as the default
-	if (midiInputs.size() > 0)
+	// Set the second item as the default
+	if (midiInputs.size() > 1)
 	{
-		midiInputList.setSelectedId(1);
+		midiInputList.setSelectedId(2);
 		// get the name of the first MIDI input
 		juce::String midiInputName = midiInputs[0].name;
 		midiManager.openMidiInput(midiInputName);
