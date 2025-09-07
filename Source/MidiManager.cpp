@@ -223,7 +223,7 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
         juce::MidiFile midiFile;
         midiFile.setTicksPerQuarterNote(960);
 
-        // Map MIDI channels to tag strings
+        // Map MIDI channels to their corresponding tag strings
         std::map<int, juce::String> channelTags;
         for (const auto& instrument : mainComponent->getConductor().orchestra)
         {
@@ -231,21 +231,21 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
                 channelTags[instrument.midiChannel] = tagsString;
         }
 
-        // Split events into tracks per channel
-        std::map<int, juce::MidiMessageSequence> channelSequences;
+        // Group events into tracks based on tag strings, ignoring channels
+        std::map<juce::String, juce::MidiMessageSequence> tagSequences;
         for (int i = 0; i < recordedMIDI.getNumEvents(); ++i)
         {
                 const auto& msg = recordedMIDI.getEventPointer(i)->message;
-                channelSequences[msg.getChannel()].addEvent(msg);
+                juce::String tag = channelTags.count(msg.getChannel())
+                        ? channelTags[msg.getChannel()]
+                        : juce::String("Channel ") + juce::String(msg.getChannel());
+                tagSequences[tag].addEvent(msg);
         }
 
-        for (auto& entry : channelSequences)
+        for (auto& entry : tagSequences)
         {
-                int channel = entry.first;
+                juce::String name = entry.first;
                 auto& seq = entry.second;
-
-                juce::String name = channelTags.count(channel) ? channelTags[channel]
-                        : juce::String("Channel ") + juce::String(channel);
 
                 seq.addEvent(juce::MidiMessage::createTrackNameEvent(name), 0.0);
                 seq.addEvent(juce::MidiMessage::createInstrumentNameEvent(name), 0.0);
