@@ -90,7 +90,15 @@ void MidiManager::newRecording()
         // Lock the MIDI critical section
         const juce::ScopedLock sl(midiCriticalSection);
 
-        // Mark the start time of this pass without clearing previous data
+        // Clear existing recording data
+        recordBuffer.clear();
+        trackSequence.clear();
+        overdubPasses.clear();
+
+        // Reset playback so the buffer starts from the beginning
+        mainComponent->getPluginManager().resetPlayback();
+
+        // Zero the recording offset
         recordStartTime = juce::Time::getHighResolutionTicks();
 }
 
@@ -188,6 +196,11 @@ void MidiManager::replay()
 {
         undoLastOverdub();
         const juce::ScopedLock sl(midiCriticalSection);
+
+        // Restart playback from the beginning of the current buffer
+        mainComponent->getPluginManager().resetPlayback();
+
+        // Reset timing for the next overdub pass
         recordStartTime = juce::Time::getHighResolutionTicks();
 }
 

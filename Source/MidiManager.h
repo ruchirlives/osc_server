@@ -26,9 +26,11 @@ public:
 	void openMidiInput(juce::String midiInputName);
 	
         void closeMidiInput();
+        // Clear all recorded data and reset the recording offset
         void newRecording();
         void overdubPass();
         void undoLastOverdub();
+        // Remove the last overdub and restart playback from the beginning
         void replay();
         void saveRecording();
         void sendTestNote();
