@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <vector>
 
 class MainComponent; // Forward declaration
 
@@ -25,8 +26,12 @@ public:
 	void openMidiInput(juce::String midiInputName);
 	
         void closeMidiInput();
-        void startRecording();
+        // Clear all recorded data and reset the recording offset
+        void newRecording();
         void overdubPass();
+        void undoLastOverdub();
+        // Remove the last overdub and restart playback from the beginning
+        void replay();
         void saveRecording();
         void sendTestNote();
 
@@ -36,8 +41,8 @@ public:
 	// Lock access for thread safety
 	juce::CriticalSection& getCriticalSection() { return midiCriticalSection; }
 
-	// Save to MIDI file
-	void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
+        // Save to a MIDI file, grouping events by instrument tags into separate tracks
+        void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
 
 
 private:
@@ -46,6 +51,8 @@ private:
         juce::MidiBuffer recordBuffer; // MIDI Buffer to store recorded MIDI messages
         juce::MidiMessageSequence trackSequence; // Accumulated MIDI takes
         juce::int64 recordStartTime; // Start time for recording MIDI messages
+        struct OverdubPass { juce::MidiMessageSequence sequence; juce::int64 startTime; };
+        std::vector<OverdubPass> overdubPasses; // History of overdubs
 
 	juce::CriticalSection& midiCriticalSection; // Critical section to protect the MIDI buffer
 	juce::MidiBuffer& incomingMidi; // MIDI Buffer to store incoming MIDI messages

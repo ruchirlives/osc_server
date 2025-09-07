@@ -11,6 +11,7 @@
 #include "MidiManager.h"
 #include "MainComponent.h"
 #include "PluginManager.h"
+#include <map>
 
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
@@ -85,12 +86,20 @@ void MidiManager::closeMidiInput()
 }
 
 
-void MidiManager::startRecording()
+void MidiManager::newRecording()
 {
         // Lock the MIDI critical section
         const juce::ScopedLock sl(midiCriticalSection);
 
-        // Mark the start time of this pass without clearing previous data
+        // Clear existing recording data
+        recordBuffer.clear();
+        trackSequence.clear();
+        overdubPasses.clear();
+
+        // Reset playback so the buffer starts from the beginning
+        mainComponent->getPluginManager().resetPlayback();
+
+        // Zero the recording offset
         recordStartTime = juce::Time::getHighResolutionTicks();
 }
 
@@ -129,6 +138,8 @@ void MidiManager::overdubPass()
         int samplePosition;
         juce::MidiMessageSequence passSequence;
 
+        juce::int64 passStart = recordStartTime;
+
         juce::int64 ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
         double ticksPerQuarterNote = 960.0;
         double bpm = mainComponent->getBpm();
@@ -148,6 +159,49 @@ void MidiManager::overdubPass()
         trackSequence.addSequence(passSequence, 0.0);
         trackSequence.updateMatchedPairs();
 
+        overdubPasses.push_back({ passSequence, passStart });
+
+        recordStartTime = juce::Time::getHighResolutionTicks();
+}
+
+void MidiManager::undoLastOverdub()
+{
+        const juce::ScopedLock sl(midiCriticalSection);
+
+        if (overdubPasses.empty())
+                return;
+
+        auto lastPass = overdubPasses.back();
+        overdubPasses.pop_back();
+
+        trackSequence.clear();
+        for (const auto& pass : overdubPasses)
+                trackSequence.addSequence(pass.sequence, 0.0);
+        trackSequence.updateMatchedPairs();
+
+        juce::MidiBuffer newBuffer;
+        juce::MidiBuffer::Iterator it(recordBuffer);
+        juce::MidiMessage msg;
+        int samplePosition;
+        while (it.getNextEvent(msg, samplePosition))
+        {
+                if ((juce::int64)samplePosition < lastPass.startTime)
+                        newBuffer.addEvent(msg, samplePosition);
+        }
+        recordBuffer.swapWith(newBuffer);
+
+        recordStartTime = lastPass.startTime;
+}
+
+void MidiManager::replay()
+{
+        undoLastOverdub();
+        const juce::ScopedLock sl(midiCriticalSection);
+
+        // Restart playback from the beginning of the current buffer
+        mainComponent->getPluginManager().resetPlayback();
+
+        // Reset timing for the next overdub pass
         recordStartTime = juce::Time::getHighResolutionTicks();
 }
 
@@ -166,29 +220,51 @@ void MidiManager::saveRecording()
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-	juce::MidiFile midiFile;  // Create a MidiFile object
-	midiFile.setTicksPerQuarterNote(960);  // Set the ticks per quarter note (can adjust based on your needs)
+        juce::MidiFile midiFile;
+        midiFile.setTicksPerQuarterNote(960);
 
-	// Add the recorded MIDI events to the MidiFile object
-	midiFile.addTrack(recordedMIDI);
+        // Map MIDI channels to their corresponding tag strings
+        std::map<int, juce::String> channelTags;
+        for (const auto& instrument : mainComponent->getConductor().orchestra)
+        {
+                juce::String tagsString = OrchestraTableModel::convertVectorToString(instrument.tags);
+                channelTags[instrument.midiChannel] = tagsString;
+        }
 
-	// Create a file to save the MIDI data
-	juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
+        // Group events into tracks based on tag strings, ignoring channels
+        std::map<juce::String, juce::MidiMessageSequence> tagSequences;
+        for (int i = 0; i < recordedMIDI.getNumEvents(); ++i)
+        {
+                const auto& msg = recordedMIDI.getEventPointer(i)->message;
+                juce::String tag = channelTags.count(msg.getChannel())
+                        ? channelTags[msg.getChannel()]
+                        : juce::String("Channel ") + juce::String(msg.getChannel());
+                tagSequences[tag].addEvent(msg);
+        }
 
-	// If you want to ensure the file is fresh, delete it if it exists before proceeding
-	if (midiFileToSave.existsAsFile())
-	{
-		midiFileToSave.deleteFile();  // Delete the existing file
-	}
+        for (auto& entry : tagSequences)
+        {
+                juce::String name = entry.first;
+                auto& seq = entry.second;
 
-	juce::FileOutputStream stream(midiFileToSave);
+                seq.addEvent(juce::MidiMessage::createTrackNameEvent(name), 0.0);
+                seq.addEvent(juce::MidiMessage::createInstrumentNameEvent(name), 0.0);
+                seq.sort();
+                seq.updateMatchedPairs();
+                midiFile.addTrack(seq);
+        }
 
-	// Save the MIDI data to the file
-	midiFile.writeTo(stream);
+        juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
 
-	stream.flush();
+        if (midiFileToSave.existsAsFile())
+        {
+                midiFileToSave.deleteFile();
+        }
 
-	DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
+        juce::FileOutputStream stream(midiFileToSave);
+        midiFile.writeTo(stream);
+        stream.flush();
 
+        DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
 }
 
