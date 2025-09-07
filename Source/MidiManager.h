@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <vector>
 
 class MainComponent; // Forward declaration
 
@@ -25,8 +26,10 @@ public:
 	void openMidiInput(juce::String midiInputName);
 	
         void closeMidiInput();
-        void startRecording();
+        void newRecording();
         void overdubPass();
+        void undoLastOverdub();
+        void replay();
         void saveRecording();
         void sendTestNote();
 
@@ -46,6 +49,8 @@ private:
         juce::MidiBuffer recordBuffer; // MIDI Buffer to store recorded MIDI messages
         juce::MidiMessageSequence trackSequence; // Accumulated MIDI takes
         juce::int64 recordStartTime; // Start time for recording MIDI messages
+        struct OverdubPass { juce::MidiMessageSequence sequence; juce::int64 startTime; };
+        std::vector<OverdubPass> overdubPasses; // History of overdubs
 
 	juce::CriticalSection& midiCriticalSection; // Critical section to protect the MIDI buffer
 	juce::MidiBuffer& incomingMidi; // MIDI Buffer to store incoming MIDI messages

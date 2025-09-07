@@ -801,8 +801,8 @@ void OrchestraTableModel::selectRow(int row, const juce::ModifierKeys& modifiers
 	// This will allow row selection to be triggered.
 	table.selectRowsBasedOnModifierKeys(row, modifiers, true);
 
-	sendTags(row);
-	mainComponent->midiManager.startRecording();
+        sendTags(row);
+        mainComponent->midiManager.newRecording();
 
 	// Copy first tag in Tags to clipboard
 	//juce::SystemClipboard::copyTextToClipboard(orchestraData[row].tags.empty() ? "" : orchestraData[row].tags[0]);
