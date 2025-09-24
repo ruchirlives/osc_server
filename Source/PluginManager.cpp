@@ -216,8 +216,6 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     playbackSamplePosition += bufferToFill.numSamples;
 }
 
-
-
 void PluginManager::releaseResources()
 {
     for (auto& [pluginId, pluginInstance] : pluginInstances)

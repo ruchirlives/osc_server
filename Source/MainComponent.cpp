@@ -90,6 +90,13 @@ MainComponent::MainComponent()
 	addAndMakeVisible(moveToEndButton);
 	moveToEndButton.onClick = [this]() { moveSelectedRowsToEnd(); }; // Use lambda for button click handling
 
+    // Initialize the "Start Overdub" button
+    addAndMakeVisible(startOverdubButton);
+    startOverdubButton.onClick = [this]() { midiManager.startOverdub(); updateOverdubUI(); };
+
+    // Initialize the "Stop Overdub" button
+    addAndMakeVisible(stopOverdubButton);
+    stopOverdubButton.onClick = [this]() { midiManager.stopOverdub(); updateOverdubUI(); };
 }
 
 void MainComponent::resized()
@@ -146,13 +153,15 @@ void MainComponent::resized()
 	openPluginButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 	removeInstrumentButton.setBounds(openPluginButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 
-	// Row 3 (top row of buttons)
-	int row3Y = row2Y - buttonHeight - spacingY;
-	saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
-	restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	addNewInstrumentButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+    // Row 3 (top row of buttons)
+    int row3Y = row2Y - buttonHeight - spacingY;
+    saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
+    restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+    startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+    startOverdubButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+    stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+    addNewInstrumentButton.setBounds(stopOverdubButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+    moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 
 	// --- BPM Sync handler ---
 	bpmEditor.onTextChange = [this]() {
@@ -169,6 +178,19 @@ void MainComponent::resized()
 		};
 }
 
+void MainComponent::updateOverdubUI()
+{
+    if (midiManager.isOverdubbing)
+    {
+        startOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::orange);
+        stopOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::red);
+    }
+    else
+    {
+        startOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
+        stopOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
+    }
+}
 void MainComponent::handleAudioPortChange()
 {
 	juce::String portText = audioStreamingPortEditor.getText();

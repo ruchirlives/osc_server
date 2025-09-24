@@ -13,6 +13,21 @@
 #include <JuceHeader.h>
 
 class MainComponent; // Forward declaration
+class MidiManager;
+
+
+class PlaybackThread : public juce::Thread
+{
+public:
+    PlaybackThread(MidiManager& manager)
+        : juce::Thread("MidiPlaybackThread"), midiManager(manager) {}
+
+    void run() override;
+	std::unique_ptr<PlaybackThread> playbackThread;
+
+private:
+    MidiManager& midiManager;
+};
 
 class MidiManager : public juce::MidiInputCallback
 {
@@ -25,12 +40,15 @@ public:
 	void openMidiInput(juce::String midiInputName);
 	
 	void closeMidiInput();
+	void startOverdub();
+	void stopOverdub();
 	void getRecorded();
 	void startRecording();
 	void sendTestNote();
 
 	// Declaration of the function to process recorded MIDI
 	void processRecordedMidi();
+	bool isOverdubbing = false;
 
 	// Access to the MIDI buffer
 	juce::MidiBuffer& getMidiBuffer() { return incomingMidi; }
@@ -40,6 +58,13 @@ public:
 
 	// Save to MIDI file
 	void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
+
+	std::unique_ptr<juce::Thread> playbackThread;
+	std::atomic<bool> playbackThreadShouldRun{ false };
+
+	void startPlaybackThread();
+	void stopPlaybackThread();
+	void playbackThreadFunc();
 
 
 private:

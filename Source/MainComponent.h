@@ -142,6 +142,8 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+	void updateOverdubUI();
+
 	void handleAudioPortChange();
 
 	// Add a TextEditor for BPM input
@@ -223,6 +225,9 @@ private:
 	juce::Label audioStreamingPortLabel{ "Audio Streaming Port", "Audio Streaming Port" }; // Label for the audio streaming port
 	juce::TextEditor audioStreamingPortEditor; // Text editor for the audio streaming port
 
+	// Buttons for overdub control
+    juce::TextButton startOverdubButton { "Start Overdub" };
+    juce::TextButton stopOverdubButton { "Stop Overdub" };
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class

@@ -12,6 +12,12 @@
 #include "MainComponent.h"
 #include "PluginManager.h"
 
+
+void PlaybackThread::run()
+{
+    midiManager.playbackThreadFunc();
+}
+
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
 	// DBG("MIDI Message Received: " + message.getDescription() + " from " + source->getName());
@@ -85,6 +91,77 @@ void MidiManager::closeMidiInput()
 }
 
 
+void MidiManager::startOverdub()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    isOverdubbing = true;
+    // Do NOT clear recordBuffer!
+    recordStartTime = juce::Time::getHighResolutionTicks();
+
+    // Schedule playback of existing recorded events
+	startPlaybackThread();
+}
+
+
+// Then call this from MidiManager::stopOverdub():
+void MidiManager::stopOverdub()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    isOverdubbing = false;
+    juce::String pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+	stopPlaybackThread();
+}
+
+void MidiManager::startPlaybackThread()
+{
+	stopPlaybackThread(); // Ensure any previous thread is stopped
+
+	playbackThreadShouldRun = true;
+	playbackThread = std::make_unique<PlaybackThread>(*this);
+	playbackThread->startThread();
+}
+
+void MidiManager::stopPlaybackThread()
+{
+	playbackThreadShouldRun = false;
+	if (playbackThread)
+	{
+		playbackThread->stopThread(1000);
+		playbackThread.reset();
+	}
+}
+
+void MidiManager::playbackThreadFunc()
+{
+	juce::MidiBuffer::Iterator it(recordBuffer);
+	juce::MidiMessage msg;
+	int samplePosition;
+
+	juce::int64 previousTicks = 0;
+	bool firstEvent = true;
+
+	juce::String pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+	while (playbackThreadShouldRun)
+	{
+		{
+			// Only lock while getting the next event
+			const juce::ScopedLock sl(midiCriticalSection);
+			if (!it.getNextEvent(msg, samplePosition))
+				break;
+		}
+
+		juce::int64 eventTicks = msg.getTimeStamp();
+
+		juce::int64 waitTicks = eventTicks - previousTicks;
+		if (waitTicks > 0)
+		{
+			double waitMs = (double)waitTicks * 1000.0 / (double)juce::Time::getHighResolutionTicksPerSecond();
+			juce::Thread::sleep((int)waitMs);
+		}
+		previousTicks = eventTicks;
+		incomingMidi.addEvent(msg, 0);
+	}
+}
 
 void MidiManager::getRecorded()
 {
