@@ -93,6 +93,9 @@ void MidiManager::startOverdub()
     // Do NOT clear recordBuffer!
     recordStartTime = juce::Time::getHighResolutionTicks();
 
+	// reset playback position
+	mainComponent->getPluginManager().resetPlayback();
+
     // Schedule playback of existing recorded events using addMidiMessage
 	juce::MidiBuffer::Iterator it(recordBuffer);
 	juce::MidiMessage           msg;
