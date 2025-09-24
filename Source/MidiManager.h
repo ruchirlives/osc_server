@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <vector>
 
 class MainComponent; // Forward declaration
 
@@ -27,9 +28,14 @@ public:
 	void closeMidiInput();
 	void startOverdub();
 	void stopOverdub();
+	void stripLeadingSilence();
+	void undoLastOverdub();
 	void getRecorded();
 	void startRecording();
 	void sendTestNote();
+
+	bool canUndoOverdub() const;
+	bool hasRecordedEvents() const;
 
 	// Declaration of the function to process recorded MIDI
 	void processRecordedMidi();
@@ -59,6 +65,11 @@ private:
 	juce::MidiBuffer& incomingMidi; // MIDI Buffer to store incoming MIDI messages
 
 	MainComponent* mainComponent; // Pointer to the MainComponent
+
+	std::vector<juce::MidiBuffer> overdubHistory;
+
+	static juce::int64 getTimestampFromEvent(const juce::MidiMessage& message, int samplePosition);
+	void republishRecordedEvents(const juce::MidiBuffer& bufferCopy);
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiManager)
 };

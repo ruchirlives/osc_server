@@ -12,6 +12,8 @@
 #include "MainComponent.h"
 #include "PluginManager.h"
 
+#include <limits>
+
 
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
@@ -37,10 +39,11 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 		// Create a new MIDI message with the selected MIDI channel
 		juce::MidiMessage messageWithChannel = message;
 		messageWithChannel.setChannel(midiChannel);
+		messageWithChannel.setTimeStamp(static_cast<double>(currentTimeTicks));
 		incomingMidi.addEvent(messageWithChannel, 0);
 
 		// Stamp the MIDI message with high-resolution ticks directly
-		recordBuffer.addEvent(messageWithChannel, currentTimeTicks);
+		recordBuffer.addEvent(messageWithChannel, static_cast<int>(currentTimeTicks));
 	}
 }
 
@@ -88,32 +91,18 @@ void MidiManager::closeMidiInput()
 
 void MidiManager::startOverdub()
 {
-    //const juce::ScopedLock sl(midiCriticalSection);
-    isOverdubbing = true;
-    // Do NOT clear recordBuffer!
-    recordStartTime = juce::Time::getHighResolutionTicks();
-
-	// reset playback position
-	mainComponent->getPluginManager().resetPlayback();
-
-    // Schedule playback of existing recorded events using addMidiMessage
-	juce::MidiBuffer::Iterator it(recordBuffer);
-	juce::MidiMessage           msg;
-	int                         samplePosition;
-	while (it.getNextEvent(msg, samplePosition))
+	juce::MidiBuffer bufferCopy;
 	{
-		juce::int64 ts = msg.getTimeStamp();
-		juce::int64 adjustedTimestamp = ts + recordStartTime;
-		auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
-		// Convert ticks to milliseconds
-		juce::int64 ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
-		juce::int64 timestampMs = static_cast<juce::int64>((double)ts * 1000.0 / (double)ticksPerSecond);
-		mainComponent->getPluginManager().addMidiMessage(msg, pluginId, timestampMs);
-
+		const juce::ScopedLock sl(midiCriticalSection);
+		overdubHistory.emplace_back(recordBuffer);
+		isOverdubbing = true;
+		// Do NOT clear recordBuffer!
+		recordStartTime = juce::Time::getHighResolutionTicks();
+		bufferCopy = recordBuffer;
 	}
-	mainComponent->getPluginManager().printTaggedMidiBuffer();
-}
 
+	republishRecordedEvents(bufferCopy);
+}
 
 // Then call this from MidiManager::stopOverdub():
 void MidiManager::stopOverdub()
@@ -122,6 +111,69 @@ void MidiManager::stopOverdub()
     isOverdubbing = false;
 	mainComponent->getPluginManager().clearTaggedMidiBuffer();
 
+}
+
+void MidiManager::stripLeadingSilence()
+{
+        juce::MidiBuffer bufferCopy;
+        {
+                const juce::ScopedLock sl(midiCriticalSection);
+
+                if (recordBuffer.getNumEvents() == 0)
+                        return;
+
+                juce::int64 earliestTimestamp = std::numeric_limits<juce::int64>::max();
+                juce::MidiBuffer::Iterator it(recordBuffer);
+                juce::MidiMessage msg;
+                int samplePosition;
+
+                while (it.getNextEvent(msg, samplePosition))
+                {
+                        auto ts = getTimestampFromEvent(msg, samplePosition);
+                        if (ts < earliestTimestamp)
+                                earliestTimestamp = ts;
+                }
+
+                if (earliestTimestamp <= 0 || earliestTimestamp == std::numeric_limits<juce::int64>::max())
+                        return;
+
+                juce::MidiBuffer adjustedBuffer;
+                juce::MidiBuffer::Iterator it2(recordBuffer);
+
+                while (it2.getNextEvent(msg, samplePosition))
+                {
+                        auto ts = getTimestampFromEvent(msg, samplePosition);
+                        juce::MidiMessage adjusted = msg;
+                        auto shifted = ts - earliestTimestamp;
+                        if (shifted < 0)
+                                shifted = 0;
+                        adjusted.setTimeStamp(static_cast<double>(shifted));
+                        adjustedBuffer.addEvent(adjusted, 0);
+                }
+
+                recordBuffer = adjustedBuffer;
+                bufferCopy = recordBuffer;
+        }
+
+        republishRecordedEvents(bufferCopy);
+}
+
+void MidiManager::undoLastOverdub()
+{
+        juce::MidiBuffer bufferCopy;
+        {
+                const juce::ScopedLock sl(midiCriticalSection);
+
+                if (overdubHistory.empty())
+                        return;
+
+                recordBuffer = overdubHistory.back();
+                overdubHistory.pop_back();
+                isOverdubbing = false;
+                bufferCopy = recordBuffer;
+        }
+
+        republishRecordedEvents(bufferCopy);
 }
 
 void MidiManager::getRecorded()
@@ -133,6 +185,7 @@ void MidiManager::getRecorded()
 
 	recordBuffer.clear();
 	recordStartTime = juce::Time::getHighResolutionTicks();
+	overdubHistory.clear();
 
 }
 
@@ -144,6 +197,7 @@ void MidiManager::startRecording()
 	// Clear the record buffer and set the start time
 	recordBuffer.clear();
 	recordStartTime = juce::Time::getHighResolutionTicks();
+	overdubHistory.clear();
 }
 
 void MidiManager::sendTestNote()
@@ -234,7 +288,7 @@ void MidiManager::processRecordedMidi()
 		}
 	}
 
-	// --- Debug dump of what we’ll save ------------------
+	// --- Debug dump of what weâ€™ll save ------------------
 	for (int i = 0; i < recordedMidi.getNumEvents(); ++i)
 	{
 		auto& e = recordedMidi.getEventPointer(i)->message;
@@ -274,5 +328,54 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 
 	DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
 
+}
+
+bool MidiManager::canUndoOverdub() const
+{
+        const juce::ScopedLock sl(midiCriticalSection);
+        return !overdubHistory.empty();
+}
+
+bool MidiManager::hasRecordedEvents() const
+{
+        const juce::ScopedLock sl(midiCriticalSection);
+        return recordBuffer.getNumEvents() > 0;
+}
+
+juce::int64 MidiManager::getTimestampFromEvent(const juce::MidiMessage& message, int samplePosition)
+{
+        auto timestamp = static_cast<juce::int64>(message.getTimeStamp());
+        if (timestamp == 0 && samplePosition != 0)
+                timestamp = static_cast<juce::int64>(samplePosition);
+        return timestamp;
+}
+
+void MidiManager::republishRecordedEvents(const juce::MidiBuffer& bufferCopy)
+{
+        auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+        auto& pluginManager = mainComponent->getPluginManager();
+
+        pluginManager.resetPlayback();
+
+        juce::MidiBuffer::Iterator it(bufferCopy);
+        juce::MidiMessage msg;
+        int samplePosition;
+        auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+
+        while (it.getNextEvent(msg, samplePosition))
+        {
+                auto ticks = getTimestampFromEvent(msg, samplePosition);
+                if (ticks < 0)
+                        ticks = 0;
+
+                juce::int64 timestampMs = 0;
+                if (ticksPerSecond > 0)
+                        timestampMs = static_cast<juce::int64>((static_cast<double>(ticks) * 1000.0) / static_cast<double>(ticksPerSecond));
+
+                juce::MidiMessage messageCopy = msg;
+                pluginManager.addMidiMessage(messageCopy, pluginId, timestampMs);
+        }
+
+        pluginManager.printTaggedMidiBuffer();
 }
 
