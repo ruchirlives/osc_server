@@ -3,13 +3,13 @@
 
 MainComponent::MainComponent()
 {	
-	audioStreamer = std::make_unique<AudioUdpStreamer>("127.0.0.1", 10000);
+	//audioStreamer = std::make_unique<AudioUdpStreamer>("127.0.0.1", 10000);
 
-	pluginManager.audioTapCallback = [this](const juce::AudioBuffer<float>& buffer)
-		{
-			if (audioStreamer)
-				audioStreamer->sendAudio(buffer);
-		};
+	//pluginManager.audioTapCallback = [this](const juce::AudioBuffer<float>& buffer)
+	//	{
+	//		if (audioStreamer)
+	//			audioStreamer->sendAudio(buffer);
+	//	};
 
 	setSize(600, 800);
 	resized();
@@ -26,11 +26,11 @@ MainComponent::MainComponent()
 	bpmEditor.setJustification(juce::Justification::centred);
 	bpmEditor.setInputRestrictions(5, "0123456789."); // Allow only numbers and a decimal point
 	
-	// Initialise the audio streaming port editor
-	addAndMakeVisible(audioStreamingPortLabel);
-	audioStreamingPortLabel.setText("Audio Streaming Port", juce::dontSendNotification);
-	addAndMakeVisible(audioStreamingPortEditor);
-	audioStreamingPortEditor.setText("10000"); // Default port
+	//// Initialise the audio streaming port editor
+	//addAndMakeVisible(audioStreamingPortLabel);
+	//audioStreamingPortLabel.setText("Audio Streaming Port", juce::dontSendNotification);
+	//addAndMakeVisible(audioStreamingPortEditor);
+	//audioStreamingPortEditor.setText("10000"); // Default port
 
 	// Initialize the plugins
 	initPlugins();
@@ -108,7 +108,7 @@ void MainComponent::resized()
 	const int spacingX = 10;
 	const int spacingY = 20;
 	const int labelHeight = 30;
-	const int numButtonRows = 3;
+	const int numButtonRows = 4;
 
 	const int windowWidth = getWidth();
 	const int windowHeight = getHeight();
@@ -153,15 +153,20 @@ void MainComponent::resized()
 	openPluginButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 	removeInstrumentButton.setBounds(openPluginButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 
-    // Row 3 (top row of buttons)
-    int row3Y = row2Y - buttonHeight - spacingY;
-    saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
-    restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-    startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-    startOverdubButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-    stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-    addNewInstrumentButton.setBounds(stopOverdubButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-    moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	// Row 3 (top row of buttons)
+	int row3Y = row2Y - buttonHeight - spacingY;
+	saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
+	restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	addNewInstrumentButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+
+	// Row 4
+	int row4Y = row3Y - buttonHeight - spacingY;
+	startOverdubButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
+	stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+
+
 
 	// --- BPM Sync handler ---
 	bpmEditor.onTextChange = [this]() {
