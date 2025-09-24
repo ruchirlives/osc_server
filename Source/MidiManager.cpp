@@ -120,7 +120,6 @@ void MidiManager::stopOverdub()
 {
     const juce::ScopedLock sl(midiCriticalSection);
     isOverdubbing = false;
-	// In MidiManager::stopOverdub()
 	mainComponent->getPluginManager().clearTaggedMidiBuffer();
 
 }
