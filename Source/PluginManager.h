@@ -103,6 +103,10 @@ public:
 	void scanPlugins(juce::FileSearchPath searchPath);
     bool loadPluginListFromFile();
     void savePluginListToFile();
+
+    void clearTaggedMidiBuffer();
+    void printTaggedMidiBuffer();
+
     juce::MemoryBlock getPluginState(const juce::String& pluginId);
     void restorePluginState(const juce::String& pluginId, const juce::MemoryBlock& state);
 

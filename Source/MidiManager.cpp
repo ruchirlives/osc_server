@@ -13,11 +13,6 @@
 #include "PluginManager.h"
 
 
-void PlaybackThread::run()
-{
-    midiManager.playbackThreadFunc();
-}
-
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
 	// DBG("MIDI Message Received: " + message.getDescription() + " from " + source->getName());
@@ -93,13 +88,27 @@ void MidiManager::closeMidiInput()
 
 void MidiManager::startOverdub()
 {
-    const juce::ScopedLock sl(midiCriticalSection);
+    //const juce::ScopedLock sl(midiCriticalSection);
     isOverdubbing = true;
     // Do NOT clear recordBuffer!
     recordStartTime = juce::Time::getHighResolutionTicks();
 
-    // Schedule playback of existing recorded events
-	startPlaybackThread();
+    // Schedule playback of existing recorded events using addMidiMessage
+	juce::MidiBuffer::Iterator it(recordBuffer);
+	juce::MidiMessage           msg;
+	int                         samplePosition;
+	while (it.getNextEvent(msg, samplePosition))
+	{
+		juce::int64 ts = msg.getTimeStamp();
+		juce::int64 adjustedTimestamp = ts + recordStartTime;
+		auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+		// Convert ticks to milliseconds
+		juce::int64 ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+		juce::int64 timestampMs = static_cast<juce::int64>((double)ts * 1000.0 / (double)ticksPerSecond);
+		mainComponent->getPluginManager().addMidiMessage(msg, pluginId, timestampMs);
+
+	}
+	mainComponent->getPluginManager().printTaggedMidiBuffer();
 }
 
 
@@ -108,59 +117,9 @@ void MidiManager::stopOverdub()
 {
     const juce::ScopedLock sl(midiCriticalSection);
     isOverdubbing = false;
-    juce::String pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
-	stopPlaybackThread();
-}
+	// In MidiManager::stopOverdub()
+	mainComponent->getPluginManager().clearTaggedMidiBuffer();
 
-void MidiManager::startPlaybackThread()
-{
-	stopPlaybackThread(); // Ensure any previous thread is stopped
-
-	playbackThreadShouldRun = true;
-	playbackThread = std::make_unique<PlaybackThread>(*this);
-	playbackThread->startThread();
-}
-
-void MidiManager::stopPlaybackThread()
-{
-	playbackThreadShouldRun = false;
-	if (playbackThread)
-	{
-		playbackThread->stopThread(1000);
-		playbackThread.reset();
-	}
-}
-
-void MidiManager::playbackThreadFunc()
-{
-	juce::MidiBuffer::Iterator it(recordBuffer);
-	juce::MidiMessage msg;
-	int samplePosition;
-
-	juce::int64 previousTicks = 0;
-	bool firstEvent = true;
-
-	juce::String pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
-	while (playbackThreadShouldRun)
-	{
-		{
-			// Only lock while getting the next event
-			const juce::ScopedLock sl(midiCriticalSection);
-			if (!it.getNextEvent(msg, samplePosition))
-				break;
-		}
-
-		juce::int64 eventTicks = msg.getTimeStamp();
-
-		juce::int64 waitTicks = eventTicks - previousTicks;
-		if (waitTicks > 0)
-		{
-			double waitMs = (double)waitTicks * 1000.0 / (double)juce::Time::getHighResolutionTicksPerSecond();
-			juce::Thread::sleep((int)waitMs);
-		}
-		previousTicks = eventTicks;
-		incomingMidi.addEvent(msg, 0);
-	}
 }
 
 void MidiManager::getRecorded()

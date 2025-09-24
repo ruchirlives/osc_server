@@ -13,21 +13,6 @@
 #include <JuceHeader.h>
 
 class MainComponent; // Forward declaration
-class MidiManager;
-
-
-class PlaybackThread : public juce::Thread
-{
-public:
-    PlaybackThread(MidiManager& manager)
-        : juce::Thread("MidiPlaybackThread"), midiManager(manager) {}
-
-    void run() override;
-	std::unique_ptr<PlaybackThread> playbackThread;
-
-private:
-    MidiManager& midiManager;
-};
 
 class MidiManager : public juce::MidiInputCallback
 {
@@ -62,9 +47,6 @@ public:
 	std::unique_ptr<juce::Thread> playbackThread;
 	std::atomic<bool> playbackThreadShouldRun{ false };
 
-	void startPlaybackThread();
-	void stopPlaybackThread();
-	void playbackThreadFunc();
 
 
 private:

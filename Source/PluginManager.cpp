@@ -561,7 +561,23 @@ bool PluginManager::loadPluginListFromFile()
         return false;
     }
 }
+void PluginManager::clearTaggedMidiBuffer()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    taggedMidiBuffer.clear();
+}
 
+void PluginManager::printTaggedMidiBuffer()
+{
+	const juce::ScopedLock sl(midiCriticalSection);
+	DBG("Tagged MIDI Buffer Contents:");
+	for (const auto& taggedMessage : taggedMidiBuffer)
+	{
+		DBG("Plugin ID: " << taggedMessage.pluginId
+			<< ", Timestamp: " << taggedMessage.timestamp
+			<< ", Message: " << taggedMessage.message.getDescription());
+	}
+}
 
 void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce::String& pluginId, juce::int64& adjustedTimestamp)
 {
@@ -569,8 +585,7 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
     // Add the tagged MIDI message to the buffer with a timestamp
     
     taggedMidiBuffer.emplace_back(message, pluginId, adjustedTimestamp);
-    // DBG("Added tagged MIDI message with " << pluginIds.size() << " pluginIds.");
-	// DBG("Added timestamp: " << absoluteTimeMs << "from " << timestamp);
+	DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));
 }
 
 void PluginManager::resetPlayback()
