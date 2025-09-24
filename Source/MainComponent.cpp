@@ -79,10 +79,6 @@ MainComponent::MainComponent()
 	addAndMakeVisible(restoreButton);
 	restoreButton.onClick = [this]() { restoreProject(); }; // Use lambda for button click handling
 
-	// Add recording buttons
-	addAndMakeVisible(startRecordingButton);
-	startRecordingButton.onClick = [this]() { midiManager.startRecording(); updateOverdubUI(); }; // Use lambda for button click handling
-
 	// Add Project name label
 	addAndMakeVisible(projectNameLabel);
 
@@ -167,8 +163,7 @@ void MainComponent::resized()
 	int row3Y = row2Y - buttonHeight - spacingY;
 	saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
 	restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	startRecordingButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	addNewInstrumentButton.setBounds(startRecordingButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	addNewInstrumentButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 	moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 
 	// Row 4
