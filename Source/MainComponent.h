@@ -228,6 +228,8 @@ private:
 	// Buttons for overdub control
     juce::TextButton startOverdubButton { "Start Overdub" };
     juce::TextButton stopOverdubButton { "Stop Overdub" };
+    juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
+    juce::TextButton undoOverdubButton { "Undo Overdub" };
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class

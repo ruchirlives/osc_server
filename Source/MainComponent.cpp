@@ -46,7 +46,7 @@ MainComponent::MainComponent()
 
 	// Initialize the "Get Recorded" button
 	addAndMakeVisible(getRecordedButton);
-	getRecordedButton.onClick = [this]() { midiManager.getRecorded(); }; // Use lambda for button click handling
+	getRecordedButton.onClick = [this]() { midiManager.getRecorded(); updateOverdubUI(); }; // Use lambda for button click handling
 
 	// Initialize the "List Plugin Instances" button
 	addAndMakeVisible(listPluginInstancesButton);
@@ -81,7 +81,7 @@ MainComponent::MainComponent()
 
 	// Add recording buttons
 	addAndMakeVisible(startRecordingButton);
-	startRecordingButton.onClick = [this]() { midiManager.startRecording(); }; // Use lambda for button click handling
+	startRecordingButton.onClick = [this]() { midiManager.startRecording(); updateOverdubUI(); }; // Use lambda for button click handling
 
 	// Add Project name label
 	addAndMakeVisible(projectNameLabel);
@@ -90,13 +90,23 @@ MainComponent::MainComponent()
 	addAndMakeVisible(moveToEndButton);
 	moveToEndButton.onClick = [this]() { moveSelectedRowsToEnd(); }; // Use lambda for button click handling
 
-    // Initialize the "Start Overdub" button
-    addAndMakeVisible(startOverdubButton);
-    startOverdubButton.onClick = [this]() { midiManager.startOverdub(); updateOverdubUI(); };
+	// Initialize the "Start Overdub" button
+	addAndMakeVisible(startOverdubButton);
+	startOverdubButton.onClick = [this]() { midiManager.startOverdub(); updateOverdubUI(); };
 
-    // Initialize the "Stop Overdub" button
-    addAndMakeVisible(stopOverdubButton);
-    stopOverdubButton.onClick = [this]() { midiManager.stopOverdub(); updateOverdubUI(); };
+	// Initialize the "Stop Overdub" button
+	addAndMakeVisible(stopOverdubButton);
+	stopOverdubButton.onClick = [this]() { midiManager.stopOverdub(); updateOverdubUI(); };
+
+	// Initialize the "Strip Silence" button
+	addAndMakeVisible(stripLeadingSilenceButton);
+	stripLeadingSilenceButton.onClick = [this]() { midiManager.stripLeadingSilence(); updateOverdubUI(); };
+
+	// Initialize the "Undo Overdub" button
+	addAndMakeVisible(undoOverdubButton);
+	undoOverdubButton.onClick = [this]() { midiManager.undoLastOverdub(); updateOverdubUI(); };
+
+	updateOverdubUI();
 }
 
 void MainComponent::resized()
@@ -165,6 +175,8 @@ void MainComponent::resized()
 	int row4Y = row3Y - buttonHeight - spacingY;
 	startOverdubButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
 	stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	stripLeadingSilenceButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	undoOverdubButton.setBounds(stripLeadingSilenceButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 
 
 
@@ -195,6 +207,9 @@ void MainComponent::updateOverdubUI()
         startOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
         stopOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
     }
+
+    stripLeadingSilenceButton.setEnabled(!midiManager.isOverdubbing && midiManager.hasRecordedEvents());
+    undoOverdubButton.setEnabled(!midiManager.isOverdubbing && midiManager.canUndoOverdub());
 }
 void MainComponent::handleAudioPortChange()
 {
