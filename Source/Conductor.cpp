@@ -810,7 +810,7 @@ void OrchestraTableModel::selectRow(int row, const juce::ModifierKeys& modifiers
 	table.selectRowsBasedOnModifierKeys(row, modifiers, true);
 
 	sendTags(row);
-	mainComponent->midiManager.startRecording();
+	//mainComponent->midiManager.startRecording();
 
 	// Copy first tag in Tags to clipboard
 	//juce::SystemClipboard::copyTextToClipboard(orchestraData[row].tags.empty() ? "" : orchestraData[row].tags[0]);

@@ -144,11 +144,12 @@ void MidiManager::stripLeadingSilence()
                 {
                         auto ts = getTimestampFromEvent(msg, samplePosition);
                         juce::MidiMessage adjusted = msg;
-                        auto shifted = ts - earliestTimestamp;
-                        if (shifted < 0)
-                                shifted = 0;
-                        adjusted.setTimeStamp(static_cast<double>(shifted));
-                        adjustedBuffer.addEvent(adjusted, 0);
+						auto shifted = ts - earliestTimestamp;
+						if (shifted < 0)
+							shifted = 0;
+						adjusted.setTimeStamp(static_cast<double>(shifted));
+						adjustedBuffer.addEvent(adjusted, static_cast<int>(shifted));
+
                 }
 
                 recordBuffer = adjustedBuffer;
