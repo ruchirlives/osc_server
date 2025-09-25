@@ -149,37 +149,39 @@ void MainComponent::resized()
 
 	// --- Button rows, starting from bottom upward ---
 
-	// Row 1 (bottom row)
+	// Row 1 (bottom row) - Scan, Select Plugin, Update, Open Plugin, List Plugin Instances
 	int row1Y = windowHeight - margin - buttonHeight;
 	ScanButton.setBounds(margin, row1Y, buttonWidth, buttonHeight);
-	updateButton.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	getRecordedButton.setBounds(updateButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	sendTestNoteButton.setBounds(getRecordedButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	addInstrumentButton.setBounds(sendTestNoteButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	updateButton.setBounds(pluginBox.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	openPluginButton.setBounds(updateButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 
-	// Row 2
+	// Row 2 - Instrument management and recording
 	int row2Y = row1Y - buttonHeight - spacingY;
-	pluginBox.setBounds(margin, row2Y, buttonWidth, buttonHeight);
-	midiInputList.setBounds(pluginBox.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
-	listPluginInstancesButton.setBounds(midiInputList.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
-	openPluginButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
-	removeInstrumentButton.setBounds(openPluginButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	addInstrumentButton.setBounds(margin, row2Y, buttonWidth, buttonHeight);
+	addNewInstrumentButton.setBounds(addInstrumentButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	removeInstrumentButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	moveToEndButton.setBounds(removeInstrumentButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
+	getRecordedButton.setBounds(moveToEndButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 
-	// Row 3 (top row of buttons)
+	// Row 3 - MIDI and utility controls
 	int row3Y = row2Y - buttonHeight - spacingY;
-	saveButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
-	restoreButton.setBounds(saveButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	addNewInstrumentButton.setBounds(restoreButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
-	moveToEndButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	sendTestNoteButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
+	importMidiButton.setBounds(sendTestNoteButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	exportMidiButton.setBounds(importMidiButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	midiInputList.setBounds(exportMidiButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
+	stripLeadingSilenceButton.setBounds(midiInputList.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 
-	// Row 4
+	// Row 4 (top row of buttons) - Project and overdub controls
 	int row4Y = row3Y - buttonHeight - spacingY;
-        startOverdubButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
-        stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-        stripLeadingSilenceButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-        undoOverdubButton.setBounds(stripLeadingSilenceButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-        importMidiButton.setBounds(undoOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-        exportMidiButton.setBounds(importMidiButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	saveButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
+	restoreButton.setBounds(saveButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	undoOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+
+
 
 
 
