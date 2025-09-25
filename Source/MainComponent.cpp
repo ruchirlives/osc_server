@@ -95,20 +95,20 @@ MainComponent::MainComponent()
 	stopOverdubButton.onClick = [this]() { midiManager.stopOverdub(); updateOverdubUI(); };
 
 	// Initialize the "Strip Silence" button
-        addAndMakeVisible(stripLeadingSilenceButton);
-        stripLeadingSilenceButton.onClick = [this]() { midiManager.stripLeadingSilence(); updateOverdubUI(); };
+    addAndMakeVisible(stripLeadingSilenceButton);
+    stripLeadingSilenceButton.onClick = [this]() { midiManager.stripLeadingSilence(); updateOverdubUI(); };
 
-        // Initialize the "Undo Overdub" button
-        addAndMakeVisible(undoOverdubButton);
-        undoOverdubButton.onClick = [this]() { midiManager.undoLastOverdub(); updateOverdubUI(); };
+    // Initialize the "Undo Overdub" button
+    addAndMakeVisible(undoOverdubButton);
+    undoOverdubButton.onClick = [this]() { midiManager.undoLastOverdub(); updateOverdubUI(); };
 
-        addAndMakeVisible(importMidiButton);
-        importMidiButton.onClick = [this]() { midiManager.importMidiFileToRecordBuffer(); updateOverdubUI(); };
+    addAndMakeVisible(importMidiButton);
+    importMidiButton.onClick = [this]() { midiManager.importMidiFileToRecordBuffer(); updateOverdubUI(); };
 
-        addAndMakeVisible(exportMidiButton);
-        exportMidiButton.onClick = [this]() { midiManager.exportRecordBufferToMidiFile(); };
+    addAndMakeVisible(exportMidiButton);
+    exportMidiButton.onClick = [this]() { midiManager.exportRecordBufferToMidiFile(); };
 
-        updateOverdubUI();
+    updateOverdubUI();
 }
 
 void MainComponent::resized()
