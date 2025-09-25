@@ -13,6 +13,8 @@
 #include "PluginManager.h"
 
 #include <limits>
+#include <map>
+#include <utility>
 
 
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
@@ -45,6 +47,173 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 		// Stamp the MIDI message with high-resolution ticks directly
 		recordBuffer.addEvent(messageWithChannel, static_cast<int>(currentTimeTicks));
 	}
+}
+
+std::map<int, juce::String> MidiManager::buildChannelTagMap(const juce::String& pluginId) const
+{
+        std::map<int, juce::String> channelTags;
+
+        if (mainComponent == nullptr)
+                return channelTags;
+
+        const auto& orchestra = mainComponent->getConductor().orchestra;
+        for (const auto& instrument : orchestra)
+        {
+                if (pluginId.isNotEmpty() && instrument.pluginInstanceId != pluginId)
+                        continue;
+
+                auto tagString = serialiseTags(instrument.tags);
+                if (tagString.isEmpty())
+                        tagString = instrument.instrumentName;
+
+                channelTags[instrument.midiChannel] = tagString;
+        }
+
+        return channelTags;
+}
+
+juce::String MidiManager::serialiseTags(const std::vector<juce::String>& tags)
+{
+        juce::StringArray tagArray;
+        for (const auto& tag : tags)
+        {
+                auto trimmed = tag.trim();
+                if (trimmed.isNotEmpty())
+                        tagArray.add(trimmed);
+        }
+
+        return tagArray.joinIntoString(", ");
+}
+
+juce::String MidiManager::extractTrackName(const juce::MidiMessageSequence& sequence)
+{
+        for (int i = 0; i < sequence.getNumEvents(); ++i)
+        {
+                const auto* holder = sequence.getEventPointer(i);
+                if (holder == nullptr)
+                        continue;
+
+                const auto& message = holder->message;
+                if (message.isTextMetaEvent() && message.getMetaEventType() == juce::MidiMessage::metaEventTrackName)
+                        return message.getTextFromTextMetaEvent();
+        }
+
+        return {};
+}
+
+std::map<int, MidiManager::ChannelTrackInfo> MidiManager::buildChannelSequences(const juce::MidiBuffer& bufferCopy) const
+{
+        std::map<int, ChannelTrackInfo> channelSequences;
+
+        if (bufferCopy.getNumEvents() == 0)
+                return channelSequences;
+
+        struct EventData
+        {
+                juce::MidiMessage message;
+                int channel{ 0 };
+                juce::int64 timestamp{ 0 };
+        };
+
+        std::vector<EventData> events;
+        events.reserve(static_cast<size_t>(bufferCopy.getNumEvents()));
+
+        juce::int64 earliestTimestamp = std::numeric_limits<juce::int64>::max();
+
+        juce::MidiBuffer::Iterator iterator(bufferCopy);
+        juce::MidiMessage eventMessage;
+        int samplePosition = 0;
+
+        while (iterator.getNextEvent(eventMessage, samplePosition))
+        {
+                EventData data;
+                data.message = eventMessage;
+                data.channel = juce::jlimit(1, 16, data.message.getChannel());
+                data.timestamp = getTimestampFromEvent(data.message, samplePosition);
+
+                if (data.timestamp < earliestTimestamp)
+                        earliestTimestamp = data.timestamp;
+
+                events.push_back(std::move(data));
+        }
+
+        if (earliestTimestamp == std::numeric_limits<juce::int64>::max())
+                earliestTimestamp = 0;
+
+        auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+        double ticksPerQuarterNote = 960.0;
+        double bpm = mainComponent != nullptr ? mainComponent->getBpm() : 120.0;
+        if (bpm <= 0.0)
+                bpm = 120.0;
+
+        double tickConversionFactor = ticksPerSecond > 0
+                ? (ticksPerQuarterNote * bpm) / (static_cast<double>(ticksPerSecond) * 60.0)
+                : 1.0;
+
+        for (auto& event : events)
+        {
+                auto timeDiff = event.timestamp - earliestTimestamp;
+                if (timeDiff < 0)
+                        timeDiff = 0;
+
+                double timeInTicks = static_cast<double>(timeDiff) * tickConversionFactor;
+                if (timeInTicks < 0.0)
+                        timeInTicks = 0.0;
+
+                event.message.setTimeStamp(timeInTicks);
+
+                auto& channelInfo = channelSequences[event.channel];
+                channelInfo.sequence.addEvent(event.message);
+        }
+
+        return channelSequences;
+}
+
+void MidiManager::writeMidiFile(const juce::File& file, const std::map<int, ChannelTrackInfo>& channelSequences) const
+{
+        if (channelSequences.empty())
+                return;
+
+        juce::MidiFile midiFile;
+        midiFile.setTicksPerQuarterNote(960);
+
+        for (const auto& entry : channelSequences)
+        {
+                auto sequence = entry.second.sequence;
+                if (sequence.getNumEvents() == 0)
+                        continue;
+
+                if (entry.second.trackName.isNotEmpty())
+                {
+                        auto trackNameMessage = juce::MidiMessage::textMetaEvent(juce::MidiMessage::metaEventTrackName, entry.second.trackName);
+                        trackNameMessage.setTimeStamp(0.0);
+                        sequence.addEvent(trackNameMessage);
+                }
+
+                sequence.updateMatchedPairs();
+                midiFile.addTrack(sequence);
+        }
+
+        if (midiFile.getNumTracks() == 0)
+                return;
+
+        juce::File parentDir = file.getParentDirectory();
+        if (!parentDir.exists())
+                parentDir.createDirectory();
+
+        if (file.existsAsFile())
+                file.deleteFile();
+
+        juce::FileOutputStream stream(file);
+        if (!stream.openedOk())
+        {
+                DBG("Failed to open file for writing MIDI data: " + file.getFullPathName());
+                return;
+        }
+
+        midiFile.writeTo(stream);
+        stream.flush();
+        DBG("MIDI File Saved: " + file.getFullPathName());
 }
 
 void MidiManager::openMidiInput(juce::String midiInputName)
@@ -298,21 +467,40 @@ void MidiManager::processRecordedMidi()
 	}
 
 	// Finally, write out to your MIDI file
-	saveToMidiFile(recordedMidi);
+        saveToMidiFile(recordedMidi);
 }
 
 
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-	juce::MidiFile midiFile;  // Create a MidiFile object
-	midiFile.setTicksPerQuarterNote(960);  // Set the ticks per quarter note (can adjust based on your needs)
+        juce::MidiFile midiFile;  // Create a MidiFile object
+        midiFile.setTicksPerQuarterNote(960);  // Set the ticks per quarter note (can adjust based on your needs)
 
-	// Add the recorded MIDI events to the MidiFile object
-	midiFile.addTrack(recordedMIDI);
+        // Add the recorded MIDI events to the MidiFile object
+        juce::String trackName;
+        if (mainComponent != nullptr)
+        {
+                auto channel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel();
+                auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+                auto channelTags = buildChannelTagMap(pluginId);
+                auto it = channelTags.find(channel);
+                if (it != channelTags.end())
+                        trackName = it->second;
+        }
 
-	// Create a file to save the MIDI data
-	juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
+        if (trackName.isNotEmpty() && extractTrackName(recordedMIDI).isEmpty())
+        {
+                auto trackNameMessage = juce::MidiMessage::textMetaEvent(juce::MidiMessage::metaEventTrackName, trackName);
+                trackNameMessage.setTimeStamp(0.0);
+                recordedMIDI.addEvent(trackNameMessage);
+        }
+
+        recordedMIDI.updateMatchedPairs();
+        midiFile.addTrack(recordedMIDI);
+
+        // Create a file to save the MIDI data
+        juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
 
 	// If you want to ensure the file is fresh, delete it if it exists before proceeding
 	if (midiFileToSave.existsAsFile())
@@ -325,10 +513,146 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 	// Save the MIDI data to the file
 	midiFile.writeTo(stream);
 
-	stream.flush();
+        stream.flush();
 
-	DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
+        DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
 
+}
+
+void MidiManager::exportRecordBufferToMidiFile()
+{
+        juce::MidiBuffer bufferCopy;
+        {
+                const juce::ScopedLock sl(midiCriticalSection);
+                if (recordBuffer.getNumEvents() == 0)
+                {
+                        DBG("No MIDI events to export.");
+                        return;
+                }
+
+                bufferCopy = recordBuffer;
+        }
+
+        juce::FileChooser fileChooser("Export MIDI File", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.mid");
+        if (!fileChooser.browseForFileToSave(true))
+                return;
+
+        auto targetFile = fileChooser.getResult();
+
+        auto channelSequences = buildChannelSequences(bufferCopy);
+
+        juce::String pluginId;
+        if (mainComponent != nullptr)
+                pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+
+        auto channelTags = buildChannelTagMap(pluginId);
+        for (auto& entry : channelSequences)
+        {
+                auto it = channelTags.find(entry.first);
+                if (it != channelTags.end())
+                        entry.second.trackName = it->second;
+                else if (pluginId.isNotEmpty())
+                        entry.second.trackName = pluginId + " Ch " + juce::String(entry.first);
+                else
+                        entry.second.trackName = "Channel " + juce::String(entry.first);
+        }
+
+        writeMidiFile(targetFile, channelSequences);
+}
+
+void MidiManager::importMidiFileToRecordBuffer()
+{
+        juce::FileChooser fileChooser("Import MIDI File", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.mid");
+        if (!fileChooser.browseForFileToOpen())
+                return;
+
+        auto midiFileToImport = fileChooser.getResult();
+        juce::FileInputStream inputStream(midiFileToImport);
+
+        if (!inputStream.openedOk())
+        {
+                DBG("Failed to open MIDI file: " + midiFileToImport.getFullPathName());
+                return;
+        }
+
+        juce::MidiFile midiFile;
+        if (!midiFile.readFrom(inputStream))
+        {
+                DBG("Failed to read MIDI data from file: " + midiFileToImport.getFullPathName());
+                return;
+        }
+
+        midiFile.convertTimestampTicksToSeconds();
+
+        juce::MidiBuffer newBuffer;
+        auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+
+        juce::String pluginId;
+        if (mainComponent != nullptr)
+                pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+
+        auto channelTags = buildChannelTagMap(pluginId);
+        std::map<juce::String, int> tagToChannel;
+        for (const auto& entry : channelTags)
+        {
+                if (entry.second.isNotEmpty())
+                        tagToChannel[entry.second] = entry.first;
+        }
+
+        for (int trackIndex = 0; trackIndex < midiFile.getNumTracks(); ++trackIndex)
+        {
+                auto* track = midiFile.getTrack(trackIndex);
+                if (track == nullptr)
+                        continue;
+
+                auto trackName = extractTrackName(*track);
+                int channelForTrack = 0;
+                auto channelIt = tagToChannel.find(trackName);
+                if (channelIt != tagToChannel.end())
+                        channelForTrack = channelIt->second;
+
+                for (int eventIndex = 0; eventIndex < track->getNumEvents(); ++eventIndex)
+                {
+                        const auto* holder = track->getEventPointer(eventIndex);
+                        if (holder == nullptr)
+                                continue;
+
+                        const auto& message = holder->message;
+                        if (message.isMetaEvent())
+                                continue;
+
+                        juce::MidiMessage messageCopy = message;
+                        if (channelForTrack > 0)
+                                messageCopy.setChannel(channelForTrack);
+
+                        double timeInSeconds = messageCopy.getTimeStamp();
+                        juce::int64 timestamp = ticksPerSecond > 0
+                                ? static_cast<juce::int64>(timeInSeconds * static_cast<double>(ticksPerSecond))
+                                : static_cast<juce::int64>(timeInSeconds * 1000.0);
+
+                        if (timestamp < 0)
+                                timestamp = 0;
+
+                        messageCopy.setTimeStamp(static_cast<double>(timestamp));
+                        newBuffer.addEvent(messageCopy, static_cast<int>(timestamp));
+                }
+        }
+
+        if (newBuffer.getNumEvents() == 0)
+        {
+                DBG("No MIDI events were imported from file: " + midiFileToImport.getFullPathName());
+                return;
+        }
+
+        {
+                const juce::ScopedLock sl(midiCriticalSection);
+                recordBuffer = newBuffer;
+                overdubHistory.clear();
+                isOverdubbing = false;
+                recordStartTime = juce::Time::getHighResolutionTicks();
+        }
+
+        republishRecordedEvents(newBuffer);
 }
 
 bool MidiManager::canUndoOverdub() const

@@ -225,11 +225,13 @@ private:
 	juce::Label audioStreamingPortLabel{ "Audio Streaming Port", "Audio Streaming Port" }; // Label for the audio streaming port
 	juce::TextEditor audioStreamingPortEditor; // Text editor for the audio streaming port
 
-	// Buttons for overdub control
+        // Buttons for overdub control
     juce::TextButton startOverdubButton { "Start Overdub" };
     juce::TextButton stopOverdubButton { "Stop Overdub" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
     juce::TextButton undoOverdubButton { "Undo Overdub" };
+        juce::TextButton importMidiButton { "Import MIDI" };
+        juce::TextButton exportMidiButton { "Export MIDI" };
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class
