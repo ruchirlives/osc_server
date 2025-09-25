@@ -99,14 +99,20 @@ MainComponent::MainComponent()
 	stopOverdubButton.onClick = [this]() { midiManager.stopOverdub(); updateOverdubUI(); };
 
 	// Initialize the "Strip Silence" button
-	addAndMakeVisible(stripLeadingSilenceButton);
-	stripLeadingSilenceButton.onClick = [this]() { midiManager.stripLeadingSilence(); updateOverdubUI(); };
+        addAndMakeVisible(stripLeadingSilenceButton);
+        stripLeadingSilenceButton.onClick = [this]() { midiManager.stripLeadingSilence(); updateOverdubUI(); };
 
-	// Initialize the "Undo Overdub" button
-	addAndMakeVisible(undoOverdubButton);
-	undoOverdubButton.onClick = [this]() { midiManager.undoLastOverdub(); updateOverdubUI(); };
+        // Initialize the "Undo Overdub" button
+        addAndMakeVisible(undoOverdubButton);
+        undoOverdubButton.onClick = [this]() { midiManager.undoLastOverdub(); updateOverdubUI(); };
 
-	updateOverdubUI();
+        addAndMakeVisible(importMidiButton);
+        importMidiButton.onClick = [this]() { midiManager.importMidiFileToRecordBuffer(); updateOverdubUI(); };
+
+        addAndMakeVisible(exportMidiButton);
+        exportMidiButton.onClick = [this]() { midiManager.exportRecordBufferToMidiFile(); };
+
+        updateOverdubUI();
 }
 
 void MainComponent::resized()
@@ -173,10 +179,12 @@ void MainComponent::resized()
 
 	// Row 4
 	int row4Y = row3Y - buttonHeight - spacingY;
-	startOverdubButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
-	stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	stripLeadingSilenceButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	undoOverdubButton.setBounds(stripLeadingSilenceButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+        startOverdubButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
+        stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+        stripLeadingSilenceButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+        undoOverdubButton.setBounds(stripLeadingSilenceButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+        importMidiButton.setBounds(undoOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+        exportMidiButton.setBounds(importMidiButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 
 
 
