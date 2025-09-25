@@ -46,7 +46,10 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 		incomingMidi.addEvent(messageWithChannel, 0);
 
 		// Stamp the MIDI message with high-resolution ticks directly
-		recordBuffer.addEvent(messageWithChannel, static_cast<int>(currentTimeTicks));
+		if (isOverdubbing)
+		{
+			recordBuffer.addEvent(messageWithChannel, static_cast<int>(currentTimeTicks));
+		}
 	}
 }
 
@@ -358,17 +361,6 @@ void MidiManager::getRecorded()
 	recordStartTime = juce::Time::getHighResolutionTicks();
 	overdubHistory.clear();
 
-}
-
-void MidiManager::startRecording()
-{
-	// Lock the MIDI critical section
-	const juce::ScopedLock sl(midiCriticalSection);
-
-	// Clear the record buffer and set the start time
-	recordBuffer.clear();
-	recordStartTime = juce::Time::getHighResolutionTicks();
-	overdubHistory.clear();
 }
 
 void MidiManager::sendTestNote()

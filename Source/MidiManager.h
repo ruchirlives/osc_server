@@ -32,8 +32,7 @@ public:
 	void stripLeadingSilence();
 	void undoLastOverdub();
 	void getRecorded();
-        void startRecording();
-        void sendTestNote();
+	void sendTestNote();
 
         void exportRecordBufferToMidiFile();
         void importMidiFileToRecordBuffer();
