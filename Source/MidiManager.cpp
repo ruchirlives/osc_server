@@ -95,7 +95,7 @@ juce::String MidiManager::extractTrackName(const juce::MidiMessageSequence& sequ
                         continue;
 
                 const auto& message = holder->message;
-                if (message.isTextMetaEvent() && message.getMetaEventType() == juce::MidiMessage::metaEventTrackName)
+                if (message.isTextMetaEvent() && message.getMetaEventType() == 0x03)
                         return message.getTextFromTextMetaEvent();
         }
 
@@ -186,7 +186,7 @@ void MidiManager::writeMidiFile(const juce::File& file, const std::map<int, Chan
 
                 if (entry.second.trackName.isNotEmpty())
                 {
-                        auto trackNameMessage = juce::MidiMessage::textMetaEvent(juce::MidiMessage::metaEventTrackName, entry.second.trackName);
+                        auto trackNameMessage = juce::MidiMessage::textMetaEvent(0x03, entry.second.trackName);
                         trackNameMessage.setTimeStamp(0.0);
                         sequence.addEvent(trackNameMessage);
                 }
@@ -485,6 +485,8 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
                 auto channel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel();
                 auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
                 auto channelTags = buildChannelTagMap(pluginId);
+
+				// Look up the track name based on the selected channel
                 auto it = channelTags.find(channel);
                 if (it != channelTags.end())
                         trackName = it->second;
@@ -492,8 +494,8 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 
         if (trackName.isNotEmpty() && extractTrackName(recordedMIDI).isEmpty())
         {
-                auto trackNameMessage = juce::MidiMessage::textMetaEvent(juce::MidiMessage::metaEventTrackName, trackName);
-                trackNameMessage.setTimeStamp(0.0);
+            auto trackNameMessage = juce::MidiMessage::textMetaEvent(0x03, trackName);
+            trackNameMessage.setTimeStamp(0.0);
                 recordedMIDI.addEvent(trackNameMessage);
         }
 
