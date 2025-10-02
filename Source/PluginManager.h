@@ -93,6 +93,8 @@ public:
 	void addMidiMessage(const juce::MidiMessage& message, const juce::String& pluginId, juce::int64& timestamp);
 	void resetPlayback();
 
+    void stopAllNotes();
+
     juce::int8 getNumInstances(std::vector<juce::String>& instances);
 
     void savePluginDescriptionsToFile(const juce::String& dataFilePath, std::vector<juce::String> instances = {});

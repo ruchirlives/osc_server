@@ -267,6 +267,7 @@ void MidiManager::startOverdub()
 	juce::MidiBuffer bufferCopy;
 	{
 		const juce::ScopedLock sl(midiCriticalSection);
+        mainComponent->getPluginManager().stopAllNotes();
 		overdubHistory.emplace_back(recordBuffer);
 		isOverdubbing = true;
 		// Do NOT clear recordBuffer!
@@ -281,8 +282,10 @@ void MidiManager::startOverdub()
 void MidiManager::stopOverdub()
 {
     const juce::ScopedLock sl(midiCriticalSection);
+	mainComponent->getPluginManager().stopAllNotes();
     isOverdubbing = false;
 	mainComponent->getPluginManager().clearTaggedMidiBuffer();
+    // stopAllNotes
 
 }
 
@@ -467,51 +470,62 @@ void MidiManager::processRecordedMidi()
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-        juce::MidiFile midiFile;  // Create a MidiFile object
-        midiFile.setTicksPerQuarterNote(960);  // Set the ticks per quarter note (can adjust based on your needs)
+    juce::MidiFile midiFile;
+    midiFile.setTicksPerQuarterNote(960);
 
-        // Add the recorded MIDI events to the MidiFile object
-        juce::String trackName;
-        if (mainComponent != nullptr)
-        {
-                auto channel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel();
-                auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
-                auto channelTags = buildChannelTagMap(pluginId);
+    if (recordedMIDI.getNumEvents() == 0)
+    {
+        DBG("No MIDI events to save.");
+        return;
+    }
 
-				// Look up the track name based on the selected channel
-                auto it = channelTags.find(channel);
-                if (it != channelTags.end())
-                        trackName = it->second;
-        }
+    juce::String trackName;
+    if (mainComponent != nullptr)
+    {
+        auto channel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel();
+        auto pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+        auto channelTags = buildChannelTagMap(pluginId);
+        auto it = channelTags.find(channel);
+        if (it != channelTags.end())
+            trackName = it->second;
+    }
 
-        if (trackName.isNotEmpty() && extractTrackName(recordedMIDI).isEmpty())
-        {
-            auto trackNameMessage = juce::MidiMessage::textMetaEvent(0x03, trackName);
-            trackNameMessage.setTimeStamp(0.0);
-                recordedMIDI.addEvent(trackNameMessage);
-        }
+    if (trackName.isNotEmpty() && extractTrackName(recordedMIDI).isEmpty())
+    {
+        auto trackNameMessage = juce::MidiMessage::textMetaEvent(0x03, trackName);
+        trackNameMessage.setTimeStamp(0.0);
+        recordedMIDI.addEvent(trackNameMessage);
+    }
 
-        recordedMIDI.updateMatchedPairs();
-        midiFile.addTrack(recordedMIDI);
+    recordedMIDI.updateMatchedPairs();
+    midiFile.addTrack(recordedMIDI);
 
-        // Create a file to save the MIDI data
-        juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
+    juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
 
-	// If you want to ensure the file is fresh, delete it if it exists before proceeding
-	if (midiFileToSave.existsAsFile())
-	{
-		midiFileToSave.deleteFile();  // Delete the existing file
-	}
+    if (midiFileToSave.existsAsFile())
+        midiFileToSave.deleteFile();
 
-	juce::FileOutputStream stream(midiFileToSave);
+    juce::FileOutputStream stream(midiFileToSave);
+    if (!stream.openedOk())
+    {
+        DBG("Failed to open file for writing MIDI data: " + midiFileToSave.getFullPathName());
+        return;
+    }
 
-	// Save the MIDI data to the file
-	midiFile.writeTo(stream);
-
+    try
+    {
+        midiFile.writeTo(stream);
         stream.flush();
-
         DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
-
+    }
+    catch (const std::exception& e)
+    {
+        DBG("Exception while writing MIDI file: " + juce::String(e.what()));
+    }
+    catch (...)
+    {
+        DBG("Unknown exception while writing MIDI file.");
+    }
 }
 
 void MidiManager::exportRecordBufferToMidiFile()

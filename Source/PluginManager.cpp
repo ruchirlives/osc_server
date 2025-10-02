@@ -594,15 +594,47 @@ void PluginManager::resetPlayback()
         hostPlayHead.positionInfo.setIsPlaying(false);
         // Also clear the taggedMidiBuffer
         taggedMidiBuffer.clear();
-	// And stop any currently playing notes
-	//for (const auto& [pluginId, pluginInstance] : pluginInstances)
-	//{
-	//	if (pluginInstance != nullptr)
-	//	{
-	//		pluginInstance->
-	//	}
-	//}
+
 }
+
+// And stop any currently playing notes
+void PluginManager::stopAllNotes()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    for (auto& [pluginId, pluginInstance] : pluginInstances)
+    {
+        if (pluginInstance != nullptr)
+        {
+            int numOut = pluginInstance->getTotalNumOutputChannels();
+            if (numOut <= 0)
+                continue; // Skip plugins with no output channels
+
+            juce::MidiBuffer stopMessages;
+            for (int channel = 1; channel <= 16; ++channel)
+            {
+                stopMessages.addEvent(juce::MidiMessage::allNotesOff(channel), 0);
+                stopMessages.addEvent(juce::MidiMessage::allSoundOff(channel), 0);
+            }
+            juce::AudioBuffer<float> dummyBuffer(numOut, 512);
+            dummyBuffer.clear();
+
+            try
+            {
+                pluginInstance->processBlock(dummyBuffer, stopMessages);
+            }
+            catch (const std::exception& e)
+            {
+                DBG("Exception in stopAllNotes for plugin " << pluginId << ": " << e.what());
+            }
+            catch (...)
+            {
+                DBG("Unknown exception in stopAllNotes for plugin " << pluginId);
+            }
+        }
+    }
+}
+
+
 
 juce::int8 PluginManager::getNumInstances(std::vector<juce::String>& instances)
 {
