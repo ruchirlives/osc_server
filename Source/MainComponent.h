@@ -179,7 +179,7 @@ public:
 
 	// Getter for pluginManager
 	PluginManager& getPluginManager() { return pluginManager; }
-	MidiManager midiManager{this, midiCriticalSection, midiBuffer }; // Create an instance of the MidiManager class
+	MidiManager& getMidiManager() { return midiManager; }
 	juce::TableListBox orchestraTable; // TableListBox to display orchestra information
 
 
@@ -215,6 +215,7 @@ private:
 
 	juce::CriticalSection midiCriticalSection; // Critical section to protect the MIDI buffer
 	juce::MidiBuffer midiBuffer; // MIDI buffer to store incoming MIDI messages
+	MidiManager midiManager{this, midiCriticalSection, midiBuffer }; // Create an instance of the MidiManager class
 
 	// Label for the Project Name
 	juce::Label projectNameLabel{ "Project Name", "Project Name" }; // Label for the project name
