@@ -415,19 +415,29 @@ void PluginManager::savePluginData(const juce::String& dataFilePath, const juce:
 		dataFile.deleteFile();
 	}
 
-	juce::FileOutputStream dataOutputStream(dataFile);
+        juce::FileOutputStream dataOutputStream(dataFile);
 
-	// Check if the file opened successfully
-	if (dataOutputStream.openedOk())
-	{
-		// Create VST3Visitor instance
-		CustomVST3Visitor visitor;
+        // Check if the file opened successfully
+        if (dataOutputStream.openedOk())
+        {
+                // Validate that the plugin exists before attempting to use it. Using
+                // operator[] here would create a new empty entry and give us a null
+                // pointer, so explicitly look up the plugin first.
+                auto pluginIt = pluginInstances.find(pluginId);
+                if (pluginIt == pluginInstances.end() || pluginIt->second == nullptr)
+                {
+                        DBG("Failed to save plugin data. Plugin not found: " << pluginId);
+                        return;
+                }
 
-		// Get the plugin instance
-		juce::AudioPluginInstance* plugin = pluginInstances[pluginId].get();
+                // Create VST3Visitor instance
+                CustomVST3Visitor visitor;
 
-		// Visit the plugin instance
-		plugin->getExtensions(visitor);
+                // Get the plugin instance
+                juce::AudioPluginInstance* plugin = pluginIt->second.get();
+
+                // Visit the plugin instance
+                plugin->getExtensions(visitor);
 
 		// Get and write the plugin state
 		juce::MemoryBlock state = visitor.presetData;
