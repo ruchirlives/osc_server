@@ -121,6 +121,7 @@ public:
 
 
 private:
+    mutable juce::CriticalSection pluginInstanceLock;
     std::map<juce::String, std::unique_ptr<juce::AudioPluginInstance>> pluginInstances;
     std::map<juce::String, std::unique_ptr<PluginWindow>> pluginWindows;
 

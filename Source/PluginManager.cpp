@@ -69,6 +69,7 @@ PluginManager::~PluginManager()
 void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
     currentSampleRate = sampleRate;
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     for (auto& [pluginId, pluginInstance] : pluginInstances)
     {
         if (pluginInstance != nullptr)
@@ -105,6 +106,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     bufferToFill.clearActiveBufferRegion();
 
     const juce::ScopedLock sl(midiCriticalSection);
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
 
     // Guard against missing audio device
     if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
@@ -218,6 +220,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
 
 void PluginManager::releaseResources()
 {
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     for (auto& [pluginId, pluginInstance] : pluginInstances)
     {
         if (pluginInstance != nullptr)
@@ -247,11 +250,12 @@ juce::PluginDescription PluginManager::getDescFromName(const juce::String& name)
 
 void PluginManager::instantiatePluginByName(const juce::String& name, const juce::String& pluginId)
 {
-	juce::PluginDescription desc = getDescFromName(name);
+        juce::PluginDescription desc = getDescFromName(name);
     if (desc.name.isNotEmpty())
     {
-		instantiatePlugin(&desc, pluginId);
-	}
+                const juce::ScopedLock pluginLock(pluginInstanceLock);
+                instantiatePlugin(&desc, pluginId);
+        }
     else
     {
 		DBG("Plugin not found: " << name);
@@ -262,6 +266,7 @@ void PluginManager::instantiatePluginByName(const juce::String& name, const juce
 juce::StringArray PluginManager::getPluginInstanceIds() const
 {
     juce::StringArray instanceIds;
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     for (const auto& pluginPair : pluginInstances)
     {
         instanceIds.add(pluginPair.first);
@@ -281,6 +286,7 @@ void PluginManager::instantiatePlugin(juce::PluginDescription* desc, const juce:
 
     if (instance != nullptr)
     {
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
         pluginInstances[pluginId] = std::move(instance);
         pluginInstances[pluginId]->setPlayHead(&hostPlayHead);
         pluginInstances[pluginId]->prepareToPlay(sampleRate, blockSize);
@@ -294,10 +300,11 @@ void PluginManager::instantiatePlugin(juce::PluginDescription* desc, const juce:
 
 void PluginManager::openPluginWindow(juce::String pluginId)
 {
-	if (pluginWindows.find(pluginId) == pluginWindows.end() && pluginInstances.find(pluginId) != pluginInstances.end())
-	{
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        if (pluginWindows.find(pluginId) == pluginWindows.end() && pluginInstances.find(pluginId) != pluginInstances.end())
+        {
         pluginWindows[pluginId] = std::make_unique<PluginWindow>(pluginInstances[pluginId].get());
-	}
+        }
 	else if (pluginWindows.find(pluginId) != pluginWindows.end())
 	{
 		pluginWindows[pluginId]->setVisible(true);
@@ -315,10 +322,11 @@ void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)
     juce::Uuid uuid;
     juce::String pluginId = "Selection 1";
 
-	if (pluginInstances.find(pluginId) == pluginInstances.end())
-	{
-		instantiatePlugin(desc, pluginId);
-	}
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        if (pluginInstances.find(pluginId) == pluginInstances.end())
+        {
+                instantiatePlugin(desc, pluginId);
+        }
 	else
 	{
 		DBG("Plugin already instantiated: " << pluginId);
@@ -327,11 +335,12 @@ void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)
 
 juce::String PluginManager::getPluginData(juce::String pluginId)
 {
-	juce::String response = "Plugin not found.";
-	if (pluginInstances.find(pluginId) != pluginInstances.end())
-	{
-		juce::PluginDescription desc = pluginInstances[pluginId]->getPluginDescription();
-		response = desc.name;
+        juce::String response = "Plugin not found.";
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        if (pluginInstances.find(pluginId) != pluginInstances.end())
+        {
+                juce::PluginDescription desc = pluginInstances[pluginId]->getPluginDescription();
+                response = desc.name;
 		DBG("Plugin data found: " << response);
 		
 	}
@@ -340,6 +349,7 @@ juce::String PluginManager::getPluginData(juce::String pluginId)
 
 void PluginManager::resetPlugin(const juce::String& pluginId)
 {
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
         // Destroy the plugin window first which also deletes the editor
@@ -358,6 +368,7 @@ void PluginManager::resetPlugin(const juce::String& pluginId)
 
 void PluginManager::resetAllPlugins()
 {
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     // Iterate over a copy of the keys, as we modify the original map
     std::vector<juce::String> pluginIds;
     for (const auto& [pluginId, _] : pluginInstances)
@@ -379,20 +390,22 @@ void PluginManager::resetAllPlugins()
 
 bool PluginManager::hasPluginInstance(const juce::String& pluginId)
 {
-	if (pluginInstances.find(pluginId) != pluginInstances.end())
-	{
-		return true;
-	}
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        if (pluginInstances.find(pluginId) != pluginInstances.end())
+        {
+                return true;
+        }
     return false;
 }
 
 void PluginManager::listPluginInstances()
 {
-	for (const auto& [pluginId, pluginInstance] : pluginInstances)
-	{
-		DBG("Plugin ID: " << pluginId);
-		if (pluginInstance != nullptr)
-		{
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        for (const auto& [pluginId, pluginInstance] : pluginInstances)
+        {
+                DBG("Plugin ID: " << pluginId);
+                if (pluginInstance != nullptr)
+                {
 			DBG("Plugin Name: " << pluginInstance->getName());
 		}
 	}
@@ -400,8 +413,8 @@ void PluginManager::listPluginInstances()
 
 void PluginManager::savePluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
 {
-	// Get plugin unique ID
-	juce::String uniqueId = getPluginUniqueId(pluginId);
+        // Get plugin unique ID
+        juce::String uniqueId = getPluginUniqueId(pluginId);
 
     // Construct full file path
 	juce::String fullFilePath = dataFilePath + "/" + filename + ".vstpreset";
@@ -423,6 +436,7 @@ void PluginManager::savePluginData(const juce::String& dataFilePath, const juce:
                 // Validate that the plugin exists before attempting to use it. Using
                 // operator[] here would create a new empty entry and give us a null
                 // pointer, so explicitly look up the plugin first.
+                const juce::ScopedLock pluginLock(pluginInstanceLock);
                 auto pluginIt = pluginInstances.find(pluginId);
                 if (pluginIt == pluginInstances.end() || pluginIt->second == nullptr)
                 {
@@ -460,6 +474,7 @@ void PluginManager::savePluginData(const juce::String& dataFilePath, const juce:
 
 juce::String PluginManager::getPluginUniqueId(const juce::String& pluginId)
 {
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     auto it = pluginInstances.find(pluginId);
     if (it == pluginInstances.end() || it->second == nullptr)
     {
@@ -751,6 +766,7 @@ void PluginManager::upsertPluginDescriptionsFromFile(const juce::String& dataFil
 juce::MemoryBlock PluginManager::getPluginState(const juce::String& pluginId)
 {
     juce::MemoryBlock state;
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
         pluginInstances[pluginId]->getStateInformation(state);
@@ -766,6 +782,7 @@ juce::MemoryBlock PluginManager::getPluginState(const juce::String& pluginId)
 
 void PluginManager::restorePluginState(const juce::String& pluginId, const juce::MemoryBlock& state)
 {
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
         pluginInstances[pluginId]->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
@@ -795,11 +812,12 @@ void PluginManager::saveAllPluginStates(const juce::String& dataFilePath, std::v
         
 
         // Iterate over each plugin instance and save its state
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
         for (const auto& [pluginId, pluginInstance] : pluginInstances)
         {
-			// Check if instances is empty or if the pluginId is in the instances vector
-			if (instances.empty() || std::find(instances.begin(), instances.end(), pluginId) != instances.end())
-			{
+                        // Check if instances is empty or if the pluginId is in the instances vector
+                        if (instances.empty() || std::find(instances.begin(), instances.end(), pluginId) != instances.end())
+                        {
 				// Write plugin ID
 				dataOutputStream.writeString(pluginId);
 
@@ -855,6 +873,7 @@ void PluginManager::restoreAllPluginStates(const juce::String& dataFilePath)
 
 void PluginManager::renamePluginInstance(const juce::String& oldId, const juce::String& newId)
 {
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
     if (pluginInstances.find(oldId) != pluginInstances.end())
     {
         // Move the plugin instance to the new ID
