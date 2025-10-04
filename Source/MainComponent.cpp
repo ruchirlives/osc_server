@@ -33,9 +33,13 @@ MainComponent::MainComponent()
 	//     pluginManager.getDeviceManager().setAudioDeviceSetup(setup, true);
 	// }
 
-	setSize(600, 800);
-	resized();
-	juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
+        setSize(600, 800);
+        juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
+
+        addAndMakeVisible(audioDriverLabel);
+        audioDriverLabel.setJustificationType(juce::Justification::centredLeft);
+
+        initAudioDrivers();
 
 	// Initialise the Orchestra TableListBox
 	addAndMakeVisible(orchestraTableWrapper);
@@ -130,6 +134,7 @@ MainComponent::MainComponent()
     addAndMakeVisible(exportMidiButton);
     exportMidiButton.onClick = [this]() { midiManager.exportRecordBufferToMidiFile(); };
 
+    resized();
     updateOverdubUI();
 }
 
@@ -154,18 +159,26 @@ void MainComponent::resized()
 	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);
 	bpmEditor.setBounds(projectNameLabel.getRight() + spacingX, margin, 75, labelHeight);
 
-	audioStreamingPortLabel.setBounds(bpmEditor.getRight() + spacingX, margin, 150, labelHeight);
-	audioStreamingPortEditor.setBounds(audioStreamingPortLabel.getRight() + spacingX, margin, 75, labelHeight);
+        audioStreamingPortLabel.setBounds(bpmEditor.getRight() + spacingX, margin, 150, labelHeight);
+        audioStreamingPortEditor.setBounds(audioStreamingPortLabel.getRight() + spacingX, margin, 75, labelHeight);
 
-	bpmEditor.setJustification(juce::Justification::centred);
-	audioStreamingPortEditor.setJustification(juce::Justification::centred);
+        const int driverRowY = audioStreamingPortEditor.getBottom() + spacingY / 2;
+        audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
+        audioDriverList.setBounds(audioDriverLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 
-	// --- Reserved space at bottom for buttons ---
-	const int totalButtonHeight = numButtonRows * buttonHeight + (numButtonRows - 1) * spacingY;
-	const int buttonAreaTop = windowHeight - totalButtonHeight - margin;
+        bpmEditor.setJustification(juce::Justification::centred);
+        audioStreamingPortEditor.setJustification(juce::Justification::centred);
+        audioDriverList.setJustificationType(juce::Justification::centredLeft);
 
-	// --- Table area: from bottom of top controls to top of button area ---
-	const int tableTop = projectNameLabel.getBottom() + spacingY;
+        // --- Reserved space at bottom for buttons ---
+        const int totalButtonHeight = numButtonRows * buttonHeight + (numButtonRows - 1) * spacingY;
+        const int buttonAreaTop = windowHeight - totalButtonHeight - margin;
+
+        // --- Table area: from bottom of top controls to top of button area ---
+        int topControlsBottom = projectNameLabel.getBottom();
+        topControlsBottom = juce::jmax(topControlsBottom, audioStreamingPortEditor.getBottom());
+        topControlsBottom = juce::jmax(topControlsBottom, audioDriverList.getBottom());
+        const int tableTop = topControlsBottom + spacingY;
 	const int tableHeight = buttonAreaTop - tableTop - spacingY;  // extra spacing between table and buttons
 	orchestraTableWrapper.setBounds(margin, tableTop, windowWidth - 2 * margin, tableHeight);
 
@@ -653,9 +666,9 @@ void MainComponent::initPlugins()
 
 void MainComponent::initMidiInputs()
 {
-	addAndMakeVisible(midiInputList);
-	midiInputList.setBounds(170, 300, 150, 30);
-	midiInputList.addListener(this);
+        addAndMakeVisible(midiInputList);
+        midiInputList.setBounds(170, 300, 150, 30);
+        midiInputList.addListener(this);
 
 	// Get the list of MIDI input devices
 	auto midiInputs = juce::MidiInput::getAvailableDevices();
@@ -695,14 +708,69 @@ void MainComponent::initMidiInputs()
 	midiInputList.setSelectedId(1);
 	// get the name of the first MIDI input
 	juce::String midiInputName = midiInputs[0].name;
-	midiManager.openMidiInput(midiInputName);
+        midiManager.openMidiInput(midiInputName);
 
+}
+
+void MainComponent::initAudioDrivers()
+{
+        addAndMakeVisible(audioDriverList);
+        audioDriverList.addListener(this);
+        audioDriverList.setTextWhenNothingSelected("Select Driver");
+
+        auto& deviceManager = pluginManager.getDeviceManager();
+        auto& availableDeviceTypes = deviceManager.getAvailableDeviceTypes();
+
+        audioDriverList.clear(juce::dontSendNotification);
+
+        int itemId = 1;
+
+        for (auto* type : availableDeviceTypes)
+        {
+                if (type == nullptr)
+                        continue;
+
+                auto typeName = type->getTypeName();
+                if (typeName.isNotEmpty())
+                        audioDriverList.addItem(typeName, itemId++);
+        }
+
+        if (audioDriverList.getNumItems() == 0)
+        {
+                audioDriverList.setEnabled(false);
+                audioDriverList.setText("No Drivers Available", juce::dontSendNotification);
+                return;
+        }
+
+        audioDriverList.setEnabled(true);
+
+        auto currentType = deviceManager.getCurrentAudioDeviceType();
+        bool matchedCurrent = false;
+        if (currentType.isNotEmpty())
+        {
+                for (int i = 0; i < audioDriverList.getNumItems(); ++i)
+                {
+                        if (audioDriverList.getItemText(i) == currentType)
+                        {
+                                audioDriverList.setSelectedId(i + 1, juce::dontSendNotification);
+                                matchedCurrent = true;
+                                break;
+                        }
+                }
+        }
+
+        if (!matchedCurrent)
+        {
+                auto firstTypeName = audioDriverList.getItemText(0);
+                audioDriverList.setSelectedId(1, juce::dontSendNotification);
+                deviceManager.setCurrentAudioDeviceType(firstTypeName, true);
+        }
 }
 
 void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
 {
-	if (comboBoxThatHasChanged == &pluginBox)
-	{
+        if (comboBoxThatHasChanged == &pluginBox)
+        {
 		int index = pluginBox.getSelectedId() - 1;
 		if (index >= 0)
 		{
@@ -733,12 +801,50 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
 			}
 		}
 	}
-	else if (comboBoxThatHasChanged == &midiInputList)
-	{
-		// Handle MIDI input selection
-		juce::String midiInputName = midiInputList.getText();
-		DBG("MIDI Input Selected: " + midiInputName);
-		midiManager.openMidiInput(midiInputName);
+        else if (comboBoxThatHasChanged == &midiInputList)
+        {
+                // Handle MIDI input selection
+                juce::String midiInputName = midiInputList.getText();
+                DBG("MIDI Input Selected: " + midiInputName);
+                midiManager.openMidiInput(midiInputName);
 
-	}
+        }
+        else if (comboBoxThatHasChanged == &audioDriverList)
+        {
+                auto selectedDriver = audioDriverList.getText();
+                if (selectedDriver.isNotEmpty())
+                {
+                        auto& deviceManager = pluginManager.getDeviceManager();
+                        if (selectedDriver != deviceManager.getCurrentAudioDeviceType())
+                        {
+                                auto previousType = deviceManager.getCurrentAudioDeviceType();
+                                deviceManager.setCurrentAudioDeviceType(selectedDriver, true);
+
+                                // If the device manager couldn't switch, revert UI selection
+                                auto appliedType = deviceManager.getCurrentAudioDeviceType();
+                                if (appliedType != selectedDriver)
+                                {
+                                        auto setSelectionTo = [this](const juce::String& type)
+                                        {
+                                                if (type.isEmpty())
+                                                        return;
+
+                                                for (int i = 0; i < audioDriverList.getNumItems(); ++i)
+                                                {
+                                                        if (audioDriverList.getItemText(i) == type)
+                                                        {
+                                                                audioDriverList.setSelectedId(i + 1, juce::dontSendNotification);
+                                                                break;
+                                                        }
+                                                }
+                                        };
+
+                                        if (appliedType.isNotEmpty())
+                                                setSelectionTo(appliedType);
+                                        else if (!previousType.isEmpty())
+                                                setSelectionTo(previousType);
+                                }
+                        }
+                }
+        }
 }

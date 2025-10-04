@@ -154,7 +154,8 @@ public:
 
 	void scanForPlugins();
 	void initPlugins();
-	void initMidiInputs();
+        void initMidiInputs();
+        void initAudioDrivers();
 	void initOrchestraTable();
 	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
 	void restoreProject(bool append = false);
@@ -187,8 +188,10 @@ private:
     juce::File pluginFolder; // Use a juce::File object instead of a pointer
 
 	// Add ComboBoxes for plugin selection and MIDI input selection
-    juce::ComboBox pluginBox;  // ComboBox to display plugins
-	juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
+        juce::ComboBox pluginBox;  // ComboBox to display plugins
+        juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
+        juce::Label audioDriverLabel{ "Audio Driver", "Audio Driver" };
+        juce::ComboBox audioDriverList;
 
 	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
 	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
