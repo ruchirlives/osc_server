@@ -664,18 +664,31 @@ void MainComponent::initMidiInputs()
 		id++;
 	}
 
-	// Set the first item as the default
-	if (midiInputs.size() > 0)
-	{
-		midiInputList.setSelectedId(1);
-		// get the name of the first MIDI input
-		juce::String midiInputName = midiInputs[0].name;
-		midiManager.openMidiInput(midiInputName);
-	}
-	else
-	{
+	// Check we have some MIDI inputs
+	if (midiInputs.size() == 0) {
 		midiInputList.setText("No MIDI Inputs Available");
+		return;
 	}
+
+	// Otherwise, identify and select "USB A" if available
+	for (int i = 0; i < midiInputs.size(); ++i)
+	{
+		if (midiInputs[i].name.containsIgnoreCase("USB A"))
+		{
+			midiInputList.setSelectedId(i + 1);
+			// Open the selected MIDI input
+			juce::String midiInputName = midiInputs[i].name;
+			midiManager.openMidiInput(midiInputName);
+			return;
+		}
+
+	}
+	// if no USB A, open the first MIDI input
+	midiInputList.setSelectedId(1);
+	// get the name of the first MIDI input
+	juce::String midiInputName = midiInputs[0].name;
+	midiManager.openMidiInput(midiInputName);
+
 }
 
 void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
