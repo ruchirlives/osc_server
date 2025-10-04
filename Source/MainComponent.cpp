@@ -1,4 +1,4 @@
-#include "MainComponent.h"
+﻿#include "MainComponent.h"
 
 #if JUCE_WINDOWS
 #include <windows.h>
@@ -38,6 +38,15 @@ MainComponent::MainComponent()
 
         addAndMakeVisible(audioDriverLabel);
         audioDriverLabel.setJustificationType(juce::Justification::centredLeft);
+
+        addAndMakeVisible(asioDeviceLabel);
+        asioDeviceLabel.setJustificationType(juce::Justification::centredLeft);
+        asioDeviceLabel.setVisible(false);
+
+        addAndMakeVisible(asioDeviceList);
+        asioDeviceList.addListener(this);
+        asioDeviceList.setTextWhenNothingSelected("Select ASIO Device");
+        asioDeviceList.setVisible(false);
 
         initAudioDrivers();
 
@@ -165,6 +174,10 @@ void MainComponent::resized()
         const int driverRowY = audioStreamingPortEditor.getBottom() + spacingY / 2;
         audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
         audioDriverList.setBounds(audioDriverLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
+
+        // ASIO device selection row (only visible if ASIO is selected)
+        asioDeviceLabel.setBounds(audioDriverList.getRight() + spacingX, driverRowY, 120, labelHeight);
+        asioDeviceList.setBounds(asioDeviceLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 
         bpmEditor.setJustification(juce::Justification::centred);
         audioStreamingPortEditor.setJustification(juce::Justification::centred);
@@ -765,6 +778,71 @@ void MainComponent::initAudioDrivers()
                 audioDriverList.setSelectedId(1, juce::dontSendNotification);
                 deviceManager.setCurrentAudioDeviceType(firstTypeName, true);
         }
+
+        // If ASIO is selected, enumerate ASIO devices
+        updateAsioDeviceList();
+}
+
+void MainComponent::updateAsioDeviceList()
+{
+    auto& deviceManager = pluginManager.getDeviceManager();
+    auto currentType = deviceManager.getCurrentAudioDeviceType();
+
+    if (currentType == "ASIO")
+    {
+        asioDeviceList.clear(juce::dontSendNotification);
+
+        // Find the ASIO device type
+        auto& availableDeviceTypes = deviceManager.getAvailableDeviceTypes();
+        juce::AudioIODeviceType* asioType = nullptr;
+        for (auto* type : availableDeviceTypes)
+        {
+            if (type != nullptr && type->getTypeName() == "ASIO")
+            {
+                asioType = type;
+                break;
+            }
+        }
+
+        if (asioType)
+        {
+            asioType->scanForDevices();
+            auto deviceNames = asioType->getDeviceNames();
+            int id = 1;
+            for (int i = 0; i < deviceNames.size(); ++i)
+            {
+                asioDeviceList.addItem(deviceNames[i], id++);
+            }
+        }
+
+        asioDeviceList.setEnabled(asioDeviceList.getNumItems() > 0);
+        asioDeviceLabel.setVisible(true);
+        asioDeviceList.setVisible(true);
+
+        // Select current device if possible
+        auto* currentDevice = deviceManager.getCurrentAudioDevice();
+        if (currentDevice)
+        {
+            auto currentDeviceName = currentDevice->getName();
+            for (int i = 0; i < asioDeviceList.getNumItems(); ++i)
+            {
+                if (asioDeviceList.getItemText(i) == currentDeviceName)
+                {
+                    asioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
+                    break;
+                }
+            }
+        }
+        else if (asioDeviceList.getNumItems() > 0)
+        {
+            asioDeviceList.setSelectedId(1, juce::dontSendNotification);
+        }
+    }
+    else
+    {
+        asioDeviceLabel.setVisible(false);
+        asioDeviceList.setVisible(false);
+    }
 }
 
 void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
@@ -843,6 +921,44 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
                                                 setSelectionTo(appliedType);
                                         else if (!previousType.isEmpty())
                                                 setSelectionTo(previousType);
+                                }
+                        }
+                        // Update ASIO device list visibility and contents
+                        updateAsioDeviceList();
+                }
+        }
+        else if (comboBoxThatHasChanged == &asioDeviceList)
+        {
+                auto selectedDevice = asioDeviceList.getText();
+                if (selectedDevice.isNotEmpty())
+                {
+                        auto& deviceManager = pluginManager.getDeviceManager();
+                        juce::AudioDeviceManager::AudioDeviceSetup setup;
+                        deviceManager.getAudioDeviceSetup(setup);
+                        setup.outputDeviceName = selectedDevice;
+                        setup.inputDeviceName = selectedDevice;
+                        auto result = deviceManager.setAudioDeviceSetup(setup, true);
+
+                        // If failed, show error and revert selection
+						if (result.indexOfAnyOf("error", 0, true) >= 0)
+                        {
+                                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                    "ASIO Device Error",
+                                    "Could not open ASIO device: " + selectedDevice);
+
+                                // Revert to previous device if possible
+                                auto* currentDevice = deviceManager.getCurrentAudioDevice();
+                                if (currentDevice)
+                                {
+                                        auto currentDeviceName = currentDevice->getName();
+                                        for (int i = 0; i < asioDeviceList.getNumItems(); ++i)
+                                        {
+                                                if (asioDeviceList.getItemText(i) == currentDeviceName)
+                                                {
+                                                        asioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
+                                                        break;
+                                                }
+                                        }
                                 }
                         }
                 }

@@ -156,6 +156,7 @@ public:
 	void initPlugins();
         void initMidiInputs();
         void initAudioDrivers();
+		void updateAsioDeviceList();
 	void initOrchestraTable();
 	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
 	void restoreProject(bool append = false);
@@ -192,6 +193,10 @@ private:
         juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
         juce::Label audioDriverLabel{ "Audio Driver", "Audio Driver" };
         juce::ComboBox audioDriverList;
+
+	// Add a ComboBox for ASIO device selection
+	juce::ComboBox asioDeviceList;
+	juce::Label asioDeviceLabel{ "ASIO Device", "ASIO Device" };
 
 	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
 	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
