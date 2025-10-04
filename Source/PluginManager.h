@@ -149,3 +149,6 @@ private:
 };
 
 // Create a new class called PluginTableModel that inherits from TableListBoxModel. It will hold a reference to the PluginManager.pluginList and implement the necessary methods to display the plugin list in the table.
+
+// Confirm that getDeviceManager() returns a valid, initialized juce::AudioDeviceManager
+// No changes needed if this is already correct.

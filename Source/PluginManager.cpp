@@ -994,3 +994,8 @@ void PluginManager::renamePluginInstance(const juce::String& oldId, const juce::
     }
 }
 
+// Ensure deviceManager is properly initialized and not set to "No Device"
+// If you have any code that sets outputDeviceName to "No Device", remove or comment it out.
+
+// ...existing code...
+

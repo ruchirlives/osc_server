@@ -1,5 +1,19 @@
 #include "MainComponent.h"
 
+#if JUCE_WINDOWS
+#include <windows.h>
+#endif
+
+static bool isRunningInDebugger()
+{
+#if JUCE_WINDOWS
+    return ::IsDebuggerPresent();
+#elif JUCE_MAC || JUCE_LINUX
+    return juce::SystemStats::getEnvironmentVariable("JUCE_DEBUGGER", "").isNotEmpty();
+#else
+    return false;
+#endif
+}
 
 MainComponent::MainComponent()
 {	
@@ -10,6 +24,14 @@ MainComponent::MainComponent()
 	//		if (audioStreamer)
 	//			audioStreamer->sendAudio(buffer);
 	//	};
+
+	// Remove or comment out the debug guard to allow sound connection even under debugger
+	// if (isRunningInDebugger())
+	// {
+	//     juce::AudioDeviceManager::AudioDeviceSetup setup;
+	//     setup.outputDeviceName = "No Device";
+	//     pluginManager.getDeviceManager().setAudioDeviceSetup(setup, true);
+	// }
 
 	setSize(600, 800);
 	resized();
@@ -181,23 +203,19 @@ void MainComponent::resized()
 	stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 	undoOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 
-
-
-
-
 	// --- BPM Sync handler ---
 	bpmEditor.onTextChange = [this]() {
 		pluginManager.setBpm(getBpm());
-		};
+	};
 
 	// --- Audio Streaming Port handler ---
 	audioStreamingPortEditor.onFocusLost = [this]() {
 		handleAudioPortChange();
-		};
+	};
 
 	audioStreamingPortEditor.onReturnKey = [this]() {
 		handleAudioPortChange();
-		};
+	};
 }
 
 void MainComponent::updateOverdubUI()
@@ -273,10 +291,6 @@ void MainComponent::moveSelectedRowsToEnd()
 	orchestraTable.updateContent();
 }
 
-
-
-
-
 void MainComponent::updateProjectNameLabel(juce::String projectName)
 {
 	projectNameLabel.setText("Project Name: " + projectName, juce::dontSendNotification);
@@ -324,8 +338,6 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo>& selectedInstr
 	updateProjectNameLabel(projectName);
 
 }
-
-
 
 void MainComponent::restoreProject(bool append)
 {
@@ -397,7 +409,6 @@ void MainComponent::restoreProject(bool append)
 		}
 	}
 }
-
 
 void MainComponent::addDataToTable()
 {
@@ -536,7 +547,6 @@ void MainComponent::addNewInstrument()
 	pasteClipboard(newRow);
 }
 
-
 void MainComponent::UpdateAndSelect(int row)
 {
 	// Update the orchestra table
@@ -587,13 +597,11 @@ void MainComponent::getFolder()
 	
 }
 
-
 void MainComponent::paint(juce::Graphics& g)
 {
 	g.setColour(juce::Colours::lightgrey.darker(0.8f));  // near-black but not pure
 	g.fillAll();
 }
-
 
 double MainComponent::getBpm() const
 {
