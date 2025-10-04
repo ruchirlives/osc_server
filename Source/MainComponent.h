@@ -190,7 +190,7 @@ private:
     juce::ComboBox pluginBox;  // ComboBox to display plugins
 	juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
 
-	juce::TextButton getRecordedButton{ "Get Recorded" }; // Button to trigger 
+	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
 	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
 	juce::TextButton listPluginInstancesButton{ "List Plugin Instances" }; // Button to list plugin instances
 	juce::TextButton sendTestNoteButton{ "Send Test Note" }; // Button to send a test note
