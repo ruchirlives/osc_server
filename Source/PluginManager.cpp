@@ -53,13 +53,13 @@ void printParameterNames(const juce::AudioPluginInstance* pluginInstance)
 
 
 PluginManager::PluginManager(MainComponent* mainComponent, juce::CriticalSection& criticalSection, juce::MidiBuffer& midiBuffer)
-	: mainComponent(mainComponent), midiCriticalSection(criticalSection), incomingMidi(midiBuffer)
+    : mainComponent(mainComponent), midiCriticalSection(criticalSection), incomingMidi(midiBuffer)
 {
     formatManager.addFormat(new juce::VST3PluginFormat());  // Adds only VST3 format to the format manager
-    deviceManager.initialise(4, 32, nullptr, true); // Initialize with 4 input and 8 output channels.
-    setAudioChannels(4, 32); // Set input and output channels to 4 and 8, respectively.
-
+    // Remove: deviceManager.initialise(4, 32, nullptr, true); // Remove this duplicate initialization
+    setAudioChannels(4, 32); // Keep only this - it properly initializes the inherited AudioDeviceManager
 }
+
 
 PluginManager::~PluginManager()
 {
