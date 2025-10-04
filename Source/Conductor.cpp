@@ -909,19 +909,20 @@ int OrchestraTableModel::getSelectedMidiChannel()
 
 juce::String OrchestraTableModel::getSelectedPluginId()
 {
-	// Get the pluginId of the first selected rows
-	juce::SparseSet<int> selectedRows = table.getSelectedRows();
+    // Get the pluginId of the first selected rows
+    juce::SparseSet<int> selectedRows = table.getSelectedRows();
 
-	if (selectedRows.size() > 0)
-	{
-		juce::String pluginId = orchestraData[selectedRows[0]].pluginInstanceId;
-		return pluginId;
-	}
-	else
-	{
-		// return an empty string
-		return juce::String();
-	}
+    if (selectedRows.size() > 0)
+    {
+        int rowIndex = selectedRows[0];
+        if (rowIndex >= 0 && rowIndex < static_cast<int>(orchestraData.size()))
+        {
+            juce::String pluginId = orchestraData[rowIndex].pluginInstanceId;
+            return pluginId;
+        }
+    }
+    // return an empty string if no valid selection
+    return juce::String();
 }
 
 juce::String OrchestraTableModel::getText(int columnNumber, int rowNumber) const
