@@ -113,9 +113,6 @@ public:
     void saveAllPluginStates(const juce::String& dataFilePath, std::vector<juce::String> instances = {});
     void restoreAllPluginStates(const juce::String& dataFilePath);
 
-	// Getter for deviceManager
-	juce::AudioDeviceManager& getDeviceManager() { return deviceManager; }
-
     void renamePluginInstance(const juce::String& oldId, const juce::String& newId);
     std::function<void(const juce::AudioBuffer<float>&)> audioTapCallback;
 
@@ -128,8 +125,6 @@ private:
     // A vector to hold tagged MIDI messages
     std::vector<MyMidiMessage> taggedMidiBuffer;
     std::map<juce::String, std::map<int, std::vector<juce::String>>> channelTagsMap;
-
-    juce::AudioDeviceManager deviceManager;
     juce::AudioPluginFormatManager formatManager;
 
     juce::CriticalSection& midiCriticalSection;

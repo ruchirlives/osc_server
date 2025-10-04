@@ -56,7 +56,6 @@ PluginManager::PluginManager(MainComponent* mainComponent, juce::CriticalSection
 	: mainComponent(mainComponent), midiCriticalSection(criticalSection), incomingMidi(midiBuffer)
 {
     formatManager.addFormat(new juce::VST3PluginFormat());  // Adds only VST3 format to the format manager
-    deviceManager.initialise(4, 32, nullptr, true); // Initialize with 4 input and 8 output channels.
     setAudioChannels(4, 32); // Set input and output channels to 4 and 8, respectively.
 
 }
@@ -109,7 +108,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     const juce::ScopedLock pluginLock(pluginInstanceLock);
 
     // Guard against missing audio device
-    if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
+    if (auto* audioDevice = getAudioDeviceManager().getCurrentAudioDevice(); audioDevice != nullptr)
     {
         double sampleRate = audioDevice->getCurrentSampleRate();
 
@@ -278,8 +277,9 @@ void PluginManager::instantiatePlugin(juce::PluginDescription* desc, const juce:
 {
     juce::String errorMessage;
 
-    auto sampleRate = deviceManager.getAudioDeviceSetup().sampleRate;
-    auto blockSize = deviceManager.getAudioDeviceSetup().bufferSize;
+    auto setup = getAudioDeviceManager().getAudioDeviceSetup();
+    auto sampleRate = setup.sampleRate;
+    auto blockSize = setup.bufferSize;
 
     std::unique_ptr<juce::AudioPluginInstance> instance = formatManager.createPluginInstance(
         *desc, sampleRate, blockSize, errorMessage);
