@@ -520,6 +520,10 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 
     recordedMIDI.updateMatchedPairs();
 
+    // --- Ensure we replace the file, not append ---
+    if (midiFile.existsAsFile())
+        midiFile.deleteFile();
+
     juce::FileOutputStream outputStream(midiFile);
     if (outputStream.openedOk())
     {
