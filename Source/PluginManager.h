@@ -125,7 +125,15 @@ public:
 
 private:
     mutable juce::CriticalSection pluginInstanceLock;
-    std::map<juce::String, std::unique_ptr<juce::AudioPluginInstance>> pluginInstances;
+    juce::AudioProcessorGraph graph;
+    juce::AudioProcessorGraph::Node::Ptr audioInputNode;
+    juce::AudioProcessorGraph::Node::Ptr audioOutputNode;
+    juce::AudioProcessorGraph::Node::Ptr midiInputNode;
+    juce::AudioProcessorGraph::Node::Ptr midiOutputNode;
+    std::map<juce::String, juce::AudioProcessorGraph::NodeID> pluginNodeIds;
+    std::vector<juce::String> pluginOrder;
+    std::map<juce::String, int> pluginMidiChannels;
+    int nextMidiChannel = 1;
     std::map<juce::String, std::unique_ptr<PluginWindow>> pluginWindows;
 
     // A vector to hold tagged MIDI messages
@@ -139,11 +147,15 @@ private:
     juce::MidiBuffer& incomingMidi;
 
     // playback counter
-	juce::int64 playbackSamplePosition = 0;
+        juce::int64 playbackSamplePosition = 0;
     double currentBpm = 125.0; // Default BPM
     double currentSampleRate = 44100.0;
     juce::int64  totalSamplesProcessed{ 0 };
     MainComponent* mainComponent;
+
+    void initialiseGraph();
+    void rebuildGraphConnections();
+    juce::AudioPluginInstance* getPluginInstance(const juce::String& pluginId);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

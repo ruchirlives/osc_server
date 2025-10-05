@@ -58,6 +58,8 @@ PluginManager::PluginManager(MainComponent* mainComponent, juce::CriticalSection
     formatManager.addFormat(new juce::VST3PluginFormat());  // Adds only VST3 format to the format manager
     // Remove: deviceManager.initialise(4, 32, nullptr, true); // Remove this duplicate initialization
     setAudioChannels(4, 32); // Keep only this - it properly initializes the inherited AudioDeviceManager
+    initialiseGraph();
+    graph.setPlayHead(&hostPlayHead);
 }
 
 
@@ -66,48 +68,56 @@ PluginManager::~PluginManager()
     shutdownAudio();
 }
 
+void PluginManager::initialiseGraph()
+{
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    graph.clear();
+    pluginNodeIds.clear();
+    pluginOrder.clear();
+    pluginMidiChannels.clear();
+    nextMidiChannel = 1;
+
+    audioInputNode = graph.addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
+        juce::AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode));
+    audioOutputNode = graph.addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
+        juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode));
+    midiInputNode = graph.addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
+        juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode));
+    midiOutputNode = graph.addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
+        juce::AudioProcessorGraph::AudioGraphIOProcessor::midiOutputNode));
+
+    rebuildGraphConnections();
+
+    if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
+        graph.prepareToPlay(audioDevice->getCurrentSampleRate(), audioDevice->getCurrentBufferSizeSamples());
+}
+
 void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
     currentSampleRate = sampleRate;
     const juce::ScopedLock pluginLock(pluginInstanceLock);
-    for (auto& [pluginId, pluginInstance] : pluginInstances)
-    {
-        if (pluginInstance != nullptr)
-        {
-                        pluginInstance->prepareToPlay(sampleRate, samplesPerBlockExpected);
-
-        }
-    }
+    graph.setPlayHead(&hostPlayHead);
+    graph.prepareToPlay(sampleRate, samplesPerBlockExpected);
 }
 
 void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
 {
-    // 1) Update the shared play-head before any plugin processes
-
     auto& pos = hostPlayHead.positionInfo;
 
     pos = {};  // clear all flags
-    
-    // Validate BPM before setting
+
     if (currentBpm > 0.0)
-    {
         pos.setBpm(currentBpm);
-    }
     else
-    {
-        pos.setBpm(120.0); // Default fallback BPM
-    }
-    
+        pos.setBpm(120.0);
+
     pos.setTimeSignature(juce::AudioPlayHead::TimeSignature{ 4, 4 });
-    
-    // Validate sample position
+
     if (playbackSamplePosition >= 0 && currentSampleRate > 0.0)
     {
         pos.setTimeInSamples(playbackSamplePosition);
         pos.setTimeInSeconds(playbackSamplePosition / currentSampleRate);
-        pos.setPpqPosition(playbackSamplePosition
-            * (currentBpm / 60.0)
-            / currentSampleRate);
+        pos.setPpqPosition(playbackSamplePosition * (currentBpm / 60.0) / currentSampleRate);
     }
     else
     {
@@ -115,155 +125,94 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         pos.setTimeInSeconds(0.0);
         pos.setPpqPosition(0.0);
     }
-    
+
     pos.setIsPlaying(true);
-    
-    // clear the output buffer
+
     bufferToFill.clearActiveBufferRegion();
 
-    const juce::ScopedLock sl(midiCriticalSection);
-    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    juce::MidiBuffer midiToProcess;
+    bool deviceMissing = false;
 
-    // Guard against missing audio device
-    if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
     {
-        double sampleRate = audioDevice->getCurrentSampleRate();
+        const juce::ScopedLock midiLock(midiCriticalSection);
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
 
-        // Purge MIDI messages for non-existent plugins
-        taggedMidiBuffer.erase(
-            std::remove_if(taggedMidiBuffer.begin(), taggedMidiBuffer.end(),
-                [this](const MyMidiMessage& m)
-                {
-                    return pluginInstances.find(m.pluginId) == pluginInstances.end();
-                }),
-            taggedMidiBuffer.end());
-
-        // Cap buffer growth
-        const std::size_t maxBufferSize = 1024;
-        if (taggedMidiBuffer.size() > maxBufferSize)
-            taggedMidiBuffer.erase(taggedMidiBuffer.begin(),
-                taggedMidiBuffer.begin() + (taggedMidiBuffer.size() - maxBufferSize));
-
-        // 2) Process each plugin once, in a single loop
-        for (auto& [pluginId, pluginInstance] : pluginInstances)
+        if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
         {
-            if (!pluginInstance)
-                continue;
+            double sampleRate = audioDevice->getCurrentSampleRate();
 
-            // Validate plugin instance before processing
-            try
-            {
-                // Check if plugin is properly initialized
-                if (pluginInstance->getTotalNumOutputChannels() <= 0)
-                {
-                    DBG("Warning: Plugin " << pluginId << " has no output channels, skipping");
-                    continue;
-                }
-
-                // d) prepare a per-plugin tempBuffer with correct channel count
-                int numOut = pluginInstance->getTotalNumOutputChannels();
-                juce::AudioBuffer<float> tempBuffer(numOut, bufferToFill.numSamples);
-                tempBuffer.clear();
-
-                // e) gather tagged MIDI for this plugin
-                juce::MidiBuffer matchingMessages;
-                bool isStartingPlayback = (playbackSamplePosition == 0);
-                const int graceWindow = bufferToFill.numSamples; // One buffer's worth
-
-                for (auto it = taggedMidiBuffer.begin(); it != taggedMidiBuffer.end();)
-                {
-                    const auto& tm = *it;
-                    if (tm.pluginId == pluginId)
+            taggedMidiBuffer.erase(
+                std::remove_if(taggedMidiBuffer.begin(), taggedMidiBuffer.end(),
+                    [this](const MyMidiMessage& m)
                     {
-                        int offset = 0;
+                        return pluginNodeIds.find(m.pluginId) == pluginNodeIds.end();
+                    }),
+                taggedMidiBuffer.end());
 
-                        // Immediate message (no timestamp)
-                        if (tm.timestamp == 0)
-                        {
-                            matchingMessages.addEvent(tm.message, 0);
-                            it = taggedMidiBuffer.erase(it);
-                            continue;
-                        }
+            const std::size_t maxBufferSize = 1024;
+            if (taggedMidiBuffer.size() > maxBufferSize)
+                taggedMidiBuffer.erase(taggedMidiBuffer.begin(),
+                    taggedMidiBuffer.begin() + (taggedMidiBuffer.size() - maxBufferSize));
 
-                        // Convert ms to absolute sample position
-                        auto absPos = static_cast<juce::int64>((tm.timestamp / 1000.0) * sampleRate);
-                        offset = static_cast<int>(absPos - playbackSamplePosition);
+            bool isStartingPlayback = (playbackSamplePosition == 0);
+            const int graceWindow = bufferToFill.numSamples;
 
-                        // Handle early notes gracefully if at playback start
-                        if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
-                            || (offset >= 0 && offset < bufferToFill.numSamples))
-                        {
-                            matchingMessages.addEvent(tm.message, juce::jmax(0, offset)); // Clamp offset to 0 if early
-                            it = taggedMidiBuffer.erase(it);
-                            continue;
-                        }
-                    }
+            for (auto it = taggedMidiBuffer.begin(); it != taggedMidiBuffer.end();)
+            {
+                const auto& tm = *it;
+                int offset = 0;
 
-                    ++it; // Keep unscheduled messages
-                }
-
-                // merge in live incoming MIDI if this is the selected plugin
-                if (pluginId == mainComponent->getOrchestraTableModel().getSelectedPluginId())
-                    matchingMessages.addEvents(incomingMidi,
-                        0,
-                        bufferToFill.numSamples,
-                        bufferToFill.startSample);
-
-                // f) run the plugin with error handling
-                try
+                if (tm.timestamp == 0)
                 {
-                    pluginInstance->processBlock(tempBuffer, matchingMessages);
-                }
-                catch (const std::exception& e)
-                {
-                    DBG("Exception processing plugin " << pluginId << ": " << e.what());
-                    tempBuffer.clear(); // Clear buffer to avoid audio artifacts
-                    continue;
-                }
-                catch (...)
-                {
-                    DBG("Unknown exception processing plugin " << pluginId);
-                    tempBuffer.clear(); // Clear buffer to avoid audio artifacts
+                    auto message = tm.message;
+                    if (auto channelIt = pluginMidiChannels.find(tm.pluginId); channelIt != pluginMidiChannels.end() && message.isChannelMessage())
+                        message.setChannel(channelIt->second);
+
+                    midiToProcess.addEvent(message, 0);
+                    it = taggedMidiBuffer.erase(it);
                     continue;
                 }
 
-                // g) mix plugin output back into the host buffer
-                for (int ch = 0; ch < bufferToFill.buffer->getNumChannels(); ++ch)
+                auto absPos = static_cast<juce::int64>((tm.timestamp / 1000.0) * sampleRate);
+                offset = static_cast<int>(absPos - playbackSamplePosition);
+
+                if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
+                    || (offset >= 0 && offset < bufferToFill.numSamples))
                 {
-                    int outCh = ch < tempBuffer.getNumChannels() ? ch : tempBuffer.getNumChannels() - 1;
-                    if (outCh >= 0 && outCh < tempBuffer.getNumChannels())
-                    {
-                        bufferToFill.buffer->addFrom(ch,
-                            bufferToFill.startSample,
-                            tempBuffer,
-                            outCh,
-                            0,
-                            bufferToFill.numSamples);
-                    }
+                    auto message = tm.message;
+                    if (auto channelIt = pluginMidiChannels.find(tm.pluginId); channelIt != pluginMidiChannels.end() && message.isChannelMessage())
+                        message.setChannel(channelIt->second);
+
+                    midiToProcess.addEvent(message, juce::jmax(0, offset));
+                    it = taggedMidiBuffer.erase(it);
+                    continue;
                 }
+
+                ++it;
             }
-            catch (const std::exception& e)
-            {
-                DBG("Exception in plugin processing loop for " << pluginId << ": " << e.what());
-                continue;
-            }
-            catch (...)
-            {
-                DBG("Unknown exception in plugin processing loop for " << pluginId);
-                continue;
-            }
+
+            midiToProcess.addEvents(incomingMidi,
+                0,
+                bufferToFill.numSamples,
+                bufferToFill.startSample);
+        }
+        else
+        {
+            bufferToFill.clearActiveBufferRegion();
+            incomingMidi.clear();
+            taggedMidiBuffer.clear();
+            deviceMissing = true;
         }
     }
-    else
-    {
-        // If the device is missing, clear buffers and skip processing
-        bufferToFill.clearActiveBufferRegion();
-        incomingMidi.clear();
+
+    if (deviceMissing)
         return;
+
+    {
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        graph.processBlock(*bufferToFill.buffer, midiToProcess);
     }
 
-    // TAP audio for UDP streaming
-    // Tap the final mixed audio buffer once per callback
     if (audioTapCallback != nullptr)
     {
         try
@@ -280,7 +229,6 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         }
     }
 
-    // clear incoming MIDI and advance the host clock
     incomingMidi.clear();
     playbackSamplePosition += bufferToFill.numSamples;
 }
@@ -288,13 +236,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
 void PluginManager::releaseResources()
 {
     const juce::ScopedLock pluginLock(pluginInstanceLock);
-    for (auto& [pluginId, pluginInstance] : pluginInstances)
-    {
-        if (pluginInstance != nullptr)
-        {
-            pluginInstance->releaseResources();
-        }
-    }
+    graph.releaseResources();
 }
 
 void PluginManager::setBpm(double bpm)
@@ -334,7 +276,7 @@ juce::StringArray PluginManager::getPluginInstanceIds() const
 {
     juce::StringArray instanceIds;
     const juce::ScopedLock pluginLock(pluginInstanceLock);
-    for (const auto& pluginPair : pluginInstances)
+    for (const auto& pluginPair : pluginNodeIds)
     {
         instanceIds.add(pluginPair.first);
     }
@@ -353,11 +295,50 @@ void PluginManager::instantiatePlugin(juce::PluginDescription* desc, const juce:
 
     if (instance != nullptr)
     {
+        instance->setPlayHead(&hostPlayHead);
+        instance->prepareToPlay(sampleRate, blockSize);
+
         const juce::ScopedLock pluginLock(pluginInstanceLock);
-        pluginInstances[pluginId] = std::move(instance);
-        pluginInstances[pluginId]->setPlayHead(&hostPlayHead);
-        pluginInstances[pluginId]->prepareToPlay(sampleRate, blockSize);
-        DBG("Plugin instantiated successfully: " << pluginId);
+        if (auto node = graph.addNode(std::move(instance)))
+        {
+            pluginNodeIds[pluginId] = node->nodeID;
+            pluginOrder.push_back(pluginId);
+
+            int assignedChannel = -1;
+            for (int candidate = 1; candidate <= 16; ++candidate)
+            {
+                const bool channelInUse = std::any_of(pluginMidiChannels.begin(), pluginMidiChannels.end(),
+                    [candidate](const auto& pair)
+                    {
+                        return pair.second == candidate;
+                    });
+
+                if (!channelInUse)
+                {
+                    assignedChannel = candidate;
+                    break;
+                }
+            }
+
+            if (assignedChannel == -1)
+            {
+                assignedChannel = nextMidiChannel;
+                nextMidiChannel = (nextMidiChannel % 16) + 1;
+            }
+            else
+            {
+                nextMidiChannel = (assignedChannel % 16) + 1;
+            }
+
+            pluginMidiChannels[pluginId] = assignedChannel;
+
+            rebuildGraphConnections();
+            DBG("Plugin instantiated successfully: " << pluginId);
+        }
+        else
+        {
+            DBG("Failed to add plugin node to graph: " << pluginId);
+        }
     }
     else
     {
@@ -367,21 +348,28 @@ void PluginManager::instantiatePlugin(juce::PluginDescription* desc, const juce:
 
 void PluginManager::openPluginWindow(juce::String pluginId)
 {
-        const juce::ScopedLock pluginLock(pluginInstanceLock);
-        if (pluginWindows.find(pluginId) == pluginWindows.end() && pluginInstances.find(pluginId) != pluginInstances.end())
+    if (auto* pluginInstance = getPluginInstance(pluginId))
+    {
         {
-        pluginWindows[pluginId] = std::make_unique<PluginWindow>(pluginInstances[pluginId].get());
+            const juce::ScopedLock pluginLock(pluginInstanceLock);
+            auto windowIt = pluginWindows.find(pluginId);
+            if (windowIt == pluginWindows.end())
+            {
+                pluginWindows[pluginId] = std::make_unique<PluginWindow>(pluginInstance);
+            }
+            else
+            {
+                windowIt->second->setVisible(true);
+            }
         }
-	else if (pluginWindows.find(pluginId) != pluginWindows.end())
-	{
-		pluginWindows[pluginId]->setVisible(true);
-		getPluginData(pluginId);
-	}
-	else
-	{
-		DBG("Plugin window not found: " << pluginId);
-		listPluginInstances();
-	}
+
+        getPluginData(pluginId);
+    }
+    else
+    {
+        DBG("Plugin window not found: " << pluginId);
+        listPluginInstances();
+    }
 }
 
 void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)
@@ -389,67 +377,69 @@ void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)
     juce::Uuid uuid;
     juce::String pluginId = "Selection 1";
 
-        const juce::ScopedLock pluginLock(pluginInstanceLock);
-        if (pluginInstances.find(pluginId) == pluginInstances.end())
-        {
-                instantiatePlugin(desc, pluginId);
-        }
-	else
-	{
-		DBG("Plugin already instantiated: " << pluginId);
-	}
+    if (!hasPluginInstance(pluginId))
+    {
+        instantiatePlugin(desc, pluginId);
+    }
+    else
+    {
+        DBG("Plugin already instantiated: " << pluginId);
+    }
 }
 
 juce::String PluginManager::getPluginData(juce::String pluginId)
 {
-        juce::String response = "Plugin not found.";
-        const juce::ScopedLock pluginLock(pluginInstanceLock);
-        if (pluginInstances.find(pluginId) != pluginInstances.end())
-        {
-                juce::PluginDescription desc = pluginInstances[pluginId]->getPluginDescription();
-                response = desc.name;
-		DBG("Plugin data found: " << response);
-		
-	}
+    juce::String response = "Plugin not found.";
+    if (auto* pluginInstance = getPluginInstance(pluginId))
+    {
+        juce::PluginDescription desc = pluginInstance->getPluginDescription();
+        response = desc.name;
+        DBG("Plugin data found: " << response);
+    }
     return response;
 }
 
 void PluginManager::resetPlugin(const juce::String& pluginId)
 {
     const juce::ScopedLock pluginLock(pluginInstanceLock);
-    if (pluginInstances.find(pluginId) != pluginInstances.end())
+    auto nodeIt = pluginNodeIds.find(pluginId);
+    if (nodeIt == pluginNodeIds.end())
+        return;
+
+    pluginWindows.erase(pluginId);
+    graph.removeNode(nodeIt->second);
+    pluginNodeIds.erase(nodeIt);
+    pluginMidiChannels.erase(pluginId);
+    pluginOrder.erase(std::remove(pluginOrder.begin(), pluginOrder.end(), pluginId), pluginOrder.end());
+
+    rebuildGraphConnections();
+    DBG("Plugin reset: " << pluginId);
+
     {
-        // Destroy the plugin window first which also deletes the editor
-        pluginWindows.erase(pluginId);
-
-        // Release and reset the plugin instance
-        pluginInstances[pluginId]->releaseResources();
-        pluginInstances[pluginId].reset();
-
-        // Remove instance entry from map
-        pluginInstances.erase(pluginId);
-
-        DBG("Plugin reset: " << pluginId);
+        const juce::ScopedLock midiLock(midiCriticalSection);
+        taggedMidiBuffer.erase(
+            std::remove_if(taggedMidiBuffer.begin(), taggedMidiBuffer.end(),
+                [&pluginId](const MyMidiMessage& message)
+                {
+                    return message.pluginId == pluginId;
+                }),
+            taggedMidiBuffer.end());
     }
 }
 
 void PluginManager::resetAllPlugins()
 {
-    const juce::ScopedLock pluginLock(pluginInstanceLock);
-    // Iterate over a copy of the keys, as we modify the original map
-    std::vector<juce::String> pluginIds;
-    for (const auto& [pluginId, _] : pluginInstances)
     {
-        pluginIds.push_back(pluginId);
+        const juce::ScopedLock pluginLock(pluginInstanceLock);
+        pluginWindows.clear();
     }
 
-    for (const auto& pluginId : pluginIds)
     {
-        resetPlugin(pluginId);
+        const juce::ScopedLock midiLock(midiCriticalSection);
+        taggedMidiBuffer.clear();
     }
 
-    pluginInstances.clear();
-    pluginWindows.clear();
+    initialiseGraph();
     DBG("All plugins have been reset.");
 }
 
@@ -457,31 +447,29 @@ void PluginManager::resetAllPlugins()
 
 bool PluginManager::hasPluginInstance(const juce::String& pluginId)
 {
-        const juce::ScopedLock pluginLock(pluginInstanceLock);
-        if (pluginInstances.find(pluginId) != pluginInstances.end())
-        {
-                return true;
-        }
-    return false;
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    return pluginNodeIds.find(pluginId) != pluginNodeIds.end();
 }
 
 void PluginManager::listPluginInstances()
 {
-        const juce::ScopedLock pluginLock(pluginInstanceLock);
-        for (const auto& [pluginId, pluginInstance] : pluginInstances)
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    for (const auto& [pluginId, nodeId] : pluginNodeIds)
+    {
+        DBG("Plugin ID: " << pluginId);
+        if (auto node = graph.getNodeForId(nodeId))
         {
-                DBG("Plugin ID: " << pluginId);
-                if (pluginInstance != nullptr)
-                {
-			DBG("Plugin Name: " << pluginInstance->getName());
-		}
-	}
+            if (auto* plugin = dynamic_cast<juce::AudioPluginInstance*>(node->getProcessor()))
+                DBG("Plugin Name: " << plugin->getName());
+        }
+    }
 }
 
 void PluginManager::savePluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
 {
         // Get plugin unique ID
         juce::String uniqueId = getPluginUniqueId(pluginId);
+        juce::ignoreUnused(uniqueId);
 
     // Construct full file path
 	juce::String fullFilePath = dataFilePath + "/" + filename + ".vstpreset";
@@ -500,39 +488,27 @@ void PluginManager::savePluginData(const juce::String& dataFilePath, const juce:
         // Check if the file opened successfully
         if (dataOutputStream.openedOk())
         {
-                // Validate that the plugin exists before attempting to use it. Using
-                // operator[] here would create a new empty entry and give us a null
-                // pointer, so explicitly look up the plugin first.
-                const juce::ScopedLock pluginLock(pluginInstanceLock);
-                auto pluginIt = pluginInstances.find(pluginId);
-                if (pluginIt == pluginInstances.end() || pluginIt->second == nullptr)
+                auto* plugin = getPluginInstance(pluginId);
+                if (plugin == nullptr)
                 {
                         DBG("Failed to save plugin data. Plugin not found: " << pluginId);
                         return;
                 }
 
-                // Create VST3Visitor instance
                 CustomVST3Visitor visitor;
-
-                // Get the plugin instance
-                juce::AudioPluginInstance* plugin = pluginIt->second.get();
-
-                // Visit the plugin instance
                 plugin->getExtensions(visitor);
 
-		// Get and write the plugin state
-		juce::MemoryBlock state = visitor.presetData;
+                juce::MemoryBlock state = visitor.presetData;
 
-		// Check if the plugin state is empty
-		if (state.getSize() == 0)
-		{
-			DBG("Plugin state is empty.");
-			return;
-		}
+                if (state.getSize() == 0)
+                {
+                        DBG("Plugin state is empty.");
+                        return;
+                }
 
-		dataOutputStream.write(state.getData(), state.getSize());
-		DBG("Plugin data saved successfully to vstpreset file.");
-	}
+                dataOutputStream.write(state.getData(), state.getSize());
+                DBG("Plugin data saved successfully to vstpreset file.");
+        }
 	else
 	{
 		DBG("Failed to open file for saving plugin data.");
@@ -541,21 +517,17 @@ void PluginManager::savePluginData(const juce::String& dataFilePath, const juce:
 
 juce::String PluginManager::getPluginUniqueId(const juce::String& pluginId)
 {
-    const juce::ScopedLock pluginLock(pluginInstanceLock);
-    auto it = pluginInstances.find(pluginId);
-    if (it == pluginInstances.end() || it->second == nullptr)
+    auto* plugin = getPluginInstance(pluginId);
+    if (plugin == nullptr)
     {
         DBG("Error: Plugin ID not found or plugin instance is null.");
         return "Invalid Plugin ID";
     }
 
-    // Get the plugin instance
-    juce::AudioPluginInstance* plugin = it->second.get();
-
     // Get the plugin description
     juce::PluginDescription description = plugin->getPluginDescription();
 
-	// Create Unique ID
+        // Create Unique ID
 	juce::String uniqueId = description.createIdentifierString();
 
 	return uniqueId;
@@ -692,37 +664,14 @@ void PluginManager::resetPlayback()
 // And stop any currently playing notes
 void PluginManager::stopAllNotes()
 {
-    const juce::ScopedLock sl(midiCriticalSection);
-    for (auto& [pluginId, pluginInstance] : pluginInstances)
+    const juce::ScopedLock midiLock(midiCriticalSection);
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    for (const auto& [pluginId, channel] : pluginMidiChannels)
     {
-        if (pluginInstance != nullptr)
-        {
-            int numOut = pluginInstance->getTotalNumOutputChannels();
-            if (numOut <= 0)
-                continue; // Skip plugins with no output channels
-
-            juce::MidiBuffer stopMessages;
-            for (int channel = 1; channel <= 16; ++channel)
-            {
-                stopMessages.addEvent(juce::MidiMessage::allNotesOff(channel), 0);
-                stopMessages.addEvent(juce::MidiMessage::allSoundOff(channel), 0);
-            }
-            juce::AudioBuffer<float> dummyBuffer(numOut, 512);
-            dummyBuffer.clear();
-
-            try
-            {
-                pluginInstance->processBlock(dummyBuffer, stopMessages);
-            }
-            catch (const std::exception& e)
-            {
-                DBG("Exception in stopAllNotes for plugin " << pluginId << ": " << e.what());
-            }
-            catch (...)
-            {
-                DBG("Unknown exception in stopAllNotes for plugin " << pluginId);
-            }
-        }
+        auto allNotesOff = juce::MidiMessage::allNotesOff(channel);
+        auto allSoundOff = juce::MidiMessage::allSoundOff(channel);
+        taggedMidiBuffer.emplace_back(allNotesOff, pluginId, 0);
+        taggedMidiBuffer.emplace_back(allSoundOff, pluginId, 0);
     }
 }
 
@@ -731,27 +680,26 @@ void PluginManager::stopAllNotes()
 juce::int8 PluginManager::getNumInstances(std::vector<juce::String>& instances)
 {
     juce::int8 numInstances = 0;
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
 
     if (instances.empty())
     {
-        numInstances = pluginInstances.size();
+        numInstances = static_cast<juce::int8>(pluginNodeIds.size());
         DBG("Number of total plugins if selection not used: " << juce::String(numInstances));
     }
     else
     {
-        // Find the number of instances that are also in the pluginInstances map
-
         for (const auto& instance : instances)
         {
-            if (pluginInstances.find(instance) != pluginInstances.end())
+            if (pluginNodeIds.find(instance) != pluginNodeIds.end())
             {
                 numInstances++;
-				DBG("Instance found: " << instance);
+                                DBG("Instance found: " << instance);
             }
         }
     }
-	DBG("Count of instances to save: " << juce::String(numInstances));
-	return numInstances;
+        DBG("Count of instances to save: " << juce::String(numInstances));
+        return numInstances;
 }
 
 void PluginManager::savePluginDescriptionsToFile(const juce::String& dataFilePath, std::vector<juce::String> instances)
@@ -767,28 +715,40 @@ void PluginManager::savePluginDescriptionsToFile(const juce::String& dataFilePat
 
 	juce::FileOutputStream dataOutputStream(dataFile);
 
-	if (dataOutputStream.openedOk())
-	{
-		// Save the number of pluginsInstances
+        if (dataOutputStream.openedOk())
+        {
+                // Save the number of pluginsInstances
         juce::int8 numInstances = getNumInstances(instances);
-		dataOutputStream.writeInt(numInstances);
+                dataOutputStream.writeInt(numInstances);
 
-		// Iterate over each plugin instance and save its id and description pair
-		for (const auto& pluginPair : pluginInstances)
-		{
-			// Check if instances is empty or if the pluginId is in the instances vector
-			if (instances.empty() || std::find(instances.begin(), instances.end(), pluginPair.first) != instances.end())
-			{
-				// Write plugin ID
-				dataOutputStream.writeString(pluginPair.first);
+                // Iterate over each plugin instance and save its id and description pair
+                const juce::ScopedLock pluginLock(pluginInstanceLock);
+                for (const auto& pluginPair : pluginNodeIds)
+                {
+                        if (instances.empty() || std::find(instances.begin(), instances.end(), pluginPair.first) != instances.end())
+                        {
+                                dataOutputStream.writeString(pluginPair.first);
 
-				// Get and write plugin description
-				juce::PluginDescription desc = pluginPair.second->getPluginDescription();
-				dataOutputStream.writeString(desc.name);
-			}
-		}
-		DBG("All plugin descriptions saved successfully to binary file.");
-	}
+                                if (auto node = graph.getNodeForId(pluginPair.second))
+                                {
+                                        if (auto* plugin = dynamic_cast<juce::AudioPluginInstance*>(node->getProcessor()))
+                                        {
+                                                juce::PluginDescription desc = plugin->getPluginDescription();
+                                                dataOutputStream.writeString(desc.name);
+                                        }
+                                        else
+                                        {
+                                                dataOutputStream.writeString({});
+                                        }
+                                }
+                                else
+                                {
+                                        dataOutputStream.writeString({});
+                                }
+                        }
+                }
+                DBG("All plugin descriptions saved successfully to binary file.");
+        }
 	else
 	{
 		DBG("Failed to open file for saving plugin descriptions.");
@@ -845,11 +805,11 @@ void PluginManager::upsertPluginDescriptionsFromFile(const juce::String& dataFil
             juce::String pluginId = dataInputStream.readString();
             juce::String name = dataInputStream.readString();
 
-            // first check if the pluginId is not already in the pluginInstances map
-			if (pluginInstances.find(pluginId) == pluginInstances.end())
-			{
-				instantiatePluginByName(name, pluginId);
-			}
+            // first check if the pluginId is not already in the graph
+                        if (pluginNodeIds.find(pluginId) == pluginNodeIds.end())
+                        {
+                                instantiatePluginByName(name, pluginId);
+                        }
 
 
             DBG("All plugin descriptions upserted successfully from binary file.");
@@ -865,26 +825,23 @@ void PluginManager::upsertPluginDescriptionsFromFile(const juce::String& dataFil
 juce::MemoryBlock PluginManager::getPluginState(const juce::String& pluginId)
 {
     juce::MemoryBlock state;
-    const juce::ScopedLock pluginLock(pluginInstanceLock);
-    if (pluginInstances.find(pluginId) != pluginInstances.end())
+    if (auto* plugin = getPluginInstance(pluginId))
     {
-        pluginInstances[pluginId]->getStateInformation(state);
-        juce::String stateString = state.toString(); // Attempt to convert to a readable string
+        plugin->getStateInformation(state);
     }
     else
-	{
-		DBG("Plugin not found: " << pluginId);
-	}
+    {
+        DBG("Plugin not found: " << pluginId);
+    }
     return state;
 }
 
 
 void PluginManager::restorePluginState(const juce::String& pluginId, const juce::MemoryBlock& state)
 {
-    const juce::ScopedLock pluginLock(pluginInstanceLock);
-    if (pluginInstances.find(pluginId) != pluginInstances.end())
+    if (auto* plugin = getPluginInstance(pluginId))
     {
-        pluginInstances[pluginId]->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+        plugin->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
         DBG("Plugin state restored for: " << pluginId);
     }
 }
@@ -910,21 +867,23 @@ void PluginManager::saveAllPluginStates(const juce::String& dataFilePath, std::v
         dataOutputStream.writeInt(numInstances);
         
 
-        // Iterate over each plugin instance and save its state
-        const juce::ScopedLock pluginLock(pluginInstanceLock);
-        for (const auto& [pluginId, pluginInstance] : pluginInstances)
+        std::vector<juce::String> idsToSave;
         {
-                        // Check if instances is empty or if the pluginId is in the instances vector
-                        if (instances.empty() || std::find(instances.begin(), instances.end(), pluginId) != instances.end())
-                        {
-				// Write plugin ID
-				dataOutputStream.writeString(pluginId);
+            const juce::ScopedLock pluginLock(pluginInstanceLock);
+            for (const auto& [pluginId, _] : pluginNodeIds)
+            {
+                if (instances.empty() || std::find(instances.begin(), instances.end(), pluginId) != instances.end())
+                    idsToSave.push_back(pluginId);
+            }
+        }
 
-				// Get and write plugin state
-				juce::MemoryBlock state = getPluginState(pluginId);
-				dataOutputStream.writeInt((int)state.getSize());
-				dataOutputStream.write(state.getData(), state.getSize());
-			}
+        for (const auto& pluginId : idsToSave)
+        {
+            dataOutputStream.writeString(pluginId);
+
+            juce::MemoryBlock state = getPluginState(pluginId);
+            dataOutputStream.writeInt((int)state.getSize());
+            dataOutputStream.write(state.getData(), state.getSize());
         }
         DBG("All plugin states saved successfully to binary file.");
     }
@@ -973,25 +932,117 @@ void PluginManager::restoreAllPluginStates(const juce::String& dataFilePath)
 void PluginManager::renamePluginInstance(const juce::String& oldId, const juce::String& newId)
 {
     const juce::ScopedLock pluginLock(pluginInstanceLock);
-    if (pluginInstances.find(oldId) != pluginInstances.end())
+    auto oldNode = pluginNodeIds.find(oldId);
+    if (oldNode == pluginNodeIds.end())
     {
-        // Move the plugin instance to the new ID
-        pluginInstances[newId] = std::move(pluginInstances[oldId]);
-        pluginInstances.erase(oldId);
+        DBG("Error: Plugin Instance ID " + oldId + " not found.");
+        return;
+    }
 
-        // Update the plugin window mapping if necessary
-        if (pluginWindows.find(oldId) != pluginWindows.end())
+    if (pluginNodeIds.find(newId) != pluginNodeIds.end())
+    {
+        DBG("Error: Plugin Instance ID " + newId + " already exists.");
+        return;
+    }
+
+    auto nodeId = oldNode->second;
+    pluginNodeIds.erase(oldNode);
+    pluginNodeIds[newId] = nodeId;
+
+    if (auto orderIt = std::find(pluginOrder.begin(), pluginOrder.end(), oldId); orderIt != pluginOrder.end())
+        *orderIt = newId;
+
+    if (auto midiIt = pluginMidiChannels.find(oldId); midiIt != pluginMidiChannels.end())
+    {
+        int channel = midiIt->second;
+        pluginMidiChannels.erase(midiIt);
+        pluginMidiChannels[newId] = channel;
+    }
+
+    if (auto windowIt = pluginWindows.find(oldId); windowIt != pluginWindows.end())
+    {
+        pluginWindows[newId] = std::move(windowIt->second);
+        pluginWindows.erase(oldId);
+    }
+
+    for (auto& taggedMessage : taggedMidiBuffer)
+    {
+        if (taggedMessage.pluginId == oldId)
+            taggedMessage.pluginId = newId;
+    }
+
+    DBG("Plugin Instance ID renamed from " + oldId + " to " + newId);
+}
+
+void PluginManager::rebuildGraphConnections()
+{
+    if (audioInputNode == nullptr || audioOutputNode == nullptr)
+        return;
+
+    graph.clearConnections();
+
+    auto connectAudio = [this](juce::AudioProcessorGraph::NodeID sourceId, juce::AudioProcessorGraph::NodeID destId)
+    {
+        if (sourceId == destId)
+            return;
+
+        if (auto sourceNode = graph.getNodeForId(sourceId))
         {
-            pluginWindows[newId] = std::move(pluginWindows[oldId]);
-            pluginWindows.erase(oldId);
-        }
+            if (auto destNode = graph.getNodeForId(destId))
+            {
+                auto sourceOutputs = sourceNode->getProcessor()->getTotalNumOutputChannels();
+                auto destInputs = destNode->getProcessor()->getTotalNumInputChannels();
+                auto numChannels = juce::jmin(sourceOutputs, destInputs);
 
-        DBG("Plugin Instance ID renamed from " + oldId + " to " + newId);
+                for (int ch = 0; ch < numChannels; ++ch)
+                    graph.addConnection({ { sourceId, ch }, { destId, ch } });
+            }
+        }
+    };
+
+    juce::AudioProcessorGraph::NodeID lastNodeId = audioInputNode->nodeID;
+
+    if (pluginOrder.empty())
+    {
+        connectAudio(audioInputNode->nodeID, audioOutputNode->nodeID);
+        if (midiInputNode != nullptr && midiOutputNode != nullptr)
+            graph.addConnection({ { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex }, { midiOutputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
     }
     else
     {
-        DBG("Error: Plugin Instance ID " + oldId + " not found.");
+        for (const auto& pluginId : pluginOrder)
+        {
+            auto nodeIt = pluginNodeIds.find(pluginId);
+            if (nodeIt == pluginNodeIds.end())
+                continue;
+
+            auto nodeId = nodeIt->second;
+            connectAudio(lastNodeId, nodeId);
+
+            if (midiInputNode != nullptr)
+                graph.addConnection({ { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex }, { nodeId, juce::AudioProcessorGraph::midiChannelIndex } });
+
+            if (midiOutputNode != nullptr)
+                graph.addConnection({ { nodeId, juce::AudioProcessorGraph::midiChannelIndex }, { midiOutputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
+
+            lastNodeId = nodeId;
+        }
+
+        connectAudio(lastNodeId, audioOutputNode->nodeID);
     }
+}
+
+juce::AudioPluginInstance* PluginManager::getPluginInstance(const juce::String& pluginId)
+{
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    auto nodeIt = pluginNodeIds.find(pluginId);
+    if (nodeIt == pluginNodeIds.end())
+        return nullptr;
+
+    if (auto node = graph.getNodeForId(nodeIt->second))
+        return dynamic_cast<juce::AudioPluginInstance*>(node->getProcessor());
+
+    return nullptr;
 }
 
 // Ensure deviceManager is properly initialized and not set to "No Device"
