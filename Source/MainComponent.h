@@ -173,6 +173,7 @@ public:
 	void removeInstrument();
 
 	void comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged) override;
+	void setMidiInput(juce::String inputText);
 	void addDataToTable();
 	void openPlugins(juce::TableListBox& table);
 

@@ -1033,6 +1033,22 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
         }
 }
 
+// Set Midi input
+void MainComponent::setMidiInput(juce::String inputText)
+{
+	auto midiInputs = juce::MidiInput::getAvailableDevices();
+	for (auto input : midiInputs)
+	{
+		if (input.name == inputText)
+		{
+			midiManager.openMidiInput(input.name);
+			// Set UI
+			midiInputList.setText(input.name, juce::dontSendNotification);
+			return;
+		}
+	}
+}
+
 // Helper to load settings from config.ini
 void MainComponent::loadConfig()
 {
@@ -1048,6 +1064,10 @@ void MainComponent::loadConfig()
             bpmEditor.setText(line.fromFirstOccurrenceOf("bpm=", false, false));
         else if (line.startsWith("audioStreamingPort="))
             audioStreamingPortEditor.setText(line.fromFirstOccurrenceOf("audioStreamingPort=", false, false));
+		else if (line.startsWith("audioDriver="))
+			setSelectedAudioDevice(line.fromFirstOccurrenceOf("audioDriver=", false, false));
+		else if (line.startsWith("midiInput="))
+			setMidiInput(line.fromFirstOccurrenceOf("midiInput=", false, false));
         // Add more settings as needed
     }
 }
@@ -1058,6 +1078,8 @@ void MainComponent::saveConfig()
     juce::StringArray lines;
     lines.add("bpm=" + bpmEditor.getText());
     lines.add("audioStreamingPort=" + audioStreamingPortEditor.getText());
+	lines.add("audioDriver=" + getSelectedAudioDevice());
+	lines.add("midiInput=" + midiInputList.getText());
     // Add more settings as needed
 
     juce::String configText = lines.joinIntoString("\n");
