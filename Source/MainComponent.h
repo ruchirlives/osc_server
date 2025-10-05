@@ -154,7 +154,8 @@ public:
 
 	void scanForPlugins();
 	void initPlugins();
-        void initMidiInputs();
+	void initPluginsList();
+	void initMidiInputs();
         void initAudioDrivers();
         void updateAudioDeviceList();
 	void initOrchestraTable();

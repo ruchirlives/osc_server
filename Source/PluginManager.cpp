@@ -585,10 +585,6 @@ void PluginManager::scanPlugins(juce::FileSearchPath searchPaths)
     DBG("Scanning completed. " << knownPluginList.getNumTypes() << " VST3 Plugins Found");
 	savePluginListToFile();
 	DBG("Plugin list saved to file.");
-	// Reload to verify
-	knownPluginList.clear();
-	loadPluginListFromFile();
-	DBG("Plugin list reloaded from file. " << knownPluginList.getNumTypes() << " VST3 Plugins Found");
 
 }
 

@@ -657,6 +657,9 @@ void MainComponent::scanForPlugins()
 	pluginManager.scanPlugins(searchPaths);
 
 	DBG("Scanning completed.");
+
+	// Update the plugins list in the ComboBox
+	initPluginsList();
 }
 
 void MainComponent::initPlugins()
@@ -665,12 +668,20 @@ void MainComponent::initPlugins()
 	pluginBox.addListener(this);
 	pluginBox.setTextWhenNothingSelected("Select a Plugin");
 
+	initPluginsList();
+
+
+
+}
+
+// load and update plugins list
+void MainComponent::initPluginsList()
+{
 	// Try to load plugins first
 	if (!pluginManager.loadPluginListFromFile())
 	{
 		scanForPlugins();
 	}
-    
 	//Update the ListBox to display the plugins
 	pluginBox.clear();
 	for (int i = 0; i < pluginManager.knownPluginList.getNumTypes(); ++i)
@@ -681,9 +692,6 @@ void MainComponent::initPlugins()
 			pluginBox.addItem(desc->name, i + 1);
 		}
 	}
-
-
-
 }
 
 void MainComponent::initMidiInputs()
