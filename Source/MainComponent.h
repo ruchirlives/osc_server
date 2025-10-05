@@ -190,14 +190,14 @@ private:
     juce::File pluginFolder; // Use a juce::File object instead of a pointer
 
 	// Add ComboBoxes for plugin selection and MIDI input selection
-        juce::ComboBox pluginBox;  // ComboBox to display plugins
-        juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
-        juce::Label audioDriverLabel{ "Audio Driver", "Audio Driver" };
-        juce::ComboBox audioDriverList;
+    juce::ComboBox pluginBox;  // ComboBox to display plugins
+    juce::ComboBox midiInputList; // ComboBox to display MIDI inputs
+    juce::Label audioDriverLabel{ "Audio Driver", "Audio Driver" };
+    juce::ComboBox audioDriverList;
 
-        // Add a ComboBox for audio device selection within the selected driver
-        juce::ComboBox audioDeviceList;
-        juce::Label audioDeviceLabel{ "Audio Device", "Audio Device" };
+    // Add a ComboBox for audio device selection within the selected driver
+    juce::ComboBox audioDeviceList;
+    juce::Label audioDeviceLabel{ "Audio Device", "Audio Device" };
 
 	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
 	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
@@ -238,8 +238,8 @@ private:
     juce::TextButton stopOverdubButton { "Stop Overdub" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
     juce::TextButton undoOverdubButton { "Undo Overdub" };
-        juce::TextButton importMidiButton { "Import MIDI" };
-        juce::TextButton exportMidiButton { "Export MIDI" };
+    juce::TextButton importMidiButton { "Import MIDI" };
+    juce::TextButton exportMidiButton { "Export MIDI" };
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class
