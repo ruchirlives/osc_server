@@ -158,6 +158,7 @@ public:
 	void initMidiInputs();
     void initAudioDrivers();
     void updateAudioDeviceList();
+	void setSelectedAudioDriver(const juce::String& driverName);
 	juce::String getSelectedAudioDevice();
 	void setSelectedAudioDevice(const juce::String& deviceName);
 	void initOrchestraTable();

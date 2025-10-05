@@ -33,22 +33,22 @@ MainComponent::MainComponent()
 	//     pluginManager.getDeviceManager().setAudioDeviceSetup(setup, true);
 	// }
 
-        setSize(600, 800);
-        juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
+    setSize(600, 800);
+    juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
 
-        addAndMakeVisible(audioDriverLabel);
-        audioDriverLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(audioDriverLabel);
+    audioDriverLabel.setJustificationType(juce::Justification::centredLeft);
 
-        addAndMakeVisible(audioDeviceLabel);
-        audioDeviceLabel.setJustificationType(juce::Justification::centredLeft);
-        audioDeviceLabel.setVisible(false);
+    addAndMakeVisible(audioDeviceLabel);
+    audioDeviceLabel.setJustificationType(juce::Justification::centredLeft);
+    audioDeviceLabel.setVisible(false);
 
-        addAndMakeVisible(audioDeviceList);
-        audioDeviceList.addListener(this);
-        audioDeviceList.setTextWhenNothingSelected("Select Audio Device");
-        audioDeviceList.setVisible(false);
+    addAndMakeVisible(audioDeviceList);
+    audioDeviceList.addListener(this);
+    audioDeviceList.setTextWhenNothingSelected("Select Audio Device");
+    audioDeviceList.setVisible(false);
 
-        initAudioDrivers();
+    initAudioDrivers();
 
 	// Initialise the Orchestra TableListBox
 	addAndMakeVisible(orchestraTableWrapper);
@@ -185,30 +185,30 @@ void MainComponent::resized()
 	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);
 	bpmEditor.setBounds(projectNameLabel.getRight() + spacingX, margin, 75, labelHeight);
 
-        audioStreamingPortLabel.setBounds(bpmEditor.getRight() + spacingX, margin, 150, labelHeight);
-        audioStreamingPortEditor.setBounds(audioStreamingPortLabel.getRight() + spacingX, margin, 75, labelHeight);
+    audioStreamingPortLabel.setBounds(bpmEditor.getRight() + spacingX, margin, 150, labelHeight);
+    audioStreamingPortEditor.setBounds(audioStreamingPortLabel.getRight() + spacingX, margin, 75, labelHeight);
 
-        const int driverRowY = audioStreamingPortEditor.getBottom() + spacingY / 2;
-        audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
-        audioDriverList.setBounds(audioDriverLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
+    const int driverRowY = audioStreamingPortEditor.getBottom() + spacingY / 2;
+    audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
+    audioDriverList.setBounds(audioDriverLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 
-        // Audio device selection row (only visible when devices are available)
-        audioDeviceLabel.setBounds(audioDriverList.getRight() + spacingX, driverRowY, 120, labelHeight);
-        audioDeviceList.setBounds(audioDeviceLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
+    // Audio device selection row (only visible when devices are available)
+    audioDeviceLabel.setBounds(audioDriverList.getRight() + spacingX, driverRowY, 120, labelHeight);
+    audioDeviceList.setBounds(audioDeviceLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 
-        bpmEditor.setJustification(juce::Justification::centred);
-        audioStreamingPortEditor.setJustification(juce::Justification::centred);
-        audioDriverList.setJustificationType(juce::Justification::centredLeft);
+    bpmEditor.setJustification(juce::Justification::centred);
+    audioStreamingPortEditor.setJustification(juce::Justification::centred);
+    audioDriverList.setJustificationType(juce::Justification::centredLeft);
 
-        // --- Reserved space at bottom for buttons ---
-        const int totalButtonHeight = numButtonRows * buttonHeight + (numButtonRows - 1) * spacingY;
-        const int buttonAreaTop = windowHeight - totalButtonHeight - margin;
+    // --- Reserved space at bottom for buttons ---
+    const int totalButtonHeight = numButtonRows * buttonHeight + (numButtonRows - 1) * spacingY;
+    const int buttonAreaTop = windowHeight - totalButtonHeight - margin;
 
-        // --- Table area: from bottom of top controls to top of button area ---
-        int topControlsBottom = projectNameLabel.getBottom();
-        topControlsBottom = juce::jmax(topControlsBottom, audioStreamingPortEditor.getBottom());
-        topControlsBottom = juce::jmax(topControlsBottom, audioDriverList.getBottom());
-        const int tableTop = topControlsBottom + spacingY;
+    // --- Table area: from bottom of top controls to top of button area ---
+    int topControlsBottom = projectNameLabel.getBottom();
+    topControlsBottom = juce::jmax(topControlsBottom, audioStreamingPortEditor.getBottom());
+    topControlsBottom = juce::jmax(topControlsBottom, audioDriverList.getBottom());
+    const int tableTop = topControlsBottom + spacingY;
 	const int tableHeight = buttonAreaTop - tableTop - spacingY;  // extra spacing between table and buttons
 	orchestraTableWrapper.setBounds(margin, tableTop, windowWidth - 2 * margin, tableHeight);
 
@@ -703,9 +703,9 @@ void MainComponent::initPluginsList()
 
 void MainComponent::initMidiInputs()
 {
-        addAndMakeVisible(midiInputList);
-        midiInputList.setBounds(170, 300, 150, 30);
-        midiInputList.addListener(this);
+    addAndMakeVisible(midiInputList);
+    midiInputList.setBounds(170, 300, 150, 30);
+    midiInputList.addListener(this);
 
 	// Get the list of MIDI input devices
 	auto midiInputs = juce::MidiInput::getAvailableDevices();
@@ -728,20 +728,6 @@ void MainComponent::initMidiInputs()
 		return;
 	}
 
-	// Otherwise, identify and select "USB A" if available
-	for (int i = 0; i < midiInputs.size(); ++i)
-	{
-		if (midiInputs[i].name.containsIgnoreCase("USB A"))
-		{
-			midiInputList.setSelectedId(i + 1);
-			// Open the selected MIDI input
-			juce::String midiInputName = midiInputs[i].name;
-			midiManager.openMidiInput(midiInputName);
-			return;
-		}
-
-	}
-	// if no USB A, open the first MIDI input
 	midiInputList.setSelectedId(1);
 	// get the name of the first MIDI input
 	juce::String midiInputName = midiInputs[0].name;
@@ -877,37 +863,50 @@ void MainComponent::updateAudioDeviceList()
     // Fall back to the first device when no current device is active or matches
     audioDeviceList.setSelectedId(1, juce::dontSendNotification);
 }
-
-juce::String MainComponent::getSelectedAudioDevice()
+void MainComponent::setSelectedAudioDriver(const juce::String& driverName)
 {
 	auto& deviceManager = pluginManager.getDeviceManager();
-	if (auto* currentDevice = deviceManager.getCurrentAudioDevice())
+	// Set the driver if it's different from the current one
+	if (driverName != deviceManager.getCurrentAudioDeviceType())
 	{
-		return currentDevice->getName();
+		deviceManager.setCurrentAudioDeviceType(driverName, true);
 	}
-	return {};
+	// Update audio device list visibility and contents
+	updateAudioDeviceList();
+	// Ensure the UI reflects the actual current driver
+	auto selectedDriver = deviceManager.getCurrentAudioDeviceType();
+	if (selectedDriver.isNotEmpty())
+	{
+		for (int i = 0; i < audioDriverList.getNumItems(); ++i)
+		{
+			if (audioDriverList.getItemText(i) == selectedDriver)
+			{
+				audioDriverList.setSelectedId(i + 1, juce::dontSendNotification);
+				break;
+			}
+		}
+	}
+
 }
 
 void MainComponent::setSelectedAudioDevice(const juce::String& deviceName)
 {
 	auto& deviceManager = pluginManager.getDeviceManager();
-	juce::AudioDeviceManager::AudioDeviceSetup setup;
-	deviceManager.getAudioDeviceSetup(setup);
-	setup.outputDeviceName = deviceName;
-	setup.inputDeviceName = deviceName;
-	deviceManager.setAudioDeviceSetup(setup, true);
-
-	updateAudioDeviceList();
-	// Ensure the UI reflects the actual current device
-	auto selectedDevice = getSelectedAudioDevice();
-	if (selectedDevice.isNotEmpty())
+	// Set the device if it's different from the current one
+	if (auto* currentDevice = deviceManager.getCurrentAudioDevice())
 	{
-		for (int i = 0; i < audioDeviceList.getNumItems(); ++i)
+		if (deviceName != currentDevice->getName())
 		{
-			if (audioDeviceList.getItemText(i) == selectedDevice)
+			juce::AudioDeviceManager::AudioDeviceSetup setup;
+			deviceManager.getAudioDeviceSetup(setup);
+			setup.outputDeviceName = deviceName;
+			setup.inputDeviceName = deviceName;
+			auto result = deviceManager.setAudioDeviceSetup(setup, true);
+			if (result.indexOfAnyOf("error", 0, true) >= 0)
 			{
-				audioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
-				break;
+				juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+					"Audio Device Error",
+					"Could not open audio device: " + deviceName);
 			}
 		}
 	}
@@ -1065,7 +1064,9 @@ void MainComponent::loadConfig()
         else if (line.startsWith("audioStreamingPort="))
             audioStreamingPortEditor.setText(line.fromFirstOccurrenceOf("audioStreamingPort=", false, false));
 		else if (line.startsWith("audioDriver="))
-			setSelectedAudioDevice(line.fromFirstOccurrenceOf("audioDriver=", false, false));
+			setSelectedAudioDriver(line.fromFirstOccurrenceOf("audioDriver=", false, false));
+		else if (line.startsWith("audioDevice="))
+			setSelectedAudioDevice(line.fromFirstOccurrenceOf("audioDevice=", false, false));
 		else if (line.startsWith("midiInput="))
 			setMidiInput(line.fromFirstOccurrenceOf("midiInput=", false, false));
         // Add more settings as needed
@@ -1078,7 +1079,8 @@ void MainComponent::saveConfig()
     juce::StringArray lines;
     lines.add("bpm=" + bpmEditor.getText());
     lines.add("audioStreamingPort=" + audioStreamingPortEditor.getText());
-	lines.add("audioDriver=" + getSelectedAudioDevice());
+	lines.add("audioDriver=" + audioDriverList.getText());
+	lines.add("audioDevice=" + audioDeviceList.getText());
 	lines.add("midiInput=" + midiInputList.getText());
     // Add more settings as needed
 
