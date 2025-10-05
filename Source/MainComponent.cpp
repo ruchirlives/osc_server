@@ -39,14 +39,14 @@ MainComponent::MainComponent()
         addAndMakeVisible(audioDriverLabel);
         audioDriverLabel.setJustificationType(juce::Justification::centredLeft);
 
-        addAndMakeVisible(asioDeviceLabel);
-        asioDeviceLabel.setJustificationType(juce::Justification::centredLeft);
-        asioDeviceLabel.setVisible(false);
+        addAndMakeVisible(audioDeviceLabel);
+        audioDeviceLabel.setJustificationType(juce::Justification::centredLeft);
+        audioDeviceLabel.setVisible(false);
 
-        addAndMakeVisible(asioDeviceList);
-        asioDeviceList.addListener(this);
-        asioDeviceList.setTextWhenNothingSelected("Select ASIO Device");
-        asioDeviceList.setVisible(false);
+        addAndMakeVisible(audioDeviceList);
+        audioDeviceList.addListener(this);
+        audioDeviceList.setTextWhenNothingSelected("Select Audio Device");
+        audioDeviceList.setVisible(false);
 
         initAudioDrivers();
 
@@ -175,9 +175,9 @@ void MainComponent::resized()
         audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
         audioDriverList.setBounds(audioDriverLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 
-        // ASIO device selection row (only visible if ASIO is selected)
-        asioDeviceLabel.setBounds(audioDriverList.getRight() + spacingX, driverRowY, 120, labelHeight);
-        asioDeviceList.setBounds(asioDeviceLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
+        // Audio device selection row (only visible when devices are available)
+        audioDeviceLabel.setBounds(audioDriverList.getRight() + spacingX, driverRowY, 120, labelHeight);
+        audioDeviceList.setBounds(audioDeviceLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 
         bpmEditor.setJustification(juce::Justification::centred);
         audioStreamingPortEditor.setJustification(juce::Justification::centred);
@@ -779,70 +779,79 @@ void MainComponent::initAudioDrivers()
                 deviceManager.setCurrentAudioDeviceType(firstTypeName, true);
         }
 
-        // If ASIO is selected, enumerate ASIO devices
-        updateAsioDeviceList();
+        // Update the audio device list for the currently selected driver type
+        updateAudioDeviceList();
 }
 
-void MainComponent::updateAsioDeviceList()
+void MainComponent::updateAudioDeviceList()
 {
     auto& deviceManager = pluginManager.getDeviceManager();
     auto currentType = deviceManager.getCurrentAudioDeviceType();
 
-    if (currentType == "ASIO")
+    audioDeviceList.clear(juce::dontSendNotification);
+
+    if (currentType.isEmpty())
     {
-        asioDeviceList.clear(juce::dontSendNotification);
+        audioDeviceLabel.setVisible(false);
+        audioDeviceList.setVisible(false);
+        return;
+    }
 
-        // Find the ASIO device type
-        auto& availableDeviceTypes = deviceManager.getAvailableDeviceTypes();
-        juce::AudioIODeviceType* asioType = nullptr;
-        for (auto* type : availableDeviceTypes)
+    // Find the device type that matches the currently selected driver
+    juce::AudioIODeviceType* selectedType = nullptr;
+    for (auto* type : deviceManager.getAvailableDeviceTypes())
+    {
+        if (type != nullptr && type->getTypeName() == currentType)
         {
-            if (type != nullptr && type->getTypeName() == "ASIO")
-            {
-                asioType = type;
-                break;
-            }
-        }
-
-        if (asioType)
-        {
-            asioType->scanForDevices();
-            auto deviceNames = asioType->getDeviceNames();
-            int id = 1;
-            for (int i = 0; i < deviceNames.size(); ++i)
-            {
-                asioDeviceList.addItem(deviceNames[i], id++);
-            }
-        }
-
-        asioDeviceList.setEnabled(asioDeviceList.getNumItems() > 0);
-        asioDeviceLabel.setVisible(true);
-        asioDeviceList.setVisible(true);
-
-        // Select current device if possible
-        auto* currentDevice = deviceManager.getCurrentAudioDevice();
-        if (currentDevice)
-        {
-            auto currentDeviceName = currentDevice->getName();
-            for (int i = 0; i < asioDeviceList.getNumItems(); ++i)
-            {
-                if (asioDeviceList.getItemText(i) == currentDeviceName)
-                {
-                    asioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
-                    break;
-                }
-            }
-        }
-        else if (asioDeviceList.getNumItems() > 0)
-        {
-            asioDeviceList.setSelectedId(1, juce::dontSendNotification);
+            selectedType = type;
+            break;
         }
     }
-    else
+
+    if (selectedType == nullptr)
     {
-        asioDeviceLabel.setVisible(false);
-        asioDeviceList.setVisible(false);
+        audioDeviceLabel.setVisible(false);
+        audioDeviceList.setVisible(false);
+        return;
     }
+
+    selectedType->scanForDevices();
+
+    auto deviceNames = selectedType->getDeviceNames();
+    int id = 1;
+    for (auto& name : deviceNames)
+    {
+        audioDeviceList.addItem(name, id++);
+    }
+
+    if (audioDeviceList.getNumItems() == 0)
+    {
+        audioDeviceLabel.setVisible(false);
+        audioDeviceList.setVisible(false);
+        return;
+    }
+
+    audioDeviceLabel.setText(currentType + " Device", juce::dontSendNotification);
+    audioDeviceLabel.setVisible(true);
+    audioDeviceList.setVisible(true);
+    audioDeviceList.setEnabled(true);
+
+    // Select the currently active device if possible
+    if (auto* currentDevice = deviceManager.getCurrentAudioDevice())
+    {
+        auto currentDeviceName = currentDevice->getName();
+        for (int i = 0; i < audioDeviceList.getNumItems(); ++i)
+        {
+            if (audioDeviceList.getItemText(i) == currentDeviceName)
+            {
+                audioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
+                return;
+            }
+        }
+    }
+
+    // Fall back to the first device when no current device is active or matches
+    audioDeviceList.setSelectedId(1, juce::dontSendNotification);
 }
 
 void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
@@ -923,13 +932,13 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
                                                 setSelectionTo(previousType);
                                 }
                         }
-                        // Update ASIO device list visibility and contents
-                        updateAsioDeviceList();
+                        // Update audio device list visibility and contents
+                        updateAudioDeviceList();
                 }
         }
-        else if (comboBoxThatHasChanged == &asioDeviceList)
+        else if (comboBoxThatHasChanged == &audioDeviceList)
         {
-                auto selectedDevice = asioDeviceList.getText();
+                auto selectedDevice = audioDeviceList.getText();
                 if (selectedDevice.isNotEmpty())
                 {
                         auto& deviceManager = pluginManager.getDeviceManager();
@@ -940,22 +949,22 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
                         auto result = deviceManager.setAudioDeviceSetup(setup, true);
 
                         // If failed, show error and revert selection
-						if (result.indexOfAnyOf("error", 0, true) >= 0)
+                                                if (result.indexOfAnyOf("error", 0, true) >= 0)
                         {
                                 juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                    "ASIO Device Error",
-                                    "Could not open ASIO device: " + selectedDevice);
+                                    "Audio Device Error",
+                                    "Could not open audio device: " + selectedDevice);
 
                                 // Revert to previous device if possible
                                 auto* currentDevice = deviceManager.getCurrentAudioDevice();
                                 if (currentDevice)
                                 {
                                         auto currentDeviceName = currentDevice->getName();
-                                        for (int i = 0; i < asioDeviceList.getNumItems(); ++i)
+                                        for (int i = 0; i < audioDeviceList.getNumItems(); ++i)
                                         {
-                                                if (asioDeviceList.getItemText(i) == currentDeviceName)
+                                                if (audioDeviceList.getItemText(i) == currentDeviceName)
                                                 {
-                                                        asioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
+                                                        audioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
                                                         break;
                                                 }
                                         }
