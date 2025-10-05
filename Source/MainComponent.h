@@ -156,8 +156,10 @@ public:
 	void initPlugins();
 	void initPluginsList();
 	void initMidiInputs();
-        void initAudioDrivers();
-        void updateAudioDeviceList();
+    void initAudioDrivers();
+    void updateAudioDeviceList();
+	juce::String getSelectedAudioDevice();
+	void setSelectedAudioDevice(const juce::String& deviceName);
 	void initOrchestraTable();
 	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
 	void restoreProject(bool append = false);
@@ -250,6 +252,13 @@ private:
 	GlobalLookAndFeel globalLNF;  // Not static
 	RoundedTableWrapper orchestraTableWrapper{ orchestraTable };
 	std::unique_ptr<AudioUdpStreamer> audioStreamer;
+
+    // Add a member to hold the config file path
+    juce::File configFile;
+
+    // Helper methods for config
+    void loadConfig();
+    void saveConfig();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

@@ -143,8 +143,25 @@ MainComponent::MainComponent()
     addAndMakeVisible(exportMidiButton);
     exportMidiButton.onClick = [this]() { midiManager.exportRecordBufferToMidiFile(); };
 
+    // Set up config file path
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    if (!dawServerDir.exists())
+        dawServerDir.createDirectory();
+    configFile = dawServerDir.getChildFile("config.ini");
+
+    loadConfig();
+
     resized();
     updateOverdubUI();
+}
+
+MainComponent::~MainComponent()
+{
+    saveConfig();
+    pluginManager.releaseResources();
+	midiManager.closeMidiInput();
+	conductor.shutdown(); // <--- important for clean exit
+	juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
 
 void MainComponent::resized()
@@ -279,16 +296,6 @@ void MainComponent::handleAudioPortChange()
 		audioStreamingPortEditor.setText("10000", juce::dontSendNotification); // Reset to default
 	}
 }
-
-
-MainComponent::~MainComponent()
-{
-	pluginManager.releaseResources();
-	midiManager.closeMidiInput();
-	conductor.shutdown(); // <--- important for clean exit
-	juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
-}
-
 
 void MainComponent::moveSelectedRowsToEnd()
 {
@@ -871,6 +878,41 @@ void MainComponent::updateAudioDeviceList()
     audioDeviceList.setSelectedId(1, juce::dontSendNotification);
 }
 
+juce::String MainComponent::getSelectedAudioDevice()
+{
+	auto& deviceManager = pluginManager.getDeviceManager();
+	if (auto* currentDevice = deviceManager.getCurrentAudioDevice())
+	{
+		return currentDevice->getName();
+	}
+	return {};
+}
+
+void MainComponent::setSelectedAudioDevice(const juce::String& deviceName)
+{
+	auto& deviceManager = pluginManager.getDeviceManager();
+	juce::AudioDeviceManager::AudioDeviceSetup setup;
+	deviceManager.getAudioDeviceSetup(setup);
+	setup.outputDeviceName = deviceName;
+	setup.inputDeviceName = deviceName;
+	deviceManager.setAudioDeviceSetup(setup, true);
+
+	updateAudioDeviceList();
+	// Ensure the UI reflects the actual current device
+	auto selectedDevice = getSelectedAudioDevice();
+	if (selectedDevice.isNotEmpty())
+	{
+		for (int i = 0; i < audioDeviceList.getNumItems(); ++i)
+		{
+			if (audioDeviceList.getItemText(i) == selectedDevice)
+			{
+				audioDeviceList.setSelectedId(i + 1, juce::dontSendNotification);
+				break;
+			}
+		}
+	}
+}
+
 void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
 {
         if (comboBoxThatHasChanged == &pluginBox)
@@ -989,4 +1031,35 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
                         }
                 }
         }
+}
+
+// Helper to load settings from config.ini
+void MainComponent::loadConfig()
+{
+    if (!configFile.existsAsFile())
+        return;
+
+    juce::StringArray lines;
+    configFile.readLines(lines);
+
+    for (auto& line : lines)
+    {
+        if (line.startsWith("bpm="))
+            bpmEditor.setText(line.fromFirstOccurrenceOf("bpm=", false, false));
+        else if (line.startsWith("audioStreamingPort="))
+            audioStreamingPortEditor.setText(line.fromFirstOccurrenceOf("audioStreamingPort=", false, false));
+        // Add more settings as needed
+    }
+}
+
+// Helper to save settings to config.ini
+void MainComponent::saveConfig()
+{
+    juce::StringArray lines;
+    lines.add("bpm=" + bpmEditor.getText());
+    lines.add("audioStreamingPort=" + audioStreamingPortEditor.getText());
+    // Add more settings as needed
+
+    juce::String configText = lines.joinIntoString("\n");
+    configFile.replaceWithText(configText);
 }
