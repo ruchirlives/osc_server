@@ -607,10 +607,11 @@ void MainComponent::basicInstrument(InstrumentInfo& instrument)
 {
 	instrument.instrumentName = "New Instrument";
 	instrument.pluginName = "New Plugin";
-	instrument.pluginInstanceId = "New Instance";
 	instrument.midiChannel = 1;
-	instrument.tags.push_back("tag1");
-	instrument.tags.push_back("tag2");
+
+	instrument.tags.clear();
+	instrument.tags.push_back("Tag " + juce::String(getNextTagNumber()));
+	instrument.pluginInstanceId = "Instance " + juce::String(getNextInstanceNumber());
 }
 
 void MainComponent::removeInstrument()
@@ -927,25 +928,44 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
 			juce::PluginDescription* desc = pluginManager.knownPluginList.getType(index);
 			if (desc != nullptr)
 			{
-				//pluginManager.instantiateSelectedPlugin(desc);
-				// add '_all' tag to the plugin as a vector
-				//std::vector<juce::String> tags;
-				//tags.push_back("_all");
 
 				// Get selected row in the orchestra table
 				auto selectedRows = orchestraTable.getSelectedRows();
+				bool haveAdded = false;
+
 				for (int i = 0; i < selectedRows.size(); ++i)
 				{
 					int row = selectedRows[i];
 					// Get the instrument from the orchestra
 					auto& instrument = conductor.orchestra[row];
+					// Check if the pluginInstanceId for this instrument is already in pluginInstances, and if so, ignore
+					if (pluginManager.hasPluginInstance(instrument.pluginInstanceId))
+					{
+						DBG("Plugin Instance ID already exists: " + instrument.pluginInstanceId);
+						continue;
+					}
+
+
 					// Set the plugin name and plugin instance ID
 					instrument.pluginName = desc->name;
+					// call plugin update
+					haveAdded = true;
 					orchestraTable.updateContent();
 
-					// Finally, deselect the pluginbox entry
-					pluginBox.setSelectedId(0, juce::dontSendNotification);
+
 				}
+				// If no rows were selected or no valid rows, add a new instrument with the selected plugin
+				if (!haveAdded)
+				{
+					addNewInstrument();
+					auto& instrument = conductor.orchestra.back();
+					instrument.pluginName = desc->name;
+
+				}
+				conductor.syncOrchestraWithPluginManager();
+
+				// Finally, deselect the pluginbox entry
+				pluginBox.setSelectedId(0, juce::dontSendNotification);
 
 
 			}
@@ -1092,3 +1112,45 @@ void MainComponent::saveConfig()
     juce::String configText = lines.joinIntoString("\n");
     configFile.replaceWithText(configText);
 }
+
+// Helper to find next available tag number
+int MainComponent::getNextTagNumber() const
+{
+    int maxTagNum = 0;
+    for (const auto& inst : conductor.orchestra)
+    {
+        for (const auto& tag : inst.tags)
+        {
+            // Match "Tag {n}" pattern
+            juce::String prefix = "Tag ";
+            if (tag.startsWith(prefix))
+            {
+                juce::String numStr = tag.fromFirstOccurrenceOf(prefix, false, false).trim();
+                int n = numStr.getIntValue();
+                if (n > maxTagNum)
+                    maxTagNum = n;
+            }
+        }
+    }
+    return maxTagNum + 1;
+}
+
+// Helper to find next available pluginInstanceId number
+int MainComponent::getNextInstanceNumber() const
+{
+    int maxInstanceNum = 0;
+    juce::String prefix = "Instance ";
+    for (const auto& inst : conductor.orchestra)
+    {
+        if (inst.pluginInstanceId.startsWith(prefix))
+        {
+            juce::String numStr = inst.pluginInstanceId.fromFirstOccurrenceOf(prefix, false, false).trim();
+            int n = numStr.getIntValue();
+            if (n > maxInstanceNum)
+                maxInstanceNum = n;
+        }
+    }
+    return maxInstanceNum + 1;
+}
+
+

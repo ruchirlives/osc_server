@@ -263,5 +263,9 @@ private:
     void loadConfig();
     void saveConfig();
 
+    // Helpers for unique tag and instance id generation
+    int getNextTagNumber() const;
+    int getNextInstanceNumber() const;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
