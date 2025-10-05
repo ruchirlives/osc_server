@@ -129,6 +129,10 @@ MainComponent::MainComponent()
 	addAndMakeVisible(stopOverdubButton);
 	stopOverdubButton.onClick = [this]() { midiManager.stopOverdub(); updateOverdubUI(); };
 
+	// Initialize the "Play Overdub" button
+	addAndMakeVisible(playOverdubButton);
+	playOverdubButton.onClick = [this]() { midiManager.playOverdub(); updateOverdubUI(); };
+
 	// Initialize the "Strip Silence" button
     addAndMakeVisible(stripLeadingSilenceButton);
     stripLeadingSilenceButton.onClick = [this]() { midiManager.stripLeadingSilence(); updateOverdubUI(); };
@@ -242,8 +246,9 @@ void MainComponent::resized()
 	int row4Y = row3Y - buttonHeight - spacingY;
 	saveButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
 	restoreButton.setBounds(saveButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	stopOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, buttonWidth/2, buttonHeight);
+	playOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth/2, buttonHeight);
+	stopOverdubButton.setBounds(playOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 	undoOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 
 	// --- BPM Sync handler ---

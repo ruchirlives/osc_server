@@ -29,6 +29,7 @@ public:
 	void closeMidiInput();
 	void startOverdub();
 	void stopOverdub();
+    void playOverdub();
 	void stripLeadingSilence();
 	void undoLastOverdub();
 	void getRecorded();

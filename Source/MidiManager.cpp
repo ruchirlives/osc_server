@@ -289,6 +289,22 @@ void MidiManager::stopOverdub()
 
 }
 
+void MidiManager::playOverdub()
+{
+    juce::MidiBuffer bufferCopy;
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        mainComponent->getPluginManager().stopAllNotes();
+        //overdubHistory.emplace_back(recordBuffer);
+        isOverdubbing = false;
+        // Do NOT clear recordBuffer!
+        recordStartTime = juce::Time::getHighResolutionTicks();
+        bufferCopy = recordBuffer;
+    }
+
+    republishRecordedEvents(bufferCopy);
+}
+
 void MidiManager::stripLeadingSilence()
 {
         juce::MidiBuffer bufferCopy;
