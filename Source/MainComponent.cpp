@@ -324,116 +324,125 @@ void MainComponent::updateProjectNameLabel(juce::String projectName)
 
 void MainComponent::saveProject(const std::vector<InstrumentInfo>& selectedInstruments)
 {
-	// Get the full file paths from the user's documents directory
-	juce::File dataFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("projectData.dat");
-	juce::File pluginsFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("projectPlugins.dat");
-	juce::File metaFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("projectMeta.xml");
+    // Create DawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    if (!dawServerDir.exists())
+        dawServerDir.createDirectory();
 
-	// Save the project state files
-	conductor.saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName(), selectedInstruments);
+    // Get the full file paths in DawServer subfolder
+    juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+    juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+    juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
 
-	// Open a file chooser dialog for the custom project file
-	juce::FileChooser fileChooser("Save Project", juce::File(), "*.oscdaw"); // Custom suffix here
-	if (fileChooser.browseForFileToSave(true))
-	{
-		// Get the selected file, ensuring it has the correct suffix
-		juce::File customFile = fileChooser.getResult().withFileExtension(".oscdaw");
+    // Save the project state files
+    conductor.saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName(), selectedInstruments);
 
-		// Delete file if it already exists
-		if (customFile.exists())
-		{
-			customFile.deleteFile();
-		}
+    // Open a file chooser dialog for the custom project file
+    juce::FileChooser fileChooser("Save Project", juce::File(), "*.oscdaw"); // Custom suffix here
+    if (fileChooser.browseForFileToSave(true))
+    {
+        // Get the selected file, ensuring it has the correct suffix
+        juce::File customFile = fileChooser.getResult().withFileExtension(".oscdaw");
 
-		juce::FileOutputStream outputStream(customFile);
+        // Delete file if it already exists
+        if (customFile.exists())
+        {
+            customFile.deleteFile();
+        }
 
-		if (outputStream.openedOk())
-		{
-			juce::ZipFile::Builder zipBuilder;
-			zipBuilder.addFile(dataFile, 5, "projectData.dat");  // Using moderate compression
-			zipBuilder.addFile(pluginsFile, 5, "projectPlugins.dat");
-			zipBuilder.addFile(metaFile, 1, "projectMeta.xml");
+        juce::FileOutputStream outputStream(customFile);
 
-			// Write the compressed data to the file
-			zipBuilder.writeToStream(outputStream, nullptr);
-		}
-	}
-	// Get the saved file name
-	juce::String projectName = fileChooser.getResult().getFileNameWithoutExtension();
-	DBG("Project Saved: " + projectName);
-	updateProjectNameLabel(projectName);
+        if (outputStream.openedOk())
+        {
+            juce::ZipFile::Builder zipBuilder;
+            zipBuilder.addFile(dataFile, 5, "projectData.dat");  // Using moderate compression
+            zipBuilder.addFile(pluginsFile, 5, "projectPlugins.dat");
+            zipBuilder.addFile(metaFile, 1, "projectMeta.xml");
 
+            // Write the compressed data to the file
+            zipBuilder.writeToStream(outputStream, nullptr);
+        }
+    }
+    // Get the saved file name
+    juce::String projectName = fileChooser.getResult().getFileNameWithoutExtension();
+    DBG("Project Saved: " + projectName);
+    updateProjectNameLabel(projectName);
 }
 
 void MainComponent::restoreProject(bool append)
 {
-	// Open a file chooser dialog to select the zip file
-	juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
-	if (fileChooser.browseForFileToOpen())
-	{
-		juce::File zipFile = fileChooser.getResult();
-		DBG("Selected Project: " + zipFile.getFullPathName());
-		juce::FileInputStream inputStream(zipFile);
-		if (inputStream.openedOk())
-		{
-			DBG("Reading Project...");
-			juce::ZipFile zip(inputStream);
-			DBG("Project Read.");
+    // Open a file chooser dialog to select the zip file
+    juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
+    if (fileChooser.browseForFileToOpen())
+    {
+        juce::File zipFile = fileChooser.getResult();
+        DBG("Selected Project: " + zipFile.getFullPathName());
+        juce::FileInputStream inputStream(zipFile);
+        if (inputStream.openedOk())
+        {
+            DBG("Reading Project...");
+            juce::ZipFile zip(inputStream);
+            DBG("Project Read.");
 
-			// Define the extraction locations
-			juce::File dataFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("projectData.dat");
-			juce::File pluginsFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("projectPlugins.dat");
-			juce::File metaFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("projectMeta.xml");
+            // Create DawServer subfolder in user's documents directory
+            juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+            if (!dawServerDir.exists())
+                dawServerDir.createDirectory();
 
-			// Extract each file
-			auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
-				{
-					auto index = zip.getIndexOfFileName(fileName);
-					if (index >= 0)
-					{
-						auto* fileStream = zip.createStreamForEntry(index);
-						if (fileStream != nullptr)
-						{
-							if (destination.exists())
-							{
-								// Delete the existing file before overwriting
-								destination.deleteFile();
-							}
-							juce::FileOutputStream outStream(destination);
-							if (outStream.openedOk())
-								outStream.writeFromInputStream(*fileStream, -1);
+            // Define the extraction locations in DawServer subfolder
+            juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+            juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+            juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
 
-							delete fileStream;
-						}
-					}
-				};
+            // Extract each file
+            auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
+                {
+                    auto index = zip.getIndexOfFileName(fileName);
+                    if (index >= 0)
+                    {
+                        auto* fileStream = zip.createStreamForEntry(index);
+                        if (fileStream != nullptr)
+                        {
+                            if (destination.exists())
+                            {
+                                // Delete the existing file before overwriting
+                                destination.deleteFile();
+                            }
+                            juce::FileOutputStream outStream(destination);
+                            if (outStream.openedOk())
+                                outStream.writeFromInputStream(*fileStream, -1);
 
-			DBG("Unzipping Project...");
-			extractFile("projectData.dat", dataFile);
-			extractFile("projectPlugins.dat", pluginsFile);
-			extractFile("projectMeta.xml", metaFile);
-			DBG("Project Unzipped.");
+                            delete fileStream;
+                        }
+                    }
+                };
 
-			if (!append)
-			{
-				// Restore project state
-				conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-			}
-			else
-			{
-				// Append project state
-				conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-			}
+            DBG("Unzipping Project...");
+            extractFile("projectData.dat", dataFile);
+            extractFile("projectPlugins.dat", pluginsFile);
+            extractFile("projectMeta.xml", metaFile);
+            DBG("Project Unzipped.");
 
-			// Update the orchestra table
-			orchestraTable.updateContent();
+            if (!append)
+            {
+                // Restore project state
+                conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+            }
+            else
+            {
+                // Append project state
+                conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+            }
 
-			// Get the restored project name
-			juce::String projectName = zipFile.getFileNameWithoutExtension();
-			DBG("Project Restored: " + projectName);
-			updateProjectNameLabel(projectName);
-		}
-	}
+            // Update the orchestra table
+            orchestraTable.updateContent();
+
+            // Get the restored project name
+            juce::String projectName = zipFile.getFileNameWithoutExtension();
+            DBG("Project Restored: " + projectName);
+            updateProjectNameLabel(projectName);
+        }
+    }
 }
 
 void MainComponent::addDataToTable()

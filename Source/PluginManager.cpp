@@ -576,7 +576,7 @@ void PluginManager::scanPlugins(juce::FileSearchPath searchPaths)
     while (scanner.scanNextFile(true, nameOfPluginBeingScanned))
     {
         juce::Thread::sleep(100);
-        if (knownPluginList.getNumTypes() > 20)
+        if (knownPluginList.getNumTypes() > 50)
         {
             break;
         }
@@ -585,32 +585,33 @@ void PluginManager::scanPlugins(juce::FileSearchPath searchPaths)
     DBG("Scanning completed. " << knownPluginList.getNumTypes() << " VST3 Plugins Found");
 	savePluginListToFile();
 	DBG("Plugin list saved to file.");
+	// Reload to verify
+	knownPluginList.clear();
+	loadPluginListFromFile();
+	DBG("Plugin list reloaded from file. " << knownPluginList.getNumTypes() << " VST3 Plugins Found");
 
 }
 
 void PluginManager::savePluginListToFile()
 {
-    // Use JUCE to save the plugin list to a file using createXml
-    std::unique_ptr<juce::XmlElement> pluginListXml;
-    pluginListXml = knownPluginList.createXml();
+    // Create DawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    if (!dawServerDir.exists())
+        dawServerDir.createDirectory();
 
-    // Ensure the XmlElement was created successfully
+    // Use DawServer subfolder for PluginList.xml
+    juce::File pluginListFile = dawServerDir.getChildFile("PluginList.xml");
+
+    std::unique_ptr<juce::XmlElement> pluginListXml = knownPluginList.createXml();
+
     if (pluginListXml != nullptr)
     {
-        // Write the XML to a file
-        juce::File pluginListFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("PluginList.xml");
+        if (pluginListFile.existsAsFile())
+            pluginListFile.deleteFile();
 
-        // Check if the file exists before attempting to clear it
-		if (pluginListFile.existsAsFile())
-		{
-			pluginListFile.deleteFile();
-		}
-
-        // Write the XML to the file directly
         bool existed = pluginListFile.existsAsFile();
         pluginListXml->writeTo(pluginListFile);
 
-        // Set file times
         if (!existed)
             pluginListFile.setCreationTime(juce::Time::getCurrentTime());
 
@@ -619,15 +620,19 @@ void PluginManager::savePluginListToFile()
     }
     else
     {
-        // Handle error: failed to create XML element
         DBG("Failed to create XML from plugin list");
     }
 }
 
 bool PluginManager::loadPluginListFromFile()
 {
-    // Load the plugin list from an XML file
-    juce::File pluginListFile = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("PluginList.xml");
+    // Create DawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    if (!dawServerDir.exists())
+        dawServerDir.createDirectory();
+
+    // Use DawServer subfolder for PluginList.xml
+    juce::File pluginListFile = dawServerDir.getChildFile("PluginList.xml");
 
     if (pluginListFile.existsAsFile())
     {
@@ -641,18 +646,17 @@ bool PluginManager::loadPluginListFromFile()
         }
         else
         {
-            // Handle error: failed to parse XML
             DBG("Failed to parse XML from PluginList.xml");
             return false;
         }
     }
     else
     {
-        // Handle error: file does not exist
         DBG("PluginList.xml does not exist");
         return false;
     }
 }
+
 void PluginManager::clearTaggedMidiBuffer()
 {
     const juce::ScopedLock sl(midiCriticalSection);

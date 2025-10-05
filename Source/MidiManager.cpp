@@ -470,8 +470,13 @@ void MidiManager::processRecordedMidi()
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-    juce::MidiFile midiFile;
-    midiFile.setTicksPerQuarterNote(960);
+    // Create DawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    if (!dawServerDir.exists())
+        dawServerDir.createDirectory();
+
+    // Save MIDI file in DawServer subfolder
+    juce::File midiFile = dawServerDir.getChildFile("recordedMIDI.mid");
 
     if (recordedMIDI.getNumEvents() == 0)
     {
@@ -498,33 +503,20 @@ void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
     }
 
     recordedMIDI.updateMatchedPairs();
-    midiFile.addTrack(recordedMIDI);
 
-    juce::File midiFileToSave = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("recordedMIDI.mid");
-
-    if (midiFileToSave.existsAsFile())
-        midiFileToSave.deleteFile();
-
-    juce::FileOutputStream stream(midiFileToSave);
-    if (!stream.openedOk())
+    juce::FileOutputStream outputStream(midiFile);
+    if (outputStream.openedOk())
     {
-        DBG("Failed to open file for writing MIDI data: " + midiFileToSave.getFullPathName());
-        return;
+        juce::MidiFile midi;
+        midi.setTicksPerQuarterNote(960);
+        midi.addTrack(recordedMIDI);
+        midi.writeTo(outputStream);
+        outputStream.flush();
+        DBG("MIDI File Saved: " + midiFile.getFullPathName());
     }
-
-    try
+    else
     {
-        midiFile.writeTo(stream);
-        stream.flush();
-        DBG("MIDI File Saved: " + midiFileToSave.getFullPathName());
-    }
-    catch (const std::exception& e)
-    {
-        DBG("Exception while writing MIDI file: " + juce::String(e.what()));
-    }
-    catch (...)
-    {
-        DBG("Unknown exception while writing MIDI file.");
+        DBG("Failed to open file for writing MIDI data: " + midiFile.getFullPathName());
     }
 }
 
