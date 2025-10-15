@@ -156,6 +156,7 @@ public:
 	void initPlugins();
 	void initPluginsList();
 	void initMidiInputs();
+	void refreshMidiInputs();
     void initAudioDrivers();
     void updateAudioDeviceList();
 	void setSelectedAudioDriver(const juce::String& driverName);

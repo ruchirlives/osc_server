@@ -720,13 +720,16 @@ void MainComponent::initMidiInputs()
     midiInputList.setBounds(170, 300, 150, 30);
     midiInputList.addListener(this);
 
-	// Get the list of MIDI input devices
+	refreshMidiInputs();
+
+}
+
+void MainComponent::refreshMidiInputs()
+{
 	auto midiInputs = juce::MidiInput::getAvailableDevices();
 	DBG(midiInputs.size() << " MIDI Input Devices Available");
-
 	// Clear the ComboBox
 	midiInputList.clear();
-
 	// Add the MIDI input devices to the ComboBox
 	int id = 1;
 	for (auto input : midiInputs)
@@ -734,18 +737,17 @@ void MainComponent::initMidiInputs()
 		midiInputList.addItem(input.name, id);
 		id++;
 	}
-
+	// Add a refresh option
+	midiInputList.addItem("Refresh List", -1);
 	// Check we have some MIDI inputs
 	if (midiInputs.size() == 0) {
 		midiInputList.setText("No MIDI Inputs Available");
 		return;
 	}
-
 	midiInputList.setSelectedId(1);
 	// get the name of the first MIDI input
 	juce::String midiInputName = midiInputs[0].name;
-        midiManager.openMidiInput(midiInputName);
-
+	midiManager.openMidiInput(midiInputName);
 }
 
 void MainComponent::initAudioDrivers()
@@ -983,6 +985,11 @@ void MainComponent::comboBoxChanged(juce::ComboBox* comboBoxThatHasChanged)
                 // Handle MIDI input selection
                 juce::String midiInputName = midiInputList.getText();
                 DBG("MIDI Input Selected: " + midiInputName);
+				if (midiInputName == "Refresh List")
+				{
+					refreshMidiInputs();
+					return;
+				}
                 midiManager.openMidiInput(midiInputName);
 
         }
