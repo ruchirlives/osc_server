@@ -347,8 +347,9 @@ void MidiManager::stripLeadingSilence()
                 recordBuffer = adjustedBuffer;
                 bufferCopy = recordBuffer;
         }
+		isStripped = true;
 
-        republishRecordedEvents(bufferCopy);
+        //republishRecordedEvents(bufferCopy);
 }
 
 void MidiManager::undoLastOverdub()
@@ -379,6 +380,8 @@ void MidiManager::getRecorded()
 	recordBuffer.clear();
 	recordStartTime = juce::Time::getHighResolutionTicks();
 	overdubHistory.clear();
+	isOverdubbing = false;
+	isStripped = false;
 
 }
 
@@ -864,5 +867,28 @@ void MidiManager::republishRecordedEvents(const juce::MidiBuffer& bufferCopy)
         }
 
         pluginManager.printTaggedMidiBuffer();
+}
+
+void MidiManager::removeMidiChannelFromOverdub(int midiChannel)
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+
+    if (recordBuffer.getNumEvents() == 0)
+        return;
+
+    juce::MidiBuffer filteredBuffer;
+    juce::MidiBuffer::Iterator it(recordBuffer);
+    juce::MidiMessage msg;
+    int samplePosition;
+
+    while (it.getNextEvent(msg, samplePosition))
+    {
+        if (msg.getChannel() != midiChannel)
+            filteredBuffer.addEvent(msg, samplePosition);
+    }
+
+    recordBuffer = std::move(filteredBuffer);
+    overdubHistory.clear();
+	DBG("Removed MIDI Channel " + juce::String(midiChannel) + " from overdub buffer.");
 }
 

@@ -1309,6 +1309,11 @@ void EditableTextCustomComponent::showContextMenu_midiChannels()
 		owner.table.updateContent();
 		});
 	contextMenu.addSubMenu("Replace MIDI Channel", midiChannelsMenu);
+	// remove this channel from overdub
+	contextMenu.addItem("Remove this MIDI Channel from Overdub", [this] {
+		int channelToRemove = getText().getIntValue();
+		owner.mainComponent->removeMidiChannelFromOverdub(channelToRemove);
+		});
 
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);

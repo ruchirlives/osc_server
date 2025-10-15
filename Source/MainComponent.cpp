@@ -279,6 +279,13 @@ void MainComponent::updateOverdubUI()
         stopOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
     }
 
+	if (midiManager.isStripped)
+		stripLeadingSilenceButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
+	else
+	{
+		stripLeadingSilenceButton.setColour(juce::TextButton::buttonColourId, juce::Colours::orange);
+	}
+
     stripLeadingSilenceButton.setEnabled(!midiManager.isOverdubbing && midiManager.hasRecordedEvents());
     undoOverdubButton.setEnabled(!midiManager.isOverdubbing && midiManager.canUndoOverdub());
 }
@@ -1151,6 +1158,13 @@ int MainComponent::getNextInstanceNumber() const
         }
     }
     return maxInstanceNum + 1;
+}
+
+void MainComponent::removeMidiChannelFromOverdub(int midiChannel)
+{
+    midiManager.removeMidiChannelFromOverdub(midiChannel);
+	midiManager.isStripped = false;
+    updateOverdubUI();
 }
 
 

@@ -189,6 +189,7 @@ public:
 	MidiManager& getMidiManager() { return midiManager; }
 	juce::TableListBox orchestraTable; // TableListBox to display orchestra information
 
+	void removeMidiChannelFromOverdub(int midiChannel);
 
 private:
     juce::File pluginFolder; // Use a juce::File object instead of a pointer

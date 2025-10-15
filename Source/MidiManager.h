@@ -44,6 +44,7 @@ public:
         // Declaration of the function to process recorded MIDI
         void processRecordedMidi();
 	bool isOverdubbing = false;
+	bool isStripped = false;
 
 	// Access to the MIDI buffer
 	juce::MidiBuffer& getMidiBuffer() { return incomingMidi; }
@@ -52,12 +53,12 @@ public:
 	juce::CriticalSection& getCriticalSection() { return midiCriticalSection; }
 
 	// Save to MIDI file
-        void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
+    void saveToMidiFile(juce::MidiMessageSequence& recordedMIDI);
 
-        std::unique_ptr<juce::Thread> playbackThread;
-        std::atomic<bool> playbackThreadShouldRun{ false };
+    std::unique_ptr<juce::Thread> playbackThread;
+    std::atomic<bool> playbackThreadShouldRun{ false };
 
-
+    void removeMidiChannelFromOverdub(int midiChannel);
 
 private:
         struct ChannelTrackInfo
