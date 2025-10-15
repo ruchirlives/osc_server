@@ -892,24 +892,48 @@ void MidiManager::republishRecordedEvents(const juce::MidiBuffer& bufferCopy)
 
 void MidiManager::removeMidiChannelFromOverdub(int midiChannel)
 {
-    const juce::ScopedLock sl(midiCriticalSection);
-
-    if (recordBuffer.getNumEvents() == 0)
+    if (midiChannel < 1 || midiChannel > 16)
         return;
 
-    juce::MidiBuffer filteredBuffer;
-    juce::MidiBuffer::Iterator it(recordBuffer);
-    juce::MidiMessage msg;
-    int samplePosition;
+    juce::MidiBuffer bufferCopy;
+    bool removedEvents = false;
 
-    while (it.getNextEvent(msg, samplePosition))
     {
-        if (msg.getChannel() != midiChannel)
+        const juce::ScopedLock sl(midiCriticalSection);
+
+        if (recordBuffer.getNumEvents() == 0)
+            return;
+
+        juce::MidiBuffer filteredBuffer;
+        juce::MidiBuffer::Iterator it(recordBuffer);
+        juce::MidiMessage msg;
+        int samplePosition;
+
+        while (it.getNextEvent(msg, samplePosition))
+        {
+            if (msg.getChannel() == midiChannel)
+            {
+                removedEvents = true;
+                continue;
+            }
+
             filteredBuffer.addEvent(msg, samplePosition);
+        }
+
+        if (!removedEvents)
+            return;
+
+        recordBuffer = std::move(filteredBuffer);
+        overdubHistory.clear();
+        bufferCopy = recordBuffer;
     }
 
-    recordBuffer = std::move(filteredBuffer);
-    overdubHistory.clear();
-	DBG("Removed MIDI Channel " + juce::String(midiChannel) + " from overdub buffer.");
+    if (mainComponent != nullptr)
+    {
+        mainComponent->getPluginManager().stopAllNotes();
+        republishRecordedEvents(bufferCopy);
+    }
+
+    DBG("Removed MIDI Channel " + juce::String(midiChannel) + " from overdub buffer.");
 }
 
