@@ -28,7 +28,13 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 	// Always record MIDI events while the plugin is active
 	if (midiInput != nullptr)
 	{
-		//const juce::ScopedLock sl(midiCriticalSection); // Ensure thread safety while accessing recordBuffer
+        // playOverdubOnTriggerArmed
+		if (playOverdubOnTriggerArmed)
+		{
+			playOverdubOnTriggerArmed = false;
+            mainComponent->startOverdub();
+
+		}
 
 		// Use high-resolution ticks for accurate MIDI event timing
 		juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks()-recordStartTime;
@@ -44,6 +50,7 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 		messageWithChannel.setChannel(midiChannel);
 		messageWithChannel.setTimeStamp(static_cast<double>(currentTimeTicks));
 		incomingMidi.addEvent(messageWithChannel, 0);
+
 
 		// Stamp the MIDI message with high-resolution ticks directly
 		if (isOverdubbing)
@@ -287,6 +294,20 @@ void MidiManager::stopOverdub()
 	mainComponent->getPluginManager().clearTaggedMidiBuffer();
     // stopAllNotes
 
+}
+
+
+void MidiManager::triggerOverdub()
+{
+	if (isOverdubbing)
+	{
+		playOverdubOnTriggerArmed = false;
+		stopOverdub();
+	}
+	else
+	{
+		playOverdubOnTriggerArmed = true;
+	}
 }
 
 void MidiManager::playOverdub()

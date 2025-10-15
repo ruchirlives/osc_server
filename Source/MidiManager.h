@@ -29,6 +29,7 @@ public:
 	void closeMidiInput();
 	void startOverdub();
 	void stopOverdub();
+    void triggerOverdub();
     void playOverdub();
 	void stripLeadingSilence();
 	void undoLastOverdub();
@@ -45,6 +46,7 @@ public:
         void processRecordedMidi();
 	bool isOverdubbing = false;
 	bool isStripped = false;
+    bool playOverdubOnTriggerArmed = false;
 
 	// Access to the MIDI buffer
 	juce::MidiBuffer& getMidiBuffer() { return incomingMidi; }

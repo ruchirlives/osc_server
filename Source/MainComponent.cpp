@@ -123,7 +123,7 @@ MainComponent::MainComponent()
 
 	// Initialize the "Start Overdub" button
 	addAndMakeVisible(startOverdubButton);
-	startOverdubButton.onClick = [this]() { midiManager.startOverdub(); updateOverdubUI(); };
+	startOverdubButton.onClick = [this]() { startOverdub(); };
 
 	// Initialize the "Stop Overdub" button
 	addAndMakeVisible(stopOverdubButton);
@@ -132,6 +132,10 @@ MainComponent::MainComponent()
 	// Initialize the "Play Overdub" button
 	addAndMakeVisible(playOverdubButton);
 	playOverdubButton.onClick = [this]() { midiManager.playOverdub(); updateOverdubUI(); };
+
+	// playOverdubOnTriggerButton
+	addAndMakeVisible(triggerOverdubButton);
+	triggerOverdubButton.onClick = [this]() { midiManager.triggerOverdub(); updateOverdubUI(); };
 
 	// Initialize the "Strip Silence" button
     addAndMakeVisible(stripLeadingSilenceButton);
@@ -246,8 +250,9 @@ void MainComponent::resized()
 	int row4Y = row3Y - buttonHeight - spacingY;
 	saveButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
 	restoreButton.setBounds(saveButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, buttonWidth/2, buttonHeight);
-	playOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth/2, buttonHeight);
+	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, buttonWidth/3, buttonHeight);
+	triggerOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth / 3, buttonHeight);
+	playOverdubButton.setBounds(triggerOverdubButton.getRight() + spacingX, row4Y, buttonWidth/3, buttonHeight);
 	stopOverdubButton.setBounds(playOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 	undoOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 
@@ -266,6 +271,12 @@ void MainComponent::resized()
 	};
 }
 
+void MainComponent::startOverdub()
+{
+	midiManager.startOverdub();
+	updateOverdubUI();
+}
+
 void MainComponent::updateOverdubUI()
 {
     if (midiManager.isOverdubbing)
@@ -282,9 +293,12 @@ void MainComponent::updateOverdubUI()
 	if (midiManager.isStripped)
 		stripLeadingSilenceButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
 	else
-	{
 		stripLeadingSilenceButton.setColour(juce::TextButton::buttonColourId, juce::Colours::orange);
-	}
+
+	if (midiManager.playOverdubOnTriggerArmed)
+		triggerOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::orange);
+	else
+		triggerOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
 
     stripLeadingSilenceButton.setEnabled(!midiManager.isOverdubbing && midiManager.hasRecordedEvents());
     undoOverdubButton.setEnabled(!midiManager.isOverdubbing && midiManager.canUndoOverdub());

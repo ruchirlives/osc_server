@@ -142,6 +142,8 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+	void startOverdub();
+
 	void updateOverdubUI();
 
 	void handleAudioPortChange();
@@ -160,7 +162,6 @@ public:
     void initAudioDrivers();
     void updateAudioDeviceList();
 	void setSelectedAudioDriver(const juce::String& driverName);
-	juce::String getSelectedAudioDevice();
 	void setSelectedAudioDevice(const juce::String& deviceName);
 	void initOrchestraTable();
 	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
@@ -191,6 +192,7 @@ public:
 	juce::TableListBox orchestraTable; // TableListBox to display orchestra information
 
 	void removeMidiChannelFromOverdub(int midiChannel);
+
 
 private:
     juce::File pluginFolder; // Use a juce::File object instead of a pointer
@@ -243,6 +245,7 @@ private:
     juce::TextButton startOverdubButton { "Start Overdub" };
     juce::TextButton stopOverdubButton { "Stop Overdub" };
 	juce::TextButton playOverdubButton{ "Play Overdub" };
+	juce::TextButton triggerOverdubButton{ "Start On Trigger" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
     juce::TextButton undoOverdubButton { "Undo Overdub" };
     juce::TextButton importMidiButton { "Import MIDI" };
