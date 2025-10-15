@@ -142,8 +142,6 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-	void startOverdub();
-
 	void updateOverdubUI();
 
 	void handleAudioPortChange();

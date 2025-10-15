@@ -23,18 +23,24 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 	// DBG("MIDI Message Received: " + message.getDescription() + " from " + source->getName());
 	// Forward the MIDI message to the buffee is their is a plugin instance
 
+    // playOverdubOnTriggerArmed
+	if (playOverdubOnTriggerArmed)
+	{
+        // Acquire the MessageManagerLock before calling any JUCE UI/component method
+        juce::MessageManagerLock lock;
+        if (!lock.lockWasGained())
+            return; // Could not get the lock, so do not call UI code
+
+		playOverdubOnTriggerArmed = false;
+        startOverdub();
+		mainComponent->updateOverdubUI();
+
+	}
 	const juce::ScopedLock sl(midiCriticalSection); // Use the custom CriticalSection for thread safety
 
 	// Always record MIDI events while the plugin is active
 	if (midiInput != nullptr)
 	{
-        // playOverdubOnTriggerArmed
-		if (playOverdubOnTriggerArmed)
-		{
-			playOverdubOnTriggerArmed = false;
-            mainComponent->startOverdub();
-
-		}
 
 		// Use high-resolution ticks for accurate MIDI event timing
 		juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks()-recordStartTime;

@@ -123,7 +123,7 @@ MainComponent::MainComponent()
 
 	// Initialize the "Start Overdub" button
 	addAndMakeVisible(startOverdubButton);
-	startOverdubButton.onClick = [this]() { startOverdub(); };
+	startOverdubButton.onClick = [this]() { midiManager.startOverdub(); updateOverdubUI(); };
 
 	// Initialize the "Stop Overdub" button
 	addAndMakeVisible(stopOverdubButton);
@@ -269,12 +269,6 @@ void MainComponent::resized()
 	audioStreamingPortEditor.onReturnKey = [this]() {
 		handleAudioPortChange();
 	};
-}
-
-void MainComponent::startOverdub()
-{
-	midiManager.startOverdub();
-	updateOverdubUI();
 }
 
 void MainComponent::updateOverdubUI()
