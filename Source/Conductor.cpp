@@ -114,7 +114,19 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 			}
 			else if (messageType == "save_project")
 			{
-				saveAllData("projectData.dat", "projectPlugins.dat", "projectMeta.xml");
+				// Create DawServer subfolder in user's documents directory
+				juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+				if (!dawServerDir.exists())
+					dawServerDir.createDirectory();
+
+				// Get the full file paths in DawServer subfolder
+				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+				juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+				juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+
+				// Save the project state files
+				saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+
 			}
 			else if (messageType == "restore_project")
 			{
