@@ -24,18 +24,18 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 	// Forward the MIDI message to the buffee is their is a plugin instance
 
     // playOverdubOnTriggerArmed
-	if (playOverdubOnTriggerArmed)
-	{
+        if (playOverdubOnTriggerArmed)
+        {
         // Acquire the MessageManagerLock before calling any JUCE UI/component method
         juce::MessageManagerLock lock;
         if (!lock.lockWasGained())
             return; // Could not get the lock, so do not call UI code
 
-		playOverdubOnTriggerArmed = false;
-        startOverdub();
-		mainComponent->updateOverdubUI();
+                playOverdubOnTriggerArmed = false;
+        startOverdub(false);
+                mainComponent->updateOverdubUI();
 
-	}
+        }
 	const juce::ScopedLock sl(midiCriticalSection); // Use the custom CriticalSection for thread safety
 
 	// Always record MIDI events while the plugin is active
@@ -275,17 +275,18 @@ void MidiManager::closeMidiInput()
 }
 
 
-void MidiManager::startOverdub()
+void MidiManager::startOverdub(bool stopActiveNotes)
 {
-	juce::MidiBuffer bufferCopy;
-	{
-		const juce::ScopedLock sl(midiCriticalSection);
-        mainComponent->getPluginManager().stopAllNotes();
-		overdubHistory.emplace_back(recordBuffer);
-		isOverdubbing = true;
-		// Do NOT clear recordBuffer!
-		recordStartTime = juce::Time::getHighResolutionTicks();
-		bufferCopy = recordBuffer;
+        juce::MidiBuffer bufferCopy;
+        {
+                const juce::ScopedLock sl(midiCriticalSection);
+        if (stopActiveNotes)
+            mainComponent->getPluginManager().stopAllNotes();
+                overdubHistory.emplace_back(recordBuffer);
+                isOverdubbing = true;
+                // Do NOT clear recordBuffer!
+                recordStartTime = juce::Time::getHighResolutionTicks();
+                bufferCopy = recordBuffer;
 	}
 
 	republishRecordedEvents(bufferCopy);
