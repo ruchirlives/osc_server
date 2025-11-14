@@ -144,6 +144,50 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             taggedMidiBuffer.erase(taggedMidiBuffer.begin(),
                 taggedMidiBuffer.begin() + (taggedMidiBuffer.size() - maxBufferSize));
 
+        const bool isStartingPlayback = (playbackSamplePosition == 0);
+        const int graceWindow = bufferToFill.numSamples;
+        std::unordered_map<juce::String, juce::MidiBuffer> scheduledPluginMessages;
+
+        if (!taggedMidiBuffer.empty())
+        {
+            std::vector<MyMidiMessage> remainingMessages;
+            remainingMessages.reserve(taggedMidiBuffer.size());
+
+            for (auto& taggedMessage : taggedMidiBuffer)
+            {
+                if (pluginInstances.find(taggedMessage.pluginId) == pluginInstances.end())
+                    continue;
+
+                bool consumed = false;
+
+                if (sampleRate <= 0.0 || taggedMessage.timestamp == 0)
+                {
+                    scheduledPluginMessages[taggedMessage.pluginId].addEvent(taggedMessage.message, 0);
+                    consumed = true;
+                }
+                else
+                {
+                    auto absPos = static_cast<juce::int64>((taggedMessage.timestamp / 1000.0) * sampleRate);
+                    auto offset64 = absPos - playbackSamplePosition;
+                    const int offset = static_cast<int>(offset64);
+
+                    if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
+                        || (offset >= 0 && offset < bufferToFill.numSamples))
+                    {
+                        scheduledPluginMessages[taggedMessage.pluginId].addEvent(
+                            taggedMessage.message,
+                            juce::jmax(0, offset));
+                        consumed = true;
+                    }
+                }
+
+                if (!consumed)
+                    remainingMessages.push_back(std::move(taggedMessage));
+            }
+
+            taggedMidiBuffer.swap(remainingMessages);
+        }
+
         // 2) Process each plugin once, in a single loop
         for (auto& [pluginId, pluginInstance] : pluginInstances)
         {
@@ -167,39 +211,10 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
 
                 // e) gather tagged MIDI for this plugin
                 juce::MidiBuffer matchingMessages;
-                bool isStartingPlayback = (playbackSamplePosition == 0);
-                const int graceWindow = bufferToFill.numSamples; // One buffer's worth
-
-                for (auto it = taggedMidiBuffer.begin(); it != taggedMidiBuffer.end();)
+                if (auto scheduled = scheduledPluginMessages.find(pluginId);
+                    scheduled != scheduledPluginMessages.end())
                 {
-                    const auto& tm = *it;
-                    if (tm.pluginId == pluginId)
-                    {
-                        int offset = 0;
-
-                        // Immediate message (no timestamp)
-                        if (tm.timestamp == 0)
-                        {
-                            matchingMessages.addEvent(tm.message, 0);
-                            it = taggedMidiBuffer.erase(it);
-                            continue;
-                        }
-
-                        // Convert ms to absolute sample position
-                        auto absPos = static_cast<juce::int64>((tm.timestamp / 1000.0) * sampleRate);
-                        offset = static_cast<int>(absPos - playbackSamplePosition);
-
-                        // Handle early notes gracefully if at playback start
-                        if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
-                            || (offset >= 0 && offset < bufferToFill.numSamples))
-                        {
-                            matchingMessages.addEvent(tm.message, juce::jmax(0, offset)); // Clamp offset to 0 if early
-                            it = taggedMidiBuffer.erase(it);
-                            continue;
-                        }
-                    }
-
-                    ++it; // Keep unscheduled messages
+                    matchingMessages = std::move(scheduled->second);
                 }
 
                 // merge in live incoming MIDI if this is the selected plugin
