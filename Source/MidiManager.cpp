@@ -306,15 +306,16 @@ void MidiManager::stopOverdub()
 
 void MidiManager::triggerOverdub()
 {
-	if (isOverdubbing)
-	{
-		playOverdubOnTriggerArmed = false;
-		stopOverdub();
-	}
-	else
-	{
-		playOverdubOnTriggerArmed = true;
-	}
+    if (isOverdubbing)
+    {
+        playOverdubOnTriggerArmed = false;
+        stopOverdub();
+    }
+    else
+    {
+        // Toggle the armed state
+        playOverdubOnTriggerArmed = !playOverdubOnTriggerArmed;
+    }
 }
 
 void MidiManager::playOverdub()
