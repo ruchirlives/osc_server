@@ -978,9 +978,6 @@ void PluginManager::restoreAllPluginStates(const juce::String& dataFilePath)
             DBG("Restoring state for plugin: " << pluginId);
             restorePluginState(pluginId, state);
 
-            // Set percentage loaded
-            float percentageLoaded = ((i + 1) / static_cast<float>(numPlugins)) * 100.0f;
-            mainComponent->updateProjectNameLabel("Restored: " + juce::String(percentageLoaded, 2) + "%");
         }
         DBG("All plugin states restored successfully from binary file.");
     }
