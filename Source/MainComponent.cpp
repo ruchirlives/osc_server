@@ -468,16 +468,35 @@ void MainComponent::restoreProject(bool append)
 
             // Update the orchestra table
             orchestraTable.updateContent();
+			resized();
 
             // Get the restored project name
             juce::String projectName = zipFile.getFileNameWithoutExtension();
             DBG("Project Restored: " + projectName);
             updateProjectNameLabel(projectName);
+            repaint();
+            if (auto* top = getTopLevelComponent())
+            {
+                auto w = top->getWidth();
+                auto h = top->getHeight();
+                top->setSize(w + 1, h);
+                top->setSize(w, h);
+            }
             restoreSucceeded = true;
         }
 
         if (!restoreSucceeded)
+        {
             projectNameLabel.setText(previousLabelText, juce::dontSendNotification);
+            repaint();
+            if (auto* top = getTopLevelComponent())
+            {
+                auto w = top->getWidth();
+                auto h = top->getHeight();
+                top->setSize(w + 1, h);
+                top->setSize(w, h);
+            }
+        }
     }
 }
 
