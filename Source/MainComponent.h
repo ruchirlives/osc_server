@@ -128,7 +128,6 @@ private:
 	juce::TableListBox& table;
 };
 
-
 class MainComponent :   public juce::Component, 
                         public juce::ComboBox::Listener
 {

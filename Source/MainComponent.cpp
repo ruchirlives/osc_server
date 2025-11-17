@@ -400,8 +400,13 @@ void MainComponent::restoreProject(bool append)
 {
     // Open a file chooser dialog to select the zip file
     juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
+	projectNameLabel.setText("Project Name: Restoring...", juce::dontSendNotification);
+	projectNameLabel.repaint();
     if (fileChooser.browseForFileToOpen())
     {
+        const juce::String previousLabelText = projectNameLabel.getText();
+        bool restoreSucceeded = false;
+
         juce::File zipFile = fileChooser.getResult();
         DBG("Selected Project: " + zipFile.getFullPathName());
         juce::FileInputStream inputStream(zipFile);
@@ -468,7 +473,11 @@ void MainComponent::restoreProject(bool append)
             juce::String projectName = zipFile.getFileNameWithoutExtension();
             DBG("Project Restored: " + projectName);
             updateProjectNameLabel(projectName);
+            restoreSucceeded = true;
         }
+
+        if (!restoreSucceeded)
+            projectNameLabel.setText(previousLabelText, juce::dontSendNotification);
     }
 }
 
@@ -1181,5 +1190,4 @@ void MainComponent::removeMidiChannelFromOverdub(int midiChannel)
 	midiManager.isStripped = false;
     updateOverdubUI();
 }
-
 

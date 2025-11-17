@@ -1,9 +1,8 @@
 #include "Conductor.h"
 #include "MainComponent.h"
 
-
 // Constructor: takes a reference to PluginManager and passes it
-Conductor::Conductor(PluginManager& pm, MidiManager& mm, MainComponent* mainComponentRef)
+Conductor::Conductor(PluginManager &pm, MidiManager &mm, MainComponent *mainComponentRef)
 	: pluginManager(pm), midiManager(mm), mainComponent(mainComponentRef)
 {
 	// Add this instance as an OSC listener
@@ -32,9 +31,8 @@ void Conductor::shutdown()
 	OSCSender::disconnect();   // close socket
 }
 
-
 // Initialise OSC Sender with a specific host and port
-void Conductor::initializeOSCSender(const juce::String& host, int port)
+void Conductor::initializeOSCSender(const juce::String &host, int port)
 {
 	if (!OSCSender::connect(host, port))
 	{
@@ -46,10 +44,10 @@ void Conductor::initializeOSCSender(const juce::String& host, int port)
 	}
 }
 
-void Conductor::sendOSCMessage(const std::vector<juce::String>& tags)
+void Conductor::sendOSCMessage(const std::vector<juce::String> &tags)
 {
 	juce::OSCMessage message("/selected/tags");
-	for (const auto& tag : tags)
+	for (const auto &tag : tags)
 	{
 		message.addString(tag);
 	}
@@ -78,8 +76,8 @@ void Conductor::initializeOSCReceiver(int port)
 	}
 }
 
-//convert string array to vector
-void Conductor::stringArrayToVector(juce::StringArray stringArray, std::vector<juce::String>& stringVector)
+// convert string array to vector
+void Conductor::stringArrayToVector(juce::StringArray stringArray, std::vector<juce::String> &stringVector)
 {
 	for (int i = 0; i < stringArray.size(); i++)
 	{
@@ -88,7 +86,7 @@ void Conductor::stringArrayToVector(juce::StringArray stringArray, std::vector<j
 }
 
 // Callback function for receiving OSC messages
-void Conductor::oscMessageReceived(const juce::OSCMessage& message)
+void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 {
 	// DBG print the message
 	// DBG("Received OSC message: " + message.getAddressPattern().toString());
@@ -110,7 +108,7 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 			{
 				// activate get_recorded method
 				DBG("Received get_recorded command");
-				 midiManager.getRecorded();
+				midiManager.getRecorded();
 			}
 			else if (messageType == "save_project")
 			{
@@ -126,7 +124,6 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 
 				// Save the project state files
 				saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-
 			}
 			else if (messageType == "restore_project")
 			{
@@ -141,13 +138,11 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 				juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
 
 				restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-
 			}
 			else if (messageType == "restore_from_file")
 			{
 				DBG("Received restore from file request for file: ");
 				mainComponent->restoreProject(false); // false means do not append, just restore
-
 			}
 			else if (messageType == "request_tags")
 			{
@@ -162,9 +157,7 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 
 				// Send the tags back to the sender
 				send_lastTag();
-
 			}
-
 		}
 		// Handle MIDI messages
 		else if (messageAddress == "/midi/message")
@@ -174,23 +167,22 @@ void Conductor::oscMessageReceived(const juce::OSCMessage& message)
 	}
 }
 
-
-void Conductor::oscAddInstrumentCommand(const juce::OSCMessage& message)
+void Conductor::oscAddInstrumentCommand(const juce::OSCMessage &message)
 {
-    if (message.size() >= 4 && message[0].isString() && message[1].isString() && message[2].isInt32())
-    {
-        juce::String instrumentName = message[0].getString();
-        juce::String pluginInstanceId = message[1].getString();
-        int midiChannel = message[2].getInt32();
+	if (message.size() >= 4 && message[0].isString() && message[1].isString() && message[2].isInt32())
+	{
+		juce::String instrumentName = message[0].getString();
+		juce::String pluginInstanceId = message[1].getString();
+		int midiChannel = message[2].getInt32();
 
 		// Extract tags starting from index 3
-        std::vector<juce::String> tags = extractTags(message, 3);
+		std::vector<juce::String> tags = extractTags(message, 3);
 
-        // Check if an instrument with the same pluginInstanceId and midiChannel already exists
-        for (auto& instrument : orchestra)
-        {
-            if (instrument.pluginInstanceId == pluginInstanceId && instrument.midiChannel == midiChannel)
-            {
+		// Check if an instrument with the same pluginInstanceId and midiChannel already exists
+		for (auto &instrument : orchestra)
+		{
+			if (instrument.pluginInstanceId == pluginInstanceId && instrument.midiChannel == midiChannel)
+			{
 				// Is the pluginName the same?
 				if (instrument.pluginName != message[1].getString())
 				{
@@ -202,41 +194,41 @@ void Conductor::oscAddInstrumentCommand(const juce::OSCMessage& message)
 				}
 
 				// Update the existing entry with the new instrumentName
-                instrument.instrumentName = instrumentName;
-                instrument.tags = tags;
-                DBG("Updated existing instrument in orchestra: " + instrumentName);
-                syncOrchestraWithPluginManager();
-                return;
-            }
-        }
+				instrument.instrumentName = instrumentName;
+				instrument.tags = tags;
+				DBG("Updated existing instrument in orchestra: " + instrumentName);
+				syncOrchestraWithPluginManager();
+				return;
+			}
+		}
 
-        // Create a new InstrumentInfo struct and add it to the orchestra vector
+		// Create a new InstrumentInfo struct and add it to the orchestra vector
 		InstrumentInfo newInstrument;
-        newInstrument.instrumentName = instrumentName;
-        newInstrument.pluginInstanceId = pluginInstanceId;
-        newInstrument.midiChannel = midiChannel;
-        newInstrument.tags = tags;
+		newInstrument.instrumentName = instrumentName;
+		newInstrument.pluginInstanceId = pluginInstanceId;
+		newInstrument.midiChannel = midiChannel;
+		newInstrument.tags = tags;
 
-        orchestra.push_back(newInstrument);
+		orchestra.push_back(newInstrument);
 
-        // Sync the orchestra list with PluginManager
-        syncOrchestraWithPluginManager();
-    }
-    else
-    {
-        DBG("Error: Incorrect OSC message format for adding instrument");
-    }
+		// Sync the orchestra list with PluginManager
+		syncOrchestraWithPluginManager();
+	}
+	else
+	{
+		DBG("Error: Incorrect OSC message format for adding instrument");
+	}
 }
 
-std::vector<std::pair<juce::String, int>> Conductor::extractPluginIdsAndChannels(const juce::OSCMessage& message, int startIndex)
+std::vector<std::pair<juce::String, int>> Conductor::extractPluginIdsAndChannels(const juce::OSCMessage &message, int startIndex)
 {
 	std::vector<juce::String> tags = extractTags(message, startIndex);
 	std::vector<std::pair<juce::String, int>> pluginIdsAndChannels;
 
 	// Find the plugin IDs associated with the tags and store them with the MIDI channel
-	for (const auto& tag : tags)
+	for (const auto &tag : tags)
 	{
-		for (const auto& instrument : orchestra)
+		for (const auto &instrument : orchestra)
 		{
 			if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
 			{
@@ -250,7 +242,7 @@ std::vector<std::pair<juce::String, int>> Conductor::extractPluginIdsAndChannels
 	return pluginIdsAndChannels;
 }
 
-void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
+void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 {
 	juce::String messageType = message[0].getString();
 	if (messageType == "note_on" || messageType == "note_off")
@@ -266,7 +258,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 			std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
 
 			// Send a message to each pluginId with its respective channel
-			for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+			for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 			{
 				handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
 				DBG("Received note on for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with note: " + juce::String(note) + " and velocity: " + juce::String(velocity) + " at time " + juce::String(timestamp));
@@ -282,12 +274,11 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 			std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
 
 			// Send a message to each pluginId with its respective channel
-			for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+			for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 			{
 				handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
 			}
 		}
-		
 	}
 	else if (messageType == "controller")
 	{
@@ -302,7 +293,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
 
 		// Send a message to each pluginId with its respective channel
-		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
 			handleIncomingControlChange(channel, controllerNumber, controllerValue, pluginId, timestamp);
 			DBG("Received control change for plugin: " + pluginId + " on channel: " + juce::String(channel) +
@@ -317,7 +308,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		// Extract pluginIds and channels using tags starting from index 3
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
 
-		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
 			handleIncomingChannelAftertouch(channel, value, pluginId, timestamp);
 			DBG("Received channel aftertouch for plugin: " + pluginId + " on channel: " + juce::String(channel) +
@@ -325,48 +316,47 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		}
 	}
 
-    else if (messageType == "poly_aftertouch")
-    {
-        int note = message[1].getInt32();
-        int value = message[2].getInt32();
-        juce::int64 timestamp = adjustTimestamp(message[3]);
+	else if (messageType == "poly_aftertouch")
+	{
+		int note = message[1].getInt32();
+		int value = message[2].getInt32();
+		juce::int64 timestamp = adjustTimestamp(message[3]);
 
-        // Extract pluginIds and channels using tags starting from index 4
-        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
+		// Extract pluginIds and channels using tags starting from index 4
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
 
-        // Send a message to each pluginId with its respective channel
-        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
-        {
-            handleIncomingPolyAftertouch(channel, note, value, pluginId, timestamp);
-            DBG("Received poly aftertouch for plugin: " + pluginId + " on channel: " + juce::String(channel) +
-                " note: " + juce::String(note) + " value: " + juce::String(value) + " at time " + juce::String(timestamp));
-        }
-    }
-    else if (messageType == "pitchbend")
-    {
-        int pitchBendValue = message[1].getInt32();
-        juce::int64 timestamp = adjustTimestamp(message[2]);
-        
-        std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
-        
-        for (const auto& [pluginId, channel] : pluginIdsAndChannels)
-        {
-            handleIncomingPitchBend(channel, pitchBendValue, pluginId, timestamp);
-            DBG("Received pitch bend for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with value: " + juce::String(pitchBendValue) + " at time " + juce::String(timestamp));
-        }
-    }
+		// Send a message to each pluginId with its respective channel
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
+		{
+			handleIncomingPolyAftertouch(channel, note, value, pluginId, timestamp);
+			DBG("Received poly aftertouch for plugin: " + pluginId + " on channel: " + juce::String(channel) +
+				" note: " + juce::String(note) + " value: " + juce::String(value) + " at time " + juce::String(timestamp));
+		}
+	}
+	else if (messageType == "pitchbend")
+	{
+		int pitchBendValue = message[1].getInt32();
+		juce::int64 timestamp = adjustTimestamp(message[2]);
+
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
+		{
+			handleIncomingPitchBend(channel, pitchBendValue, pluginId, timestamp);
+			DBG("Received pitch bend for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with value: " + juce::String(pitchBendValue) + " at time " + juce::String(timestamp));
+		}
+	}
 	else if (messageType == "program_change")
 	{
 		int programNumber = message[1].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[2]);
 		// Extract pluginIds and channels using tags starting from index 3
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
-		for (const auto& [pluginId, channel] : pluginIdsAndChannels)
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
 			handleIncomingProgramChange(channel, programNumber, pluginId, timestamp);
 			DBG("Received program change for plugin: " + pluginId + " on channel: " + juce::String(channel) + " to program: " + juce::String(programNumber));
 		}
-
 	}
 	else if (messageType == "save_plugin_data")
 	{
@@ -385,7 +375,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 
 		// Find pluginId that matches the first tag
 
-		for (const auto& instrument : orchestra)
+		for (const auto &instrument : orchestra)
 		{
 			if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
 			{
@@ -397,8 +387,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 				break;
 			}
 		}
-
-		
 	}
 	else if (messageType == "request_dawServerData")
 	{
@@ -409,7 +397,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 		juce::String tag = tags.empty() ? "" : tags[0];
 
 		// Find the entry in the orchestra that matches the tag
-		for (const auto& instrument : orchestra)
+		for (const auto &instrument : orchestra)
 		{
 			if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
 			{
@@ -451,8 +439,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 
 		// Reset the playbackSamplePosition in PluginManager
 		pluginManager.resetPlayback();
-
-
 	}
 	else if (messageType == "stop_request")
 	{
@@ -467,7 +453,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage& message)
 
 		// Reset the playbackSamplePosition in PluginManager
 		pluginManager.resetPlayback();
-		
 	}
 	else
 	{
@@ -482,7 +467,7 @@ juce::int64 Conductor::getTimestamp(const juce::OSCArgument timestampArg)
 	{
 		juce::String timestampString = timestampArg.getString();
 		double timestampInSeconds = timestampString.getDoubleValue(); // We are losing less than a microsecond precision here
-		
+
 		return static_cast<juce::int64>(timestampInSeconds * 1000.0); // Convert to milliseconds
 	}
 
@@ -505,47 +490,43 @@ juce::int64 Conductor::adjustTimestamp(const juce::OSCArgument timestampArg)
 	{
 		return adjustedStamp;
 	}
-
 }
-
-
 
 // Helper function to extract tags from the OSC message
-std::vector<juce::String> Conductor::extractTags(const juce::OSCMessage& message, int startIndex)
+std::vector<juce::String> Conductor::extractTags(const juce::OSCMessage &message, int startIndex)
 {
 	std::vector<juce::String> tags;
-    for (int i = startIndex; i < message.size(); ++i)
-    {
-        if (message[i].isString())
-        {
-            tags.push_back(message[i].getString());
-        }
-    }
-    return tags;
+	for (int i = startIndex; i < message.size(); ++i)
+	{
+		if (message[i].isString())
+		{
+			tags.push_back(message[i].getString());
+		}
+	}
+	return tags;
 }
 
-int Conductor::calculateSampleOffsetForMessage(const juce::Time& messageTime, double sampleRate)
+int Conductor::calculateSampleOffsetForMessage(const juce::Time &messageTime, double sampleRate)
 {
-	juce::Time now = juce::Time::getCurrentTime();  // Get the current time
+	juce::Time now = juce::Time::getCurrentTime(); // Get the current time
 	auto timeDifferenceMs = now.toMilliseconds() - messageTime.toMilliseconds();
 
 	// Convert the time difference to samples
 	int sampleOffset = static_cast<int>((timeDifferenceMs / 1000.0) * sampleRate);
 
 	// Clamp sampleOffset within the block size
-	return juce::jlimit(0, 511, sampleOffset);  // Assuming block size is 512 samples, adjust accordingly
+	return juce::jlimit(0, 511, sampleOffset); // Assuming block size is 512 samples, adjust accordingly
 }
 
-
 // Handles incoming OSC messages related to note_on and note_off
-void Conductor::handleIncomingNote(juce::String messageType, int channel, int note, int velocity, const juce::String& pluginId, juce::int64& timestamp)
+void Conductor::handleIncomingNote(juce::String messageType, int channel, int note, int velocity, const juce::String &pluginId, juce::int64 &timestamp)
 {
 	// Create a MIDI message based on the OSC message
 	juce::MidiMessage midiMessage;
 
 	if (messageType == "note_on")
 	{
-		midiMessage = juce::MidiMessage::noteOn(channel + 1, note, (juce::uint8)velocity);  // JUCE channels are 1-based
+		midiMessage = juce::MidiMessage::noteOn(channel + 1, note, (juce::uint8)velocity); // JUCE channels are 1-based
 	}
 	else if (messageType == "note_off")
 	{
@@ -557,17 +538,17 @@ void Conductor::handleIncomingNote(juce::String messageType, int channel, int no
 }
 
 // Handles incoming OSC program change messages
-void Conductor::handleIncomingProgramChange(int channel, int programNumber, const juce::String& pluginId, juce::int64& timestamp)
+void Conductor::handleIncomingProgramChange(int channel, int programNumber, const juce::String &pluginId, juce::int64 &timestamp)
 {
-    // Create a MIDI Program Change message
-    juce::MidiMessage midiMessage = juce::MidiMessage::programChange(channel + 1, programNumber);
+	// Create a MIDI Program Change message
+	juce::MidiMessage midiMessage = juce::MidiMessage::programChange(channel + 1, programNumber);
 
-    // Pass the message and tags to PluginManager
-    pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
+	// Pass the message and tags to PluginManager
+	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
 }
 
 // Handles CC messages
-void Conductor::handleIncomingControlChange(int channel, int controllerNumber, int controllerValue, const juce::String& pluginId, juce::int64& timestamp)
+void Conductor::handleIncomingControlChange(int channel, int controllerNumber, int controllerValue, const juce::String &pluginId, juce::int64 &timestamp)
 {
 	// Create a MIDI Control Change message
 	juce::MidiMessage midiMessage = juce::MidiMessage::controllerEvent(channel + 1, controllerNumber, controllerValue);
@@ -577,7 +558,7 @@ void Conductor::handleIncomingControlChange(int channel, int controllerNumber, i
 }
 
 // Handles channel aftertouch messages
-void Conductor::handleIncomingChannelAftertouch(int channel, int value, const juce::String& pluginId, juce::int64& timestamp)
+void Conductor::handleIncomingChannelAftertouch(int channel, int value, const juce::String &pluginId, juce::int64 &timestamp)
 {
 	// Create a MIDI Channel Aftertouch message
 	juce::MidiMessage midiMessage = juce::MidiMessage::channelPressureChange(channel + 1, (juce::uint8)value);
@@ -586,9 +567,8 @@ void Conductor::handleIncomingChannelAftertouch(int channel, int value, const ju
 	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
 }
 
-
 // Add this method to handle polyphonic aftertouch messages
-void Conductor::handleIncomingPolyAftertouch(int channel, int note, int value, const juce::String& pluginId, juce::int64& timestamp)
+void Conductor::handleIncomingPolyAftertouch(int channel, int note, int value, const juce::String &pluginId, juce::int64 &timestamp)
 {
 	// Create a MIDI Polyphonic Aftertouch message
 	juce::MidiMessage midiMessage = juce::MidiMessage::aftertouchChange(channel + 1, note, (juce::uint8)value);
@@ -598,50 +578,48 @@ void Conductor::handleIncomingPolyAftertouch(int channel, int note, int value, c
 }
 
 // Add this method to handle pitch bend messages
-void Conductor::handleIncomingPitchBend(int channel, int pitchBendValue, const juce::String& pluginId, juce::int64& timestamp)
+void Conductor::handleIncomingPitchBend(int channel, int pitchBendValue, const juce::String &pluginId, juce::int64 &timestamp)
 {
-    // Create a MIDI Pitch Bend message
-    juce::MidiMessage midiMessage = juce::MidiMessage::pitchWheel(channel + 1, pitchBendValue);
-    
-    // Pass the message to PluginManager
-    pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
+	// Create a MIDI Pitch Bend message
+	juce::MidiMessage midiMessage = juce::MidiMessage::pitchWheel(channel + 1, pitchBendValue);
+
+	// Pass the message to PluginManager
+	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
 }
 // Sync the orchestra list with PluginManager
 void Conductor::syncOrchestraWithPluginManager()
 {
 	DBG("Syncing orchestra with PluginManager");
-	if (orchestra.empty())  // Check if orchestra is empty before accessing begin()
+	if (orchestra.empty()) // Check if orchestra is empty before accessing begin()
 	{
 		DBG("Orchestra is empty, skipping removal check for plugin");
-		
 	}
-    // Iterate through each instrument in the orchestra and ensure PluginManager matches
-    for (auto& instrument : orchestra)
-    {
+	// Iterate through each instrument in the orchestra and ensure PluginManager matches
+	for (auto &instrument : orchestra)
+	{
 		if (!pluginManager.hasPluginInstance(instrument.pluginInstanceId))
-        {
-            DBG("Adding plugin to PluginManager: " + instrument.instrumentName);
-            pluginManager.instantiatePluginByName(instrument.pluginName, instrument.pluginInstanceId); // Hypothetical function to instantiate plugin by ID
-        }
-    }
+		{
+			DBG("Adding plugin to PluginManager: " + instrument.instrumentName);
+			pluginManager.instantiatePluginByName(instrument.pluginName, instrument.pluginInstanceId); // Hypothetical function to instantiate plugin by ID
+		}
+	}
 
-    // Remove plugins from PluginManager that are not in the orchestra
-    auto pluginInstances = pluginManager.getPluginInstanceIds();
-    for (const auto& pluginId : pluginInstances)
-    {
-        auto found = std::find_if(orchestra.begin(), orchestra.end(), [&](const InstrumentInfo& instrument) {
-            return instrument.pluginInstanceId == pluginId;
-            });
+	// Remove plugins from PluginManager that are not in the orchestra
+	auto pluginInstances = pluginManager.getPluginInstanceIds();
+	for (const auto &pluginId : pluginInstances)
+	{
+		auto found = std::find_if(orchestra.begin(), orchestra.end(), [&](const InstrumentInfo &instrument)
+								  { return instrument.pluginInstanceId == pluginId; });
 
-        if (found == orchestra.end())
-        {
-            DBG("Removing plugin from PluginManager: " + pluginId);
-            pluginManager.resetPlugin(pluginId);
-        }
-    }
+		if (found == orchestra.end())
+		{
+			DBG("Removing plugin from PluginManager: " + pluginId);
+			pluginManager.resetPlugin(pluginId);
+		}
+	}
 }
 
-void Conductor::saveOrchestraData(const juce::String& dataFilePath, const std::vector<InstrumentInfo>& selectedInstruments = {})
+void Conductor::saveOrchestraData(const juce::String &dataFilePath, const std::vector<InstrumentInfo> &selectedInstruments = {})
 {
 	juce::File dataFile(dataFilePath);
 
@@ -657,17 +635,17 @@ void Conductor::saveOrchestraData(const juce::String& dataFilePath, const std::v
 		juce::XmlElement rootElement("Orchestra");
 
 		// Iterate through the orchestra vector and add each instrument's data to XML
-		for (const auto& instrument : selectedInstruments.empty() ? orchestra : selectedInstruments)
+		for (const auto &instrument : selectedInstruments.empty() ? orchestra : selectedInstruments)
 		{
-			juce::XmlElement* instrumentElement = rootElement.createNewChildElement("Instrument");
+			juce::XmlElement *instrumentElement = rootElement.createNewChildElement("Instrument");
 			instrumentElement->setAttribute("instrumentName", instrument.instrumentName);
 			instrumentElement->setAttribute("pluginName", instrument.pluginName);
 			instrumentElement->setAttribute("pluginInstanceId", instrument.pluginInstanceId);
 			instrumentElement->setAttribute("midiChannel", instrument.midiChannel);
 
 			// Save tags as a sub-element
-			juce::XmlElement* tagsElement = instrumentElement->createNewChildElement("Tags");
-			for (const auto& tag : instrument.tags)
+			juce::XmlElement *tagsElement = instrumentElement->createNewChildElement("Tags");
+			for (const auto &tag : instrument.tags)
 			{
 				tagsElement->createNewChildElement("Tag")->setAttribute("value", tag);
 			}
@@ -683,13 +661,13 @@ void Conductor::saveOrchestraData(const juce::String& dataFilePath, const std::v
 	}
 }
 
-void Conductor::restoreOrchestraData(const juce::String& dataFilePath)
+void Conductor::restoreOrchestraData(const juce::String &dataFilePath)
 {
 	orchestra.clear(); // Clear existing orchestra data
 	importOrchestraData(dataFilePath);
 }
 
-void Conductor::importOrchestraData(const juce::String& dataFilePath)
+void Conductor::importOrchestraData(const juce::String &dataFilePath)
 {
 	juce::File dataFile(dataFilePath);
 	juce::XmlDocument xmlDoc(dataFile);
@@ -698,7 +676,7 @@ void Conductor::importOrchestraData(const juce::String& dataFilePath)
 	if (rootElement != nullptr && rootElement->hasTagName("Orchestra"))
 	{
 		// Iterate through each "Instrument" element and reconstruct the orchestra vector
-		for (auto* instrumentElement : rootElement->getChildIterator())
+		for (auto *instrumentElement : rootElement->getChildIterator())
 		{
 			if (instrumentElement->hasTagName("Instrument"))
 			{
@@ -709,9 +687,9 @@ void Conductor::importOrchestraData(const juce::String& dataFilePath)
 				newInstrument.midiChannel = instrumentElement->getIntAttribute("midiChannel");
 
 				// Read tags from the "Tags" sub-element
-				if (auto* tagsElement = instrumentElement->getChildByName("Tags"))
+				if (auto *tagsElement = instrumentElement->getChildByName("Tags"))
 				{
-					for (auto* tagElement : tagsElement->getChildIterator())
+					for (auto *tagElement : tagsElement->getChildIterator())
 					{
 						if (tagElement->hasTagName("Tag"))
 						{
@@ -725,7 +703,6 @@ void Conductor::importOrchestraData(const juce::String& dataFilePath)
 		}
 
 		DBG("Orchestra data restored successfully from file: " + dataFilePath);
-
 	}
 	else
 	{
@@ -733,11 +710,11 @@ void Conductor::importOrchestraData(const juce::String& dataFilePath)
 	}
 }
 
-void Conductor::saveAllData(const juce::String& dataFilePath, const juce::String& pluginDescFilePath, const juce::String& orchestraFilePath, const std::vector<InstrumentInfo>& selectedInstruments)
+void Conductor::saveAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath, const std::vector<InstrumentInfo> &selectedInstruments)
 {
 	// Create an array of selectedInstances which are the unique pluginInstances in selectedInstruments
 	std::vector<juce::String> selectedInstances;
-	for (const auto& instrument : selectedInstruments)
+	for (const auto &instrument : selectedInstruments)
 	{
 		if (std::find(selectedInstances.begin(), selectedInstances.end(), instrument.pluginInstanceId) == selectedInstances.end())
 		{
@@ -745,30 +722,29 @@ void Conductor::saveAllData(const juce::String& dataFilePath, const juce::String
 			DBG("Selected instance: " + instrument.pluginInstanceId);
 		}
 	}
-	 
+
 	pluginManager.savePluginDescriptionsToFile(pluginDescFilePath, selectedInstances);
 	pluginManager.saveAllPluginStates(dataFilePath, selectedInstances);
 	saveOrchestraData(orchestraFilePath, selectedInstruments);
 }
 
-void Conductor:: upsertAllData(const juce::String& dataFilePath, const juce::String& pluginDescFilePath, const juce::String& orchestraFilePath)
+void Conductor::upsertAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath)
 {
 	pluginManager.upsertPluginDescriptionsFromFile(pluginDescFilePath);
 	pluginManager.restoreAllPluginStates(dataFilePath);
 	importOrchestraData(orchestraFilePath);
 }
 
-void Conductor::restoreAllData(const juce::String& dataFilePath, const juce::String& pluginDescFilePath, const juce::String& orchestraFilePath)
+void Conductor::restoreAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath)
 {
 	pluginManager.restorePluginDescriptionsFromFile(pluginDescFilePath);
 	pluginManager.restoreAllPluginStates(dataFilePath);
 	restoreOrchestraData(orchestraFilePath);
 }
 
-
 // Path: OrchestraTableModel.cpp
 
-OrchestraTableModel::OrchestraTableModel(std::vector<InstrumentInfo>& data, juce::TableListBox& tableRef, MainComponent* mainComponentRef)
+OrchestraTableModel::OrchestraTableModel(std::vector<InstrumentInfo> &data, juce::TableListBox &tableRef, MainComponent *mainComponentRef)
 	: orchestraData(data), table(tableRef), mainComponent(mainComponentRef) {}
 
 int OrchestraTableModel::getNumRows()
@@ -776,7 +752,7 @@ int OrchestraTableModel::getNumRows()
 	return orchestraData.size();
 }
 
-void OrchestraTableModel::paintRowBackground(juce::Graphics& g, int rowNumber, int width, int height, bool rowIsSelected)
+void OrchestraTableModel::paintRowBackground(juce::Graphics &g, int rowNumber, int width, int height, bool rowIsSelected)
 {
 	if (rowIsSelected)
 		g.fillAll(juce::Colours::lightblue);
@@ -784,11 +760,11 @@ void OrchestraTableModel::paintRowBackground(juce::Graphics& g, int rowNumber, i
 		g.fillAll(juce::Colours::lightgrey);
 }
 
-void OrchestraTableModel::paintCell(juce::Graphics& g, int rowNumber, int columnId, int width, int height, bool rowIsSelected)
+void OrchestraTableModel::paintCell(juce::Graphics &g, int rowNumber, int columnId, int width, int height, bool rowIsSelected)
 {
 	if (rowNumber < orchestraData.size())
 	{
-		auto& instrument = orchestraData[rowNumber];
+		auto &instrument = orchestraData[rowNumber];
 		switch (columnId)
 		{
 		case 1:
@@ -812,7 +788,7 @@ void OrchestraTableModel::paintCell(juce::Graphics& g, int rowNumber, int column
 	}
 }
 
-juce::String OrchestraTableModel::convertVectorToString(const std::vector<juce::String>& vector)
+juce::String OrchestraTableModel::convertVectorToString(const std::vector<juce::String> &vector)
 {
 	juce::String result;
 	for (size_t i = 0; i < vector.size(); ++i)
@@ -826,7 +802,7 @@ juce::String OrchestraTableModel::convertVectorToString(const std::vector<juce::
 	return result;
 }
 
-void OrchestraTableModel::selectRow(int row, const juce::ModifierKeys& modifiers)
+void OrchestraTableModel::selectRow(int row, const juce::ModifierKeys &modifiers)
 {
 	// Assuming that `table` is a reference or a pointer to the table component.
 	// This will allow row selection to be triggered.
@@ -835,17 +811,17 @@ void OrchestraTableModel::selectRow(int row, const juce::ModifierKeys& modifiers
 	sendTags(row);
 
 	// Copy first tag in Tags to clipboard
-	//juce::SystemClipboard::copyTextToClipboard(orchestraData[row].tags.empty() ? "" : orchestraData[row].tags[0]);
+	// juce::SystemClipboard::copyTextToClipboard(orchestraData[row].tags.empty() ? "" : orchestraData[row].tags[0]);
 }
 
 void OrchestraTableModel::renamePluginInstance(int rowNumber)
 {
 	// Get the current plugin instance ID for the selected row
-	auto& instrument = mainComponent->getConductor().orchestra[rowNumber];
+	auto &instrument = mainComponent->getConductor().orchestra[rowNumber];
 	juce::String currentPluginInstanceId = instrument.pluginInstanceId;
 
 	// Create the RenamePluginDialog
-	auto* dialog = new RenamePluginDialog(currentPluginInstanceId);
+	auto *dialog = new RenamePluginDialog(currentPluginInstanceId);
 	// Display the dialog using DialogWindow::LaunchOptions
 	juce::DialogWindow::LaunchOptions options;
 	options.content.setOwned(dialog);
@@ -854,59 +830,55 @@ void OrchestraTableModel::renamePluginInstance(int rowNumber)
 	options.escapeKeyTriggersCloseButton = true;
 	options.useNativeTitleBar = true;
 	options.resizable = false;
-	auto* dw = options.launchAsync();  // returns the DialogWindow*
+	auto *dw = options.launchAsync(); // returns the DialogWindow*
 
 	// Set up the callback for when the dialog is closed
 	dialog->onDialogResult = [this, &instrument, currentPluginInstanceId, dialog, dw](bool accepted)
+	{
+		if (accepted) // User clicked "OK"
 		{
-			if (accepted) // User clicked "OK"
+			// Get the new plugin instance ID from the dialog
+			juce::String newPluginInstanceId = dialog->getSelectedPluginInstanceId();
+
+			// Validate the new ID
+			if (newPluginInstanceId.isEmpty())
 			{
-				// Get the new plugin instance ID from the dialog
-				juce::String newPluginInstanceId = dialog->getSelectedPluginInstanceId();
-
-				// Validate the new ID
-				if (newPluginInstanceId.isEmpty())
-				{
-					juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-						"Rename Plugin Instance",
-						"Plugin Instance ID cannot be empty.");
-					return;
-				}
-
-				// Update all rows with the same pluginInstanceId
-				for (auto& row : mainComponent->getConductor().orchestra)
-				{
-					if (row.pluginInstanceId == currentPluginInstanceId)
-					{
-						row.pluginInstanceId = newPluginInstanceId;
-					}
-				}
-
-				// Update the PluginManager
-				if (mainComponent->getPluginManager().hasPluginInstance(currentPluginInstanceId))
-				{
-					mainComponent->getPluginManager().renamePluginInstance(currentPluginInstanceId, newPluginInstanceId);
-				}
-
-				// Refresh the table to reflect the changes
-				mainComponent->orchestraTable.updateContent();
+				juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+													   "Rename Plugin Instance",
+													   "Plugin Instance ID cannot be empty.");
+				return;
 			}
 
-			// Close the dialog
-			dw->exitModalState(0); // Close the dialog
-			
-		};
+			// Update all rows with the same pluginInstanceId
+			for (auto &row : mainComponent->getConductor().orchestra)
+			{
+				if (row.pluginInstanceId == currentPluginInstanceId)
+				{
+					row.pluginInstanceId = newPluginInstanceId;
+				}
+			}
 
+			// Update the PluginManager
+			if (mainComponent->getPluginManager().hasPluginInstance(currentPluginInstanceId))
+			{
+				mainComponent->getPluginManager().renamePluginInstance(currentPluginInstanceId, newPluginInstanceId);
+			}
 
+			// Refresh the table to reflect the changes
+			mainComponent->orchestraTable.updateContent();
+		}
+
+		// Close the dialog
+		dw->exitModalState(0); // Close the dialog
+	};
 }
-
 
 void OrchestraTableModel::sendTags(int row)
 {
 	// Send the selected tags to the OSC sender
 	if (row >= 0 && row < orchestraData.size())
 	{
-		const InstrumentInfo& instrument = orchestraData[row];
+		const InstrumentInfo &instrument = orchestraData[row];
 		mainComponent->getConductor().sendOSCMessage(instrument.tags);
 	}
 }
@@ -927,25 +899,24 @@ int OrchestraTableModel::getSelectedMidiChannel()
 		// return Channel 1
 		return 1;
 	}
-
 }
 
 juce::String OrchestraTableModel::getSelectedPluginId()
 {
-    // Get the pluginId of the first selected rows
-    juce::SparseSet<int> selectedRows = table.getSelectedRows();
+	// Get the pluginId of the first selected rows
+	juce::SparseSet<int> selectedRows = table.getSelectedRows();
 
-    if (selectedRows.size() > 0)
-    {
-        int rowIndex = selectedRows[0];
-        if (rowIndex >= 0 && rowIndex < static_cast<int>(orchestraData.size()))
-        {
-            juce::String pluginId = orchestraData[rowIndex].pluginInstanceId;
-            return pluginId;
-        }
-    }
-    // return an empty string if no valid selection
-    return juce::String();
+	if (selectedRows.size() > 0)
+	{
+		int rowIndex = selectedRows[0];
+		if (rowIndex >= 0 && rowIndex < static_cast<int>(orchestraData.size()))
+		{
+			juce::String pluginId = orchestraData[rowIndex].pluginInstanceId;
+			return pluginId;
+		}
+	}
+	// return an empty string if no valid selection
+	return juce::String();
 }
 
 juce::String OrchestraTableModel::getText(int columnNumber, int rowNumber) const
@@ -956,27 +927,41 @@ juce::String OrchestraTableModel::getText(int columnNumber, int rowNumber) const
 		return "Invalid row number";
 	}
 
-	const InstrumentInfo& info = orchestraData[rowNumber];
+	const InstrumentInfo &info = orchestraData[rowNumber];
 	switch (columnNumber)
 	{
-	case 1: return info.instrumentName;
-	case 2: return info.pluginName;
-	case 3: return info.pluginInstanceId;
-	case 4: return juce::String(info.midiChannel);
-	case 5: return convertVectorToString(info.tags);
-	default: return "Invalid column number";
+	case 1:
+		return info.instrumentName;
+	case 2:
+		return info.pluginName;
+	case 3:
+		return info.pluginInstanceId;
+	case 4:
+		return juce::String(info.midiChannel);
+	case 5:
+		return convertVectorToString(info.tags);
+	default:
+		return "Invalid column number";
 	}
 }
 
-void OrchestraTableModel::setText(int columnNumber, int rowNumber, const juce::String& newText)
+void OrchestraTableModel::setText(int columnNumber, int rowNumber, const juce::String &newText)
 {
-	InstrumentInfo& info = orchestraData[rowNumber];
+	InstrumentInfo &info = orchestraData[rowNumber];
 	switch (columnNumber)
 	{
-	case 1: info.instrumentName = newText; break;
-	case 2: info.pluginName = newText; break;
-	case 3: info.pluginInstanceId = newText; break;
-	case 4: info.midiChannel = newText.getIntValue(); break;
+	case 1:
+		info.instrumentName = newText;
+		break;
+	case 2:
+		info.pluginName = newText;
+		break;
+	case 3:
+		info.pluginInstanceId = newText;
+		break;
+	case 4:
+		info.midiChannel = newText.getIntValue();
+		break;
 	case 5:
 	{
 		juce::StringArray tagsArray;
@@ -989,17 +974,17 @@ void OrchestraTableModel::setText(int columnNumber, int rowNumber, const juce::S
 			info.tags.push_back(stripped);
 		}
 		break;
-
 	}
-	default: break;
+	default:
+		break;
 	}
 }
 
 // Refresh component for editable cells
 
-juce::Component* OrchestraTableModel::refreshComponentForCell(int rowNumber, int columnId, bool isRowSelected, juce::Component* existingComponentToUpdate)
+juce::Component *OrchestraTableModel::refreshComponentForCell(int rowNumber, int columnId, bool isRowSelected, juce::Component *existingComponentToUpdate)
 {
-	auto* textLabel = dynamic_cast<EditableTextCustomComponent*>(existingComponentToUpdate);
+	auto *textLabel = dynamic_cast<EditableTextCustomComponent *>(existingComponentToUpdate);
 
 	if (textLabel == nullptr)
 		textLabel = new EditableTextCustomComponent(*this);
@@ -1008,18 +993,16 @@ juce::Component* OrchestraTableModel::refreshComponentForCell(int rowNumber, int
 	return textLabel;
 }
 
-
-
 // Path: EditableTextCustomComponent.cpp
 
-EditableTextCustomComponent::EditableTextCustomComponent(OrchestraTableModel& ownerRef)
+EditableTextCustomComponent::EditableTextCustomComponent(OrchestraTableModel &ownerRef)
 	: owner(ownerRef), row(-1), columnId(-1) // Initialize row and columnId to -1
 {
-	setEditable(false, true, false);  // Allow double-click to edit
+	setEditable(false, true, false);							// Allow double-click to edit
 	setColour(juce::Label::textColourId, juce::Colours::black); // Set text colour to black
 }
 
-void EditableTextCustomComponent::mouseDown(const juce::MouseEvent& event)
+void EditableTextCustomComponent::mouseDown(const juce::MouseEvent &event)
 {
 	if (event.mods.isRightButtonDown())
 	{
@@ -1038,7 +1021,6 @@ void EditableTextCustomComponent::mouseDown(const juce::MouseEvent& event)
 			showContextMenu_tags();
 			break;
 		}
-
 	}
 	else
 	{
@@ -1047,7 +1029,7 @@ void EditableTextCustomComponent::mouseDown(const juce::MouseEvent& event)
 		{
 			owner.selectRow(row, event.mods);
 		}
-		juce::Label::mouseDown(event);  // Call the base class method to retain default behavior
+		juce::Label::mouseDown(event); // Call the base class method to retain default behavior
 	}
 }
 
@@ -1056,9 +1038,12 @@ void EditableTextCustomComponent::showContextMenu_name()
 	juce::PopupMenu contextMenu;
 
 	// Add menu options - you can customize these as per your requirements
-	contextMenu.addItem("Save Selected", [this] {save_selection(); });
-	contextMenu.addItem("Insert from File", [this] {owner.mainComponent->restoreProject(true); });
-	contextMenu.addItem("Prefix Instance Name", [this] {prefixInstanceName(); });
+	contextMenu.addItem("Save Selected", [this]
+						{ save_selection(); });
+	contextMenu.addItem("Insert from File", [this]
+						{ owner.mainComponent->restoreProject(true); });
+	contextMenu.addItem("Prefix Instance Name", [this]
+						{ prefixInstanceName(); });
 
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);
@@ -1078,14 +1063,13 @@ void EditableTextCustomComponent::save_selection()
 		int selectedRow = selectedRows[i];
 		if (selectedRow >= 0 && selectedRow < owner.orchestraData.size())
 		{
-			InstrumentInfo& instrument = owner.orchestraData[selectedRow];
+			InstrumentInfo &instrument = owner.orchestraData[selectedRow];
 			selectedInstruments.push_back(instrument);
 		}
 	}
 
 	// Save the selected instruments
 	owner.mainComponent->saveProject(selectedInstruments);
-
 }
 
 std::vector<juce::String> presetTags = {
@@ -1130,8 +1114,7 @@ std::vector<juce::String> presetTags = {
 	"Mono Synth",
 	"Lead Synth",
 	"Lofi Synth",
-	"Chiptune Synth"
-};
+	"Chiptune Synth"};
 
 void EditableTextCustomComponent::prefixInstanceName()
 {
@@ -1140,14 +1123,14 @@ void EditableTextCustomComponent::prefixInstanceName()
 	if (selectedRows.size() == 0)
 	{
 		juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-			"Prefix Instance Name",
-			"No rows are selected.");
+											   "Prefix Instance Name",
+											   "No rows are selected.");
 		return;
 	}
 	// Prompt the user for a prefix
 	juce::AlertWindow prefixWindow("Prefix Instance Name",
-		"Enter a prefix for the selected rows:",
-		juce::AlertWindow::NoIcon);
+								   "Enter a prefix for the selected rows:",
+								   juce::AlertWindow::NoIcon);
 	prefixWindow.addTextEditor("prefix", "", "Prefix:");
 	prefixWindow.addButton("OK", 1);
 	prefixWindow.addButton("Cancel", 0);
@@ -1157,8 +1140,8 @@ void EditableTextCustomComponent::prefixInstanceName()
 		if (prefix.isEmpty())
 		{
 			juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-				"Prefix Instance Name",
-				"Prefix cannot be empty.");
+												   "Prefix Instance Name",
+												   "Prefix cannot be empty.");
 			return;
 		}
 		for (int i = 0; i < selectedRows.size(); ++i)
@@ -1166,7 +1149,7 @@ void EditableTextCustomComponent::prefixInstanceName()
 			int selectedRow = selectedRows[i];
 			if (selectedRow >= 0 && selectedRow < owner.orchestraData.size())
 			{
-				auto& instrument = owner.orchestraData[selectedRow];
+				auto &instrument = owner.orchestraData[selectedRow];
 				juce::String oldId = instrument.pluginInstanceId;
 				juce::String newName;
 				// Replace everything up to the "_" with the prefix. If there is not "_" in the pluginInstanceId, just prepend the prefix followed by "_"
@@ -1196,32 +1179,28 @@ void EditableTextCustomComponent::prefixInstanceName()
 	}
 }
 
-
 void EditableTextCustomComponent::showContextMenu_pluginInstances()
 {
 	juce::PopupMenu contextMenu;
 
 	// Add menu options - you can customize these as per your requirements
-	contextMenu.addItem("Iterate and renumber first text", [this] {iterate_pluginInstances(); });
+	contextMenu.addItem("Iterate and renumber first text", [this]
+						{ iterate_pluginInstances(); });
 	contextMenu.addItem("Rename Plugin Instance", [this]()
-		{
+						{
 			if (row != -1) // Ensure the row is valid
 			{
 				owner.renamePluginInstance(row);
-			}
-		});
+			} });
 	contextMenu.addItem("Rename References for Selected Rows", [this]()
-		{
-			renameReferencesForSelectedRows();
-		});
+						{ renameReferencesForSelectedRows(); });
 	contextMenu.addItem("Purge Plugin instance", [this]()
-		{
+						{
 			if (row != -1) // Ensure the row is valid
 			{
 				owner.mainComponent->getPluginManager().resetPlugin(owner.getSelectedPluginId());
 				owner.table.updateContent();
-			}
-		});
+			} });
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);
 }
@@ -1234,15 +1213,15 @@ void EditableTextCustomComponent::renameReferencesForSelectedRows()
 	if (selectedRows.size() == 0)
 	{
 		juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-			"Rename References",
-			"No rows are selected.");
+											   "Rename References",
+											   "No rows are selected.");
 		return;
 	}
 
 	// Prompt the user for a new name
 	juce::AlertWindow renameWindow("Rename References",
-		"Enter a new name for all selected rows:",
-		juce::AlertWindow::NoIcon);
+								   "Enter a new name for all selected rows:",
+								   juce::AlertWindow::NoIcon);
 	renameWindow.addTextEditor("newReferenceName", "", "New Name:");
 	renameWindow.addButton("OK", 1);
 	renameWindow.addButton("Cancel", 0);
@@ -1254,8 +1233,8 @@ void EditableTextCustomComponent::renameReferencesForSelectedRows()
 		if (newReferenceName.isEmpty())
 		{
 			juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-				"Rename References",
-				"Name cannot be empty.");
+												   "Rename References",
+												   "Name cannot be empty.");
 			return;
 		}
 
@@ -1265,7 +1244,7 @@ void EditableTextCustomComponent::renameReferencesForSelectedRows()
 			int selectedRow = selectedRows[i];
 			if (selectedRow >= 0 && selectedRow < owner.orchestraData.size())
 			{
-				auto& instrument = owner.orchestraData[selectedRow];
+				auto &instrument = owner.orchestraData[selectedRow];
 				instrument.pluginInstanceId = newReferenceName;
 			}
 		}
@@ -1274,7 +1253,6 @@ void EditableTextCustomComponent::renameReferencesForSelectedRows()
 		owner.table.updateContent();
 	}
 }
-
 
 void EditableTextCustomComponent::iterate_pluginInstances()
 {
@@ -1290,7 +1268,7 @@ void EditableTextCustomComponent::iterate_pluginInstances()
 		int selectedRow = selectedRows[i];
 		if (selectedRow >= 0 && selectedRow < owner.orchestraData.size())
 		{
-			InstrumentInfo& instrument = owner.orchestraData[selectedRow];
+			InstrumentInfo &instrument = owner.orchestraData[selectedRow];
 
 			// new field name will be the first selected row text with the row number appended
 			instrument.pluginInstanceId = firstSelectedRowText + juce::String(i);
@@ -1308,12 +1286,14 @@ void EditableTextCustomComponent::showContextMenu_midiChannels()
 	// Add menu options - you can customize these as per your requirements
 	for (int i = 1; i <= 16; ++i)
 	{
-		midiChannelsMenu.addItem(juce::String(i), [this, i] {actionContextSelection(juce::String(i), 4); });
+		midiChannelsMenu.addItem(juce::String(i), [this, i]
+								 { actionContextSelection(juce::String(i), 4); });
 	}
 
 	// Add menu options - you can customize these as per your requirements
-	
-	contextMenu.addItem("Sequence MIDI Channels", [this] {
+
+	contextMenu.addItem("Sequence MIDI Channels", [this]
+						{
 		// Get the set of selected rows
 		juce::SparseSet<int> selectedRows = owner.table.getSelectedRows();
 
@@ -1329,60 +1309,57 @@ void EditableTextCustomComponent::showContextMenu_midiChannels()
 		}
 		
 		// Update table content to reflect the changes in the UI
-		owner.table.updateContent();
-		});
+		owner.table.updateContent(); });
 	contextMenu.addSubMenu("Replace MIDI Channel", midiChannelsMenu);
 	// remove this channel from overdub
-	contextMenu.addItem("Remove this MIDI Channel from Overdub", [this] {
+	contextMenu.addItem("Remove this MIDI Channel from Overdub", [this]
+						{
 		int channelToRemove = getText().getIntValue();
-		owner.mainComponent->removeMidiChannelFromOverdub(channelToRemove);
-		});
+		owner.mainComponent->removeMidiChannelFromOverdub(channelToRemove); });
 
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);
 }
-
 
 void EditableTextCustomComponent::showContextMenu_tags()
 {
 	juce::PopupMenu contextMenu;
 
 	// Add menu option for "Replace Tags" with a lambda to call getTagsPresetList
-	contextMenu.addItem("Add to Tags", [this, &contextMenu] {
-		getTagsPresetList([this](const juce::String& tag, int columnId) { 
+	contextMenu.addItem("Add to Tags", [this, &contextMenu]
+						{ getTagsPresetList([this](const juce::String &tag, int columnId)
+											{ 
 			// Add to existing tags in cell
 			juce::String existingTags = getText();
 			juce::String newTags = existingTags + ", " + tag;
-			actionContextSelection(newTags, columnId); });
-		});
+			actionContextSelection(newTags, columnId); }); });
 
 	// Add menu option for "Add to Tags" with a lambda to call getTagsPresetList
-	contextMenu.addItem("Replace Tags", [this, &contextMenu] {
-		getTagsPresetList([this](const juce::String& tag, int columnId) { actionContextSelection(tag, columnId); });
-		});
+	contextMenu.addItem("Replace Tags", [this, &contextMenu]
+						{ getTagsPresetList([this](const juce::String &tag, int columnId)
+											{ actionContextSelection(tag, columnId); }); });
 
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);
 }
 
-
-void EditableTextCustomComponent::getTagsPresetList(std::function<void(const juce::String&, int)> callback)
+void EditableTextCustomComponent::getTagsPresetList(std::function<void(const juce::String &, int)> callback)
 {
 	juce::PopupMenu presetTagsMenu;
 
 	// Create presetTags from SQLlite database
 
 	// Add menu options - you can customize these as per your requirements
-	for (const auto& tag : presetTags)
+	for (const auto &tag : presetTags)
 	{
 		// Capture callback to use it within the lambda
-		presetTagsMenu.addItem(tag, [callback, tag] { callback(tag, 5); });
+		presetTagsMenu.addItem(tag, [callback, tag]
+							   { callback(tag, 5); });
 	}
 	presetTagsMenu.showAt(this);
 }
 
-
-void EditableTextCustomComponent::actionContextSelection(const juce::String& text, int columnId)
+void EditableTextCustomComponent::actionContextSelection(const juce::String &text, int columnId)
 {
 	// Get the set of selected rows
 	juce::SparseSet<int> selectedRows = owner.table.getSelectedRows();
@@ -1393,33 +1370,33 @@ void EditableTextCustomComponent::actionContextSelection(const juce::String& tex
 		int selectedRow = selectedRows[i];
 		if (selectedRow >= 0 && selectedRow < owner.orchestraData.size())
 		{
-			InstrumentInfo& instrument = owner.orchestraData[selectedRow];
+			InstrumentInfo &instrument = owner.orchestraData[selectedRow];
 
 			// Update the field based on the columnId
 			switch (columnId)
 			{
-			case 1:  // Assuming column 1 is for Instrument Name
+			case 1: // Assuming column 1 is for Instrument Name
 				instrument.instrumentName = text;
 				break;
-			case 2:  // Assuming column 2 is for Plugin Name
+			case 2: // Assuming column 2 is for Plugin Name
 				instrument.pluginName = text;
 				break;
-			case 3:  // Assuming column 3 is for Plugin Instance ID
+			case 3: // Assuming column 3 is for Plugin Instance ID
 				instrument.pluginInstanceId = text;
 				break;
-			case 4:  // Assuming column 4 is for MIDI Channel
+			case 4: // Assuming column 4 is for MIDI Channel
 				instrument.midiChannel = text.getIntValue();
 				break;
-			case 5:  // Assuming column 5 is for Tags
+			case 5: // Assuming column 5 is for Tags
 			{
 				juce::StringArray tagsArray;
 				tagsArray.addTokens(text, ",", "");
 				instrument.tags.clear();
-                                for (int j = 0; j < tagsArray.size(); j++)
-                                {
-                                        juce::String stripped = tagsArray[j].trim();
-                                        instrument.tags.push_back(stripped);
-                                }
+				for (int j = 0; j < tagsArray.size(); j++)
+				{
+					juce::String stripped = tagsArray[j].trim();
+					instrument.tags.push_back(stripped);
+				}
 				break;
 			}
 			default:
@@ -1432,7 +1409,6 @@ void EditableTextCustomComponent::actionContextSelection(const juce::String& tex
 	// Update table content to reflect the changes in the UI
 	owner.table.updateContent();
 }
-
 
 void EditableTextCustomComponent::textWasEdited()
 {
