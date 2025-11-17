@@ -900,6 +900,7 @@ void PluginManager::restorePluginState(const juce::String& pluginId, const juce:
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
         pluginInstances[pluginId]->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+        
         DBG("Plugin state restored for: " << pluginId);
     }
 }
@@ -974,7 +975,12 @@ void PluginManager::restoreAllPluginStates(const juce::String& dataFilePath)
             dataInputStream.read(state.getData(), stateSize);
 
             // Restore plugin state
+            DBG("Restoring state for plugin: " << pluginId);
             restorePluginState(pluginId, state);
+
+            // Set percentage loaded
+            float percentageLoaded = ((i + 1) / static_cast<float>(numPlugins)) * 100.0f;
+            mainComponent->updateProjectNameLabel("Restored: " + juce::String(percentageLoaded, 2) + "%");
         }
         DBG("All plugin states restored successfully from binary file.");
     }
