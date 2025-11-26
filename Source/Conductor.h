@@ -81,6 +81,7 @@ private:
     std::vector<juce::String> extractTags(const juce::OSCMessage& message, int startIndex);
     int calculateSampleOffsetForMessage(const juce::Time& messageTime, double sampleRate);
     std::vector<std::pair<juce::String, int>> extractPluginIdsAndChannels(const juce::OSCMessage& message, int startIndex);
+    bool selectInstrumentByTag(const juce::String& tag);
 
     std::vector<juce::String> lastTags = {};
     // Handles incoming OSC messages

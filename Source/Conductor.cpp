@@ -110,6 +110,22 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 				DBG("Received get_recorded command");
 				midiManager.getRecorded();
 			}
+			else if (messageType == "select_by_tag")
+			{
+				if (message.size() >= 2 && message[1].isString())
+				{
+					juce::String tag = message[1].getString();
+					DBG("Received select_by_tag command for tag: " + tag);
+					if (!selectInstrumentByTag(tag))
+					{
+						DBG("select_by_tag: no instrument found for tag: " + tag);
+					}
+				}
+				else
+				{
+					DBG("select_by_tag command missing tag argument");
+				}
+			}
 			else if (messageType == "save_project")
 			{
 				// Create DawServer subfolder in user's documents directory
@@ -504,6 +520,27 @@ std::vector<juce::String> Conductor::extractTags(const juce::OSCMessage &message
 		}
 	}
 	return tags;
+}
+
+bool Conductor::selectInstrumentByTag(const juce::String &tag)
+{
+	for (size_t i = 0; i < orchestra.size(); ++i)
+	{
+		const auto &instrument = orchestra[i];
+		if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
+		{
+			auto rowIndex = static_cast<int>(i);
+			juce::MessageManager::callAsync([this, rowIndex]()
+											{
+				if (mainComponent != nullptr)
+				{
+					mainComponent->getOrchestraTableModel().selectRow(rowIndex, juce::ModifierKeys());
+				} });
+			return true;
+		}
+	}
+
+	return false;
 }
 
 int Conductor::calculateSampleOffsetForMessage(const juce::Time &messageTime, double sampleRate)
