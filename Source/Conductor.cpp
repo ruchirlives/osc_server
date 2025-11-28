@@ -1,6 +1,37 @@
 #include "Conductor.h"
 #include "MainComponent.h"
 
+namespace
+{
+	bool ensureMinOSCArguments(const juce::OSCMessage &message, int minSize, const juce::String &context)
+	{
+		if (message.size() < minSize)
+		{
+			DBG("OSC " + context + " requires at least " + juce::String(minSize) + " args but got " + juce::String(static_cast<int>(message.size())));
+			return false;
+		}
+		return true;
+	}
+
+	bool ensureIntOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
+	{
+		if (index >= 0 && index < message.size() && message[index].isInt32())
+			return true;
+
+		DBG("OSC " + context + " argument " + juce::String(index) + " expected Int32");
+		return false;
+	}
+
+	bool ensureStringOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
+	{
+		if (index >= 0 && index < message.size() && message[index].isString())
+			return true;
+
+		DBG("OSC " + context + " argument " + juce::String(index) + " expected String");
+		return false;
+	}
+}
+
 // Constructor: takes a reference to PluginManager and passes it
 Conductor::Conductor(PluginManager &pm, MidiManager &mm, MainComponent *mainComponentRef)
 	: pluginManager(pm), midiManager(mm), mainComponent(mainComponentRef)
@@ -261,54 +292,67 @@ std::vector<std::pair<juce::String, int>> Conductor::extractPluginIdsAndChannels
 void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 {
 	juce::String messageType = message[0].getString();
-	if (messageType == "note_on" || messageType == "note_off")
+	if (messageType == "note_on")
 	{
-		if (messageType == "note_on")
+		const juce::String context("note_on");
+		if (!ensureMinOSCArguments(message, 4, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureIntOSCArgument(message, 2, context) ||
+			!ensureStringOSCArgument(message, 3, context))
 		{
-			int note = message[1].getInt32();
-			int velocity = message[2].getInt32();
-			juce::int64 timestamp = adjustTimestamp(message[3]);
-			// DBG("Received note_on message: " << note << ", velocity: " << velocity << ", timestamp: " << juce::String(timestamp));
-
-			// Extract pluginIds and channels using tags starting from index 4
-			std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
-
-			// Send a message to each pluginId with its respective channel
-			for (const auto &[pluginId, channel] : pluginIdsAndChannels)
-			{
-				handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
-				DBG("Received note on for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with note: " + juce::String(note) + " and velocity: " + juce::String(velocity) + " at time " + juce::String(timestamp));
-			}
+			return;
 		}
-		else if (messageType == "note_off")
+
+		int note = message[1].getInt32();
+		int velocity = message[2].getInt32();
+		juce::int64 timestamp = adjustTimestamp(message[3]);
+
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
+
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
-			int velocity = 0; // Note off velocity is 0
-			int note = message[1].getInt32();
-			juce::int64 timestamp = adjustTimestamp(message[2]);
+			handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
+			DBG("Received note on for plugin: " + pluginId + " on channel: " + juce::String(channel) + " with note: " + juce::String(note) + " and velocity: " + juce::String(velocity) + " at time " + juce::String(timestamp));
+		}
+	}
+	else if (messageType == "note_off")
+	{
+		const juce::String context("note_off");
+		if (!ensureMinOSCArguments(message, 3, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureStringOSCArgument(message, 2, context))
+		{
+			return;
+		}
 
-			// Extract pluginIds and channels using tags starting from index 3
-			std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+		int note = message[1].getInt32();
+		int velocity = 0;
+		juce::int64 timestamp = adjustTimestamp(message[2]);
 
-			// Send a message to each pluginId with its respective channel
-			for (const auto &[pluginId, channel] : pluginIdsAndChannels)
-			{
-				handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
-			}
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
+
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
+		{
+			handleIncomingNote(messageType, channel, note, velocity, pluginId, timestamp);
 		}
 	}
 	else if (messageType == "controller")
 	{
-		// Handle control_change messages
-		// Extract the control change parameters
+		const juce::String context("controller");
+		if (!ensureMinOSCArguments(message, 4, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureIntOSCArgument(message, 2, context) ||
+			!ensureStringOSCArgument(message, 3, context))
+		{
+			return;
+		}
 
 		int controllerNumber = message[1].getInt32();
 		int controllerValue = message[2].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[3]);
 
-		// Extract pluginIds and channels using tags starting from index 4
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
 
-		// Send a message to each pluginId with its respective channel
 		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
 			handleIncomingControlChange(channel, controllerNumber, controllerValue, pluginId, timestamp);
@@ -318,10 +362,17 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "channel_aftertouch")
 	{
+		const juce::String context("channel_aftertouch");
+		if (!ensureMinOSCArguments(message, 3, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureStringOSCArgument(message, 2, context))
+		{
+			return;
+		}
+
 		int value = message[1].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[2]);
 
-		// Extract pluginIds and channels using tags starting from index 3
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
 
 		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
@@ -331,17 +382,23 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				" value: " + juce::String(value) + " at time " + juce::String(timestamp));
 		}
 	}
-
 	else if (messageType == "poly_aftertouch")
 	{
+		const juce::String context("poly_aftertouch");
+		if (!ensureMinOSCArguments(message, 4, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureIntOSCArgument(message, 2, context) ||
+			!ensureStringOSCArgument(message, 3, context))
+		{
+			return;
+		}
+
 		int note = message[1].getInt32();
 		int value = message[2].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[3]);
 
-		// Extract pluginIds and channels using tags starting from index 4
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 4);
 
-		// Send a message to each pluginId with its respective channel
 		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
 			handleIncomingPolyAftertouch(channel, note, value, pluginId, timestamp);
@@ -351,6 +408,14 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "pitchbend")
 	{
+		const juce::String context("pitchbend");
+		if (!ensureMinOSCArguments(message, 3, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureStringOSCArgument(message, 2, context))
+		{
+			return;
+		}
+
 		int pitchBendValue = message[1].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[2]);
 
@@ -364,9 +429,16 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "program_change")
 	{
+		const juce::String context("program_change");
+		if (!ensureMinOSCArguments(message, 3, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureStringOSCArgument(message, 2, context))
+		{
+			return;
+		}
+
 		int programNumber = message[1].getInt32();
 		juce::int64 timestamp = adjustTimestamp(message[2]);
-		// Extract pluginIds and channels using tags starting from index 3
 		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 3);
 		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
 		{
@@ -376,64 +448,51 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "save_plugin_data")
 	{
-		// Get the save filepath requested
-		// Assuming the filepath is the first argument
+		const juce::String context("save_plugin_data");
+		if (!ensureMinOSCArguments(message, 3, context) ||
+			!ensureStringOSCArgument(message, 1, context) ||
+			!ensureStringOSCArgument(message, 2, context))
+		{
+			return;
+		}
+
 		juce::String filePath = message[1].getString();
-
-		// filename is the second argument
 		juce::String filename = message[2].getString();
-
-		// Get the tags
 		std::vector<juce::String> tags = extractTags(message, 3);
-
-		// Get the first tag
 		juce::String tag = tags.empty() ? "" : tags[0];
-
-		// Find pluginId that matches the first tag
 
 		for (const auto &instrument : orchestra)
 		{
 			if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
 			{
-				// Save the plugin data
 				DBG("Saving plugin data to file: " + filePath);
 				pluginManager.savePluginData(filePath, filename, instrument.pluginInstanceId);
-
-				// Break out of the loop
 				break;
 			}
 		}
 	}
 	else if (messageType == "request_dawServerData")
 	{
-		// Get the tags
-		std::vector<juce::String> tags = extractTags(message, 1);
+		const juce::String context("request_dawServerData");
+		if (!ensureMinOSCArguments(message, 2, context) ||
+			!ensureStringOSCArgument(message, 1, context))
+		{
+			return;
+		}
 
-		// Get the first tag
+		std::vector<juce::String> tags = extractTags(message, 1);
 		juce::String tag = tags.empty() ? "" : tags[0];
 
-		// Find the entry in the orchestra that matches the tag
 		for (const auto &instrument : orchestra)
 		{
 			if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
 			{
-				// Send the MIDI channel back to the sender
 				juce::OSCMessage reply("/dawServerData");
 				reply.addString(tag);
-
-				// Add the MIDI channel to the reply
 				reply.addInt32(instrument.midiChannel);
-
-				// Add the plugin ID to the reply
 				reply.addString(instrument.pluginInstanceId);
-
-				// Add the plugin name to the reply
 				reply.addString(instrument.pluginName);
-
-				// Add the instrument name to the reply
 				reply.addString(instrument.instrumentName);
-
-				// Add the plugin's device id to the reply
 				reply.addString(pluginManager.getPluginUniqueId(instrument.pluginInstanceId));
 
 				OSCSender::send(reply);
@@ -444,6 +503,13 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "sync_request")
 	{
+		const juce::String context("sync_request");
+		if (!ensureMinOSCArguments(message, 2, context) ||
+			!ensureStringOSCArgument(message, 1, context))
+		{
+			return;
+		}
+
 		juce::int64 timestamp = getTimestamp(message[1]);
 		DBG("Received sync request " << timestamp);
 
@@ -453,11 +519,16 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		timestampOffset = currentTime;
 		DBG("Timestamp offset set as current time: " << timestampOffset);
 
-		// Reset the playbackSamplePosition in PluginManager
 		pluginManager.resetPlayback();
 	}
 	else if (messageType == "stop_request")
 	{
+		const juce::String context("stop_request");
+		if (!ensureMinOSCArguments(message, 2, context) ||
+			!ensureStringOSCArgument(message, 1, context))
+		{
+			return;
+		}
 
 		DBG("Received stop request ");
 
@@ -467,7 +538,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		timestampOffset = currentTime;
 		DBG("Timestamp offset set as current time: " << timestampOffset);
 
-		// Reset the playbackSamplePosition in PluginManager
 		pluginManager.resetPlayback();
 	}
 	else
