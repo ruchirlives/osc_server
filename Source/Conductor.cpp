@@ -22,14 +22,26 @@ namespace
 		return false;
 	}
 
-	bool ensureStringOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
-	{
-		if (index >= 0 && index < message.size() && message[index].isString())
-			return true;
+bool ensureStringOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
+{
+	if (index >= 0 && index < message.size() && message[index].isString())
+		return true;
 
-		DBG("OSC " + context + " argument " + juce::String(index) + " expected String");
-		return false;
+	DBG("OSC " + context + " argument " + juce::String(index) + " expected String");
+	return false;
+}
+
+bool ensureTimestampOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
+{
+	if (index >= 0 && index < message.size())
+	{
+		if (message[index].isString() || message[index].isInt32() || message[index].isFloat32() || message[index].isFloat64())
+			return true;
 	}
+
+	DBG("OSC " + context + " argument " + juce::String(index) + " expected Timestamp");
+	return false;
+}
 }
 
 // Constructor: takes a reference to PluginManager and passes it
@@ -298,7 +310,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureIntOSCArgument(message, 2, context) ||
-			!ensureStringOSCArgument(message, 3, context))
+			!ensureTimestampOSCArgument(message, 3, context))
 		{
 			return;
 		}
@@ -320,7 +332,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		const juce::String context("note_off");
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context))
+			!ensureTimestampOSCArgument(message, 2, context))
 		{
 			return;
 		}
@@ -342,7 +354,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureIntOSCArgument(message, 2, context) ||
-			!ensureStringOSCArgument(message, 3, context))
+			!ensureTimestampOSCArgument(message, 3, context))
 		{
 			return;
 		}
@@ -365,7 +377,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		const juce::String context("channel_aftertouch");
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context))
+			!ensureTimestampOSCArgument(message, 2, context))
 		{
 			return;
 		}
@@ -388,7 +400,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureIntOSCArgument(message, 2, context) ||
-			!ensureStringOSCArgument(message, 3, context))
+			!ensureTimestampOSCArgument(message, 3, context))
 		{
 			return;
 		}
@@ -411,7 +423,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		const juce::String context("pitchbend");
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context))
+			!ensureTimestampOSCArgument(message, 2, context))
 		{
 			return;
 		}
@@ -432,7 +444,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		const juce::String context("program_change");
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context))
+			!ensureTimestampOSCArgument(message, 2, context))
 		{
 			return;
 		}
@@ -548,17 +560,29 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 juce::int64 Conductor::getTimestamp(const juce::OSCArgument timestampArg)
 {
-	// Extract string and convert to double
 	if (timestampArg.isString())
 	{
 		juce::String timestampString = timestampArg.getString();
-		double timestampInSeconds = timestampString.getDoubleValue(); // We are losing less than a microsecond precision here
-
-		return static_cast<juce::int64>(timestampInSeconds * 1000.0); // Convert to milliseconds
+		double timestampInSeconds = timestampString.getDoubleValue();
+		return static_cast<juce::int64>(timestampInSeconds * 1000.0);
+	}
+	if (timestampArg.isFloat32())
+	{
+		double timestampInSeconds = timestampArg.getFloat32();
+		return static_cast<juce::int64>(timestampInSeconds * 1000.0);
+	}
+	if (timestampArg.isFloat64())
+	{
+		double timestampInSeconds = timestampArg.getFloat64();
+		return static_cast<juce::int64>(timestampInSeconds * 1000.0);
+	}
+	if (timestampArg.isInt32())
+	{
+		// Treat integer timestamps as milliseconds
+		return static_cast<juce::int64>(timestampArg.getInt32());
 	}
 
-	// Handle invalid format
-	std::cerr << "Invalid OSC argument for timestamp: expected a string." << std::endl;
+	DBG("Invalid OSC argument for timestamp: unsupported type.");
 	return 0;
 }
 
