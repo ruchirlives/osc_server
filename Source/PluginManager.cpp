@@ -884,7 +884,6 @@ juce::MemoryBlock PluginManager::getPluginState(const juce::String& pluginId)
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
         pluginInstances[pluginId]->getStateInformation(state);
-        juce::String stateString = state.toString(); // Attempt to convert to a readable string
     }
     else
 	{
