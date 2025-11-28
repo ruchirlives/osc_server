@@ -536,8 +536,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	else if (messageType == "stop_request")
 	{
 		const juce::String context("stop_request");
-		if (!ensureMinOSCArguments(message, 2, context) ||
-			!ensureStringOSCArgument(message, 1, context))
+		if (!ensureMinOSCArguments(message, 1, context))
 		{
 			return;
 		}
