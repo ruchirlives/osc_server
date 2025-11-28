@@ -1,47 +1,65 @@
 #include "Conductor.h"
 #include "MainComponent.h"
+#include <cstdio>
 
 namespace
 {
-	bool ensureMinOSCArguments(const juce::OSCMessage &message, int minSize, const juce::String &context)
+	bool ensureMinOSCArguments(const juce::OSCMessage &message, int minSize, const char *context)
 	{
 		if (message.size() < minSize)
 		{
-			DBG("OSC " + context + " requires at least " + juce::String(minSize) + " args but got " + juce::String(static_cast<int>(message.size())));
+	#if JUCE_DEBUG
+			char buffer[256];
+			std::snprintf(buffer, sizeof(buffer), "OSC %s requires at least %d args but got %d",
+				context, minSize, static_cast<int>(message.size()));
+			std::fprintf(stderr, "%s\n", buffer);
+	#endif
 			return false;
 		}
 		return true;
 	}
 
-	bool ensureIntOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
+	bool ensureIntOSCArgument(const juce::OSCMessage &message, int index, const char *context)
 	{
 		if (index >= 0 && index < message.size() && message[index].isInt32())
 			return true;
 
-		DBG("OSC " + context + " argument " + juce::String(index) + " expected Int32");
+	#if JUCE_DEBUG
+		char buffer[256];
+		std::snprintf(buffer, sizeof(buffer), "OSC %s argument %d expected Int32", context, index);
+		std::fprintf(stderr, "%s\n", buffer);
+	#endif
 		return false;
 	}
 
-bool ensureStringOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
-{
-	if (index >= 0 && index < message.size() && message[index].isString())
-		return true;
-
-	DBG("OSC " + context + " argument " + juce::String(index) + " expected String");
-	return false;
-}
-
-bool ensureTimestampOSCArgument(const juce::OSCMessage &message, int index, const juce::String &context)
-{
-	if (index >= 0 && index < message.size())
+	bool ensureStringOSCArgument(const juce::OSCMessage &message, int index, const char *context)
 	{
-		if (message[index].isString() || message[index].isInt32() || message[index].isFloat32())
+		if (index >= 0 && index < message.size() && message[index].isString())
 			return true;
+
+	#if JUCE_DEBUG
+		char buffer[256];
+		std::snprintf(buffer, sizeof(buffer), "OSC %s argument %d expected String", context, index);
+		std::fprintf(stderr, "%s\n", buffer);
+	#endif
+		return false;
 	}
 
-	DBG("OSC " + context + " argument " + juce::String(index) + " expected Timestamp");
-	return false;
-}
+	bool ensureTimestampOSCArgument(const juce::OSCMessage &message, int index, const char *context)
+	{
+		if (index >= 0 && index < message.size())
+		{
+			if (message[index].isString() || message[index].isInt32() || message[index].isFloat32())
+				return true;
+		}
+
+	#if JUCE_DEBUG
+		char buffer[256];
+		std::snprintf(buffer, sizeof(buffer), "OSC %s argument %d expected Timestamp", context, index);
+		std::fprintf(stderr, "%s\n", buffer);
+	#endif
+		return false;
+	}
 }
 
 // Constructor: takes a reference to PluginManager and passes it
@@ -306,7 +324,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	juce::String messageType = message[0].getString();
 	if (messageType == "note_on")
 	{
-		const juce::String context("note_on");
+		constexpr const char *context = "note_on";
 		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureIntOSCArgument(message, 2, context) ||
@@ -329,7 +347,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "note_off")
 	{
-		const juce::String context("note_off");
+		constexpr const char *context = "note_off";
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureTimestampOSCArgument(message, 2, context))
@@ -350,7 +368,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "controller")
 	{
-		const juce::String context("controller");
+		constexpr const char *context = "controller";
 		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureIntOSCArgument(message, 2, context) ||
@@ -374,7 +392,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "channel_aftertouch")
 	{
-		const juce::String context("channel_aftertouch");
+		constexpr const char *context = "channel_aftertouch";
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureTimestampOSCArgument(message, 2, context))
@@ -396,7 +414,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "poly_aftertouch")
 	{
-		const juce::String context("poly_aftertouch");
+		constexpr const char *context = "poly_aftertouch";
 		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureIntOSCArgument(message, 2, context) ||
@@ -420,7 +438,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "pitchbend")
 	{
-		const juce::String context("pitchbend");
+		constexpr const char *context = "pitchbend";
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureTimestampOSCArgument(message, 2, context))
@@ -441,7 +459,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "program_change")
 	{
-		const juce::String context("program_change");
+		constexpr const char *context = "program_change";
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureIntOSCArgument(message, 1, context) ||
 			!ensureTimestampOSCArgument(message, 2, context))
@@ -460,7 +478,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "save_plugin_data")
 	{
-		const juce::String context("save_plugin_data");
+		constexpr const char *context = "save_plugin_data";
 		if (!ensureMinOSCArguments(message, 3, context) ||
 			!ensureStringOSCArgument(message, 1, context) ||
 			!ensureStringOSCArgument(message, 2, context))
@@ -485,7 +503,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "request_dawServerData")
 	{
-		const juce::String context("request_dawServerData");
+		constexpr const char *context = "request_dawServerData";
 		if (!ensureMinOSCArguments(message, 2, context) ||
 			!ensureStringOSCArgument(message, 1, context))
 		{
@@ -515,7 +533,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "sync_request")
 	{
-		const juce::String context("sync_request");
+		constexpr const char *context = "sync_request";
 		if (!ensureMinOSCArguments(message, 2, context) ||
 			!ensureStringOSCArgument(message, 1, context))
 		{
@@ -535,7 +553,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	}
 	else if (messageType == "stop_request")
 	{
-		const juce::String context("stop_request");
+		constexpr const char *context = "stop_request";
 		if (!ensureMinOSCArguments(message, 1, context))
 		{
 			return;
