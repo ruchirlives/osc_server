@@ -699,7 +699,8 @@ void PluginManager::resetPlayback()
 {
         playbackSamplePosition = 0;
         hostPlayHead.positionInfo.setIsPlaying(false);
-        // Also clear the taggedMidiBuffer
+        // Also clear the taggedMidiBuffer under the MIDI lock
+        const juce::ScopedLock sl(midiCriticalSection);
         taggedMidiBuffer.clear();
 
 }
