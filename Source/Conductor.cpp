@@ -35,7 +35,7 @@ bool ensureTimestampOSCArgument(const juce::OSCMessage &message, int index, cons
 {
 	if (index >= 0 && index < message.size())
 	{
-		if (message[index].isString() || message[index].isInt32() || message[index].isFloat32() || message[index].isFloat64())
+		if (message[index].isString() || message[index].isInt32() || message[index].isFloat32())
 			return true;
 	}
 
@@ -569,11 +569,6 @@ juce::int64 Conductor::getTimestamp(const juce::OSCArgument timestampArg)
 	if (timestampArg.isFloat32())
 	{
 		double timestampInSeconds = timestampArg.getFloat32();
-		return static_cast<juce::int64>(timestampInSeconds * 1000.0);
-	}
-	if (timestampArg.isFloat64())
-	{
-		double timestampInSeconds = timestampArg.getFloat64();
 		return static_cast<juce::int64>(timestampInSeconds * 1000.0);
 	}
 	if (timestampArg.isInt32())
