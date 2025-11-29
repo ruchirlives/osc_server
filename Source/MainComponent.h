@@ -185,10 +185,13 @@ public:
 
 	// Getter for pluginManager
 	PluginManager& getPluginManager() { return pluginManager; }
-	MidiManager& getMidiManager() { return midiManager; }
-	juce::TableListBox orchestraTable; // TableListBox to display orchestra information
+        MidiManager& getMidiManager() { return midiManager; }
+        juce::TableListBox orchestraTable; // TableListBox to display orchestra information
 
-	void removeMidiChannelFromOverdub(int midiChannel);
+        void removeMidiChannelFromOverdub(int midiChannel);
+
+        // Refresh the orchestra table and layout after data changes
+        void refreshOrchestraTableUI();
 
 
 private:

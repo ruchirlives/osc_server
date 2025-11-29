@@ -202,24 +202,28 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 				// Save the project state files
 				saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
 			}
-			else if (messageType == "restore_project")
-			{
-				// Create DawServer subfolder in user's documents directory
-				juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
-				if (!dawServerDir.exists())
-					dawServerDir.createDirectory();
+                        else if (messageType == "restore_project")
+                        {
+                                // Create DawServer subfolder in user's documents directory
+                                juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+                                if (!dawServerDir.exists())
+                                        dawServerDir.createDirectory();
 
 				// Define the extraction locations in DawServer subfolder
 				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-				juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-				juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+                                juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+                                juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
 
-				restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-			}
-			else if (messageType == "restore_from_file")
-			{
-				DBG("Received restore from file request for file: ");
-				mainComponent->restoreProject(false); // false means do not append, just restore
+                                restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+                                if (mainComponent != nullptr)
+                                {
+                                        mainComponent->refreshOrchestraTableUI();
+                                }
+                        }
+                        else if (messageType == "restore_from_file")
+                        {
+                                DBG("Received restore from file request for file: ");
+                                mainComponent->restoreProject(false); // false means do not append, just restore
 			}
 			else if (messageType == "request_tags")
 			{
