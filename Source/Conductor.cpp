@@ -187,6 +187,22 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 					DBG("select_by_tag command missing tag argument");
 				}
 			}
+			else if (messageType == "open_instrument")
+			{
+				if (message.size() >= 2 && message[1].isString())
+				{
+					juce::String tag = message[1].getString();
+					DBG("Received open_instrument command for tag: " + tag);
+					if (!openInstrumentByTag(tag))
+					{
+						DBG("open_instrument: no instrument found for tag: " + tag);
+					}
+				}
+				else
+				{
+					DBG("open_instrument command missing tag argument");
+				}
+			}
 			else if (messageType == "save_project")
 			{
 				// Create DawServer subfolder in user's documents directory
@@ -646,6 +662,24 @@ bool Conductor::selectInstrumentByTag(const juce::String &tag)
 				{
 					mainComponent->getOrchestraTableModel().selectRow(rowIndex, juce::ModifierKeys());
 				} });
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Conductor::openInstrumentByTag(const juce::String &tag)
+{
+	for (const auto &instrument : orchestra)
+	{
+		if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
+		{
+			juce::String pluginInstanceId = instrument.pluginInstanceId;
+			juce::MessageManager::callAsync([this, pluginInstanceId]()
+											{
+				pluginManager.openPluginWindow(pluginInstanceId);
+			});
 			return true;
 		}
 	}
