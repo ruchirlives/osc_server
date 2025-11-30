@@ -692,7 +692,7 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
     // Add the tagged MIDI message to the buffer with a timestamp
     
     taggedMidiBuffer.emplace_back(message, pluginId, adjustedTimestamp);
-	DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));
+	// DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));
 }
 
 void PluginManager::resetPlayback()
