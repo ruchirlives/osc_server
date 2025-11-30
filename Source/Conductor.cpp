@@ -1,6 +1,7 @@
 #include "Conductor.h"
 #include "MainComponent.h"
 #include <cstdio>
+#include <cmath>
 
 namespace
 {
@@ -59,6 +60,17 @@ namespace
 		std::fprintf(stderr, "%s\n", buffer);
 	#endif
 		return false;
+	}
+
+	double parseOscDoubleArgument(const juce::OSCArgument &argument)
+	{
+		if (argument.isFloat32())
+			return argument.getFloat32();
+		if (argument.isInt32())
+			return static_cast<double>(argument.getInt32());
+		if (argument.isString())
+			return argument.getString().getDoubleValue();
+		return 0.0;
 	}
 }
 
@@ -410,6 +422,40 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				" controller: " + juce::String(controllerNumber) + " value: " + juce::String(controllerValue) + " at time " + juce::String(timestamp));
 		}
 	}
+	else if (messageType == "controller_ramp")
+	{
+		constexpr const char *context = "controller_ramp";
+		if (!ensureMinOSCArguments(message, 6, context) ||
+			!ensureIntOSCArgument(message, 1, context) ||
+			!ensureIntOSCArgument(message, 2, context) ||
+			!ensureIntOSCArgument(message, 3, context) ||
+			!ensureTimestampOSCArgument(message, 5, context))
+		{
+			return;
+		}
+
+		if (!(message[4].isFloat32() || message[4].isInt32() || message[4].isString()))
+		{
+			DBG("OSC controller_ramp duration argument has invalid type.");
+			return;
+		}
+
+		int controllerNumber = message[1].getInt32();
+		int startValue = message[2].getInt32();
+		int endValue = message[3].getInt32();
+		double durationSeconds = parseOscDoubleArgument(message[4]);
+		juce::int64 rampStart = adjustTimestamp(message[5]);
+
+		std::vector<std::pair<juce::String, int>> pluginIdsAndChannels = extractPluginIdsAndChannels(message, 6);
+
+		for (const auto &[pluginId, channel] : pluginIdsAndChannels)
+		{
+			scheduleControllerRamp(channel, controllerNumber, startValue, endValue, durationSeconds, rampStart, pluginId);
+			DBG("Received controller ramp for plugin: " + pluginId + " on channel: " + juce::String(channel) +
+				" controller: " + juce::String(controllerNumber) + " start: " + juce::String(startValue) +
+				" end: " + juce::String(endValue) + " duration: " + juce::String(durationSeconds) + "s starting at " + juce::String(rampStart));
+		}
+	}
 	else if (messageType == "channel_aftertouch")
 	{
 		constexpr const char *context = "channel_aftertouch";
@@ -736,6 +782,40 @@ void Conductor::handleIncomingControlChange(int channel, int controllerNumber, i
 
 	// Pass the message and tags to PluginManager
 	pluginManager.addMidiMessage(midiMessage, pluginId, timestamp);
+}
+
+void Conductor::scheduleControllerRamp(int channel, int controllerNumber, int startValue, int endValue, double durationSeconds, juce::int64 startTimestamp, const juce::String &pluginId)
+{
+	const double clampedDurationSeconds = juce::jmax(0.0, durationSeconds);
+	const double durationMs = clampedDurationSeconds * 1000.0;
+	const juce::int64 durationMillisRounded = static_cast<juce::int64>(std::round(durationMs));
+	const juce::int64 rampEndTimestamp = startTimestamp + durationMillisRounded;
+
+	constexpr juce::int64 targetStepMs = 20;
+	constexpr int maxSteps = 64;
+	int steps = 2;
+	if (durationMillisRounded > 0)
+	{
+		steps = static_cast<int>(juce::jmin<juce::int64>(maxSteps, (durationMillisRounded / targetStepMs) + 2));
+		steps = juce::jmax(2, steps);
+	}
+
+	const double intervalMs = (steps > 1) ? durationMs / static_cast<double>(steps - 1) : 0.0;
+
+	for (int stepIndex = 0; stepIndex < steps; ++stepIndex)
+	{
+		const double ratio = (steps > 1) ? static_cast<double>(stepIndex) / static_cast<double>(steps - 1) : 0.0;
+		const double value = startValue + (endValue - startValue) * ratio;
+		const int controllerValue = juce::jlimit(0, 127, static_cast<int>(std::round(value)));
+
+		const double eventTimeDouble = static_cast<double>(startTimestamp) + intervalMs * stepIndex;
+		juce::int64 eventTimestamp = static_cast<juce::int64>(std::round(eventTimeDouble));
+		if (stepIndex == steps - 1)
+			eventTimestamp = rampEndTimestamp;
+
+		juce::int64 scheduledTimestamp = eventTimestamp;
+		handleIncomingControlChange(channel, controllerNumber, controllerValue, pluginId, scheduledTimestamp);
+	}
 }
 
 // Handles channel aftertouch messages
