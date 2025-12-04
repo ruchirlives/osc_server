@@ -180,13 +180,14 @@ MainComponent::~MainComponent()
 void MainComponent::resized()
 {
 	// --- Adjustable layout constants ---
-	const int margin = 10;
-	const int buttonWidth = 150;
-	const int buttonHeight = 30;
-	const int spacingX = 10;
-	const int spacingY = 20;
-	const int labelHeight = 30;
-	const int numButtonRows = 4;
+	auto metrics = getLayoutMetrics();
+	const int margin = metrics.margin;
+	const int buttonWidth = metrics.buttonWidth;
+	const int buttonHeight = metrics.buttonHeight;
+	const int spacingX = metrics.spacingX;
+	const int spacingY = metrics.spacingY;
+	const int labelHeight = metrics.labelHeight;
+	const int numButtonRows = metrics.numButtonRows;
 
 	const int windowWidth = getWidth();
 	const int windowHeight = getHeight();
@@ -225,10 +226,13 @@ void MainComponent::resized()
 	const int tableHeight = buttonAreaTop - tableTop - spacingY; // extra spacing between table and buttons
 	orchestraTableWrapper.setBounds(margin, tableTop, windowWidth - 2 * margin, tableHeight);
 
+	auto tablePanelBounds = computeTablePanelBounds(metrics, orchestraTableWrapper.getBounds());
+	auto buttonLayout = computeButtonPanelLayout(metrics, tablePanelBounds);
+
 	// --- Button rows, starting from bottom upward ---
 
 	// Row 1 (bottom row) - Scan, Select Plugin, Update, Open Plugin, List Plugin Instances
-	int row1Y = windowHeight - margin - buttonHeight;
+	const int row1Y = buttonLayout.rowY[3];
 	ScanButton.setBounds(margin, row1Y, buttonWidth, buttonHeight);
 	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 	updateButton.setBounds(pluginBox.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
@@ -236,7 +240,7 @@ void MainComponent::resized()
 	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 
 	// Row 2 - Instrument management and recording
-	int row2Y = row1Y - buttonHeight - spacingY;
+	const int row2Y = buttonLayout.rowY[2];
 	addInstrumentButton.setBounds(margin, row2Y, buttonWidth, buttonHeight);
 	addNewInstrumentButton.setBounds(addInstrumentButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 	removeInstrumentButton.setBounds(addNewInstrumentButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
@@ -244,7 +248,7 @@ void MainComponent::resized()
 	getRecordedButton.setBounds(moveToEndButton.getRight() + spacingX, row2Y, buttonWidth, buttonHeight);
 
 	// Row 3 - MIDI and utility controls
-	int row3Y = row2Y - buttonHeight - spacingY;
+	const int row3Y = buttonLayout.rowY[1];
 	sendTestNoteButton.setBounds(margin, row3Y, buttonWidth, buttonHeight);
 	importMidiButton.setBounds(sendTestNoteButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 	exportMidiButton.setBounds(importMidiButton.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
@@ -252,12 +256,14 @@ void MainComponent::resized()
 	stripLeadingSilenceButton.setBounds(midiInputList.getRight() + spacingX, row3Y, buttonWidth, buttonHeight);
 
 	// Row 4 (top row of buttons) - Project and overdub controls
-	int row4Y = row3Y - buttonHeight - spacingY;
+	const int row4Y = buttonLayout.rowY[0];
 	saveButton.setBounds(margin, row4Y, buttonWidth, buttonHeight);
 	restoreButton.setBounds(saveButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, buttonWidth / 3, buttonHeight);
-	triggerOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, buttonWidth / 3, buttonHeight);
-	playOverdubButton.setBounds(triggerOverdubButton.getRight() + spacingX, row4Y, buttonWidth / 3, buttonHeight);
+	const int miniButtonAvailableWidth = buttonWidth - 2 * spacingX;
+	const int miniButtonWidth = juce::jmax(1, miniButtonAvailableWidth / 3);
+	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
+	triggerOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
+	playOverdubButton.setBounds(triggerOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
 	stopOverdubButton.setBounds(playOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 	undoOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
 
@@ -702,8 +708,38 @@ void MainComponent::getFolder()
 
 void MainComponent::paint(juce::Graphics &g)
 {
-	g.setColour(juce::Colours::lightgrey.darker(0.8f)); // near-black but not pure
+	auto base = findColour(juce::ResizableWindow::backgroundColourId);
+	auto gradient = juce::ColourGradient(base.brighter(0.1f), 0, 0,
+		base.darker(0.2f), 0, (float)getHeight(), false);
+	g.setGradientFill(gradient);
 	g.fillAll();
+
+	auto metrics = getLayoutMetrics();
+	const auto tablePanelBounds = computeTablePanelBounds(metrics, orchestraTableWrapper.getBounds());
+	const auto buttonLayout = computeButtonPanelLayout(metrics, tablePanelBounds);
+
+	if (!tablePanelBounds.isEmpty())
+	{
+		auto tableGradientStart = tablePanelBounds.getPosition();
+		auto tableGradientEnd = tablePanelBounds.getBottomLeft();
+		auto colour = base.brighter(0.08f);
+		auto tableGradient = juce::ColourGradient(colour.brighter(0.1f),
+			tableGradientStart.x, tableGradientStart.y,
+			colour.darker(0.15f), tableGradientEnd.x, tableGradientEnd.y, false);
+		g.setGradientFill(tableGradient);
+		g.fillRoundedRectangle(tablePanelBounds, 12.0f);
+		g.setColour(juce::Colours::white.withAlpha(0.15f));
+		g.drawRoundedRectangle(tablePanelBounds, 12.0f, 2.0f);
+	}
+
+	if (!buttonLayout.panel.isEmpty())
+	{
+		auto panelColour = base.brighter(0.05f);
+		g.setColour(panelColour);
+		g.fillRoundedRectangle(buttonLayout.panel, 10.0f);
+		g.setColour(juce::Colours::white.withAlpha(0.12f));
+		g.drawRoundedRectangle(buttonLayout.panel, 10.0f, 2.0f);
+	}
 }
 
 double MainComponent::getBpm() const
@@ -1209,4 +1245,49 @@ void MainComponent::removeMidiChannelFromOverdub(int midiChannel)
 	midiManager.removeMidiChannelFromOverdub(midiChannel);
 	midiManager.isStripped = false;
 	updateOverdubUI();
+}
+
+MainComponent::LayoutMetrics MainComponent::getLayoutMetrics() const
+{
+	return LayoutMetrics{};
+}
+
+juce::Rectangle<float> MainComponent::computeTablePanelBounds(const LayoutMetrics& metrics, const juce::Rectangle<int>& tableBounds) const
+{
+	const float panelInset = 6.0f;
+
+	if (tableBounds.getWidth() <= 0 || tableBounds.getHeight() <= 0)
+		return {};
+
+	return juce::Rectangle<float>(
+		tableBounds.getX() - panelInset,
+		tableBounds.getY() - panelInset,
+		tableBounds.getWidth() + panelInset * 2.0f,
+		tableBounds.getHeight() + panelInset * 2.0f);
+}
+
+MainComponent::ButtonPanelLayout MainComponent::computeButtonPanelLayout(const LayoutMetrics& metrics, const juce::Rectangle<float>& tablePanelBounds) const
+{
+	ButtonPanelLayout layout;
+	const float panelInset = 6.0f;
+	const float cardSpacing = 18.0f;
+	const int totalButtonHeight = metrics.numButtonRows * metrics.buttonHeight + (metrics.numButtonRows - 1) * metrics.spacingY;
+	const int buttonAreaTop = getHeight() - totalButtonHeight - metrics.margin;
+
+	float buttonPanelTop = static_cast<float>(buttonAreaTop) - panelInset;
+	if (!tablePanelBounds.isEmpty())
+		buttonPanelTop = juce::jmax(buttonPanelTop, tablePanelBounds.getBottom() + cardSpacing * 0.3f);
+
+	const float buttonRowsTop = buttonPanelTop + panelInset;
+	for (int i = 0; i < metrics.numButtonRows; ++i)
+		layout.rowY[i] = static_cast<int>(buttonRowsTop + i * (metrics.buttonHeight + metrics.spacingY));
+
+	const float buttonPanelBottom = buttonRowsTop + totalButtonHeight + panelInset;
+	layout.panel = juce::Rectangle<float>(
+		metrics.margin - panelInset,
+		buttonPanelTop,
+		(float)getWidth() - 2 * (metrics.margin - panelInset),
+		juce::jmax(0.0f, buttonPanelBottom - buttonPanelTop));
+
+	return layout;
 }
