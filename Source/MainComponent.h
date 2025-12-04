@@ -274,8 +274,8 @@ private:
 
     struct LayoutMetrics
     {
-        int margin = 10;
-        int buttonWidth = 100;
+        int margin = 20;
+        int buttonWidth = 125;
         int buttonHeight = 20;
         int spacingX = 10;
         int spacingY = 10;

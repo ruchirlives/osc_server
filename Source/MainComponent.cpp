@@ -193,7 +193,7 @@ void MainComponent::resized()
 	const int windowHeight = getHeight();
 
 	// Set main window position (if needed)
-	getTopLevelComponent()->setTopLeftPosition(1600, 100);
+	getTopLevelComponent()->setTopLeftPosition(1800, 500);
 
 	// --- Top controls ---
 	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);

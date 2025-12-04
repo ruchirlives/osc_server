@@ -78,7 +78,7 @@ public:
             setFullScreen (true);
            #else
             setResizable (true, true);
-            setBounds(50, 50, 850, 400);
+            setBounds(50, 50, 750, 460);
            #endif
 
             setVisible (true);
