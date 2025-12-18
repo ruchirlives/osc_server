@@ -139,7 +139,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             taggedMidiBuffer.end());
 
         // Cap buffer growth
-        const std::size_t maxBufferSize = 10000; // maximum number of MIDI messages to keep
+        const std::size_t maxBufferSize = 50000; // maximum number of MIDI messages to keep
         if (taggedMidiBuffer.size() > maxBufferSize)
             taggedMidiBuffer.erase(taggedMidiBuffer.begin(),
                 taggedMidiBuffer.begin() + (taggedMidiBuffer.size() - maxBufferSize));
