@@ -15,6 +15,12 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>
 
+namespace
+{
+constexpr std::size_t kMaxTaggedMidiEvents = 50000;
+constexpr juce::uint32 kMidiOverflowLogIntervalMs = 2000;
+}
+
 HostPlayHead hostPlayHead;
 bool PluginManager::playStartIssued = false;
 bool PluginManager::midiStartSent = false;
@@ -138,32 +144,28 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                 }),
             taggedMidiBuffer.end());
 
-        // Cap buffer growth
-        const std::size_t maxBufferSize = 10000; // maximum number of MIDI messages to keep
-        if (taggedMidiBuffer.size() > maxBufferSize)
-            taggedMidiBuffer.erase(taggedMidiBuffer.begin(),
-                taggedMidiBuffer.begin() + (taggedMidiBuffer.size() - maxBufferSize));
-
         const bool isStartingPlayback = (playbackSamplePosition == 0);
         const int graceWindow = bufferToFill.numSamples;
         std::unordered_map<juce::String, juce::MidiBuffer> scheduledPluginMessages;
 
         if (!taggedMidiBuffer.empty())
         {
-            std::vector<MyMidiMessage> remainingMessages;
-            remainingMessages.reserve(taggedMidiBuffer.size());
-
-            for (auto& taggedMessage : taggedMidiBuffer)
+            while (!taggedMidiBuffer.empty())
             {
-                if (pluginInstances.find(taggedMessage.pluginId) == pluginInstances.end())
-                    continue;
+                auto& taggedMessage = taggedMidiBuffer.front();
 
-                bool consumed = false;
+                if (pluginInstances.find(taggedMessage.pluginId) == pluginInstances.end())
+                {
+                    taggedMidiBuffer.pop_front();
+                    continue;
+                }
+
+                bool consumeMessage = false;
 
                 if (sampleRate <= 0.0 || taggedMessage.timestamp == 0)
                 {
                     scheduledPluginMessages[taggedMessage.pluginId].addEvent(taggedMessage.message, 0);
-                    consumed = true;
+                    consumeMessage = true;
                 }
                 else
                 {
@@ -171,21 +173,38 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                     auto offset64 = absPos - playbackSamplePosition;
                     const int offset = static_cast<int>(offset64);
 
-                    if ((isStartingPlayback && offset >= -graceWindow && offset < bufferToFill.numSamples)
-                        || (offset >= 0 && offset < bufferToFill.numSamples))
+                    const bool fitsCurrentBlock = (offset >= 0 && offset < bufferToFill.numSamples);
+                    const bool fitsGraceWindow = isStartingPlayback
+                        && offset >= -graceWindow
+                        && offset < bufferToFill.numSamples;
+
+                    if (fitsCurrentBlock || fitsGraceWindow)
                     {
                         scheduledPluginMessages[taggedMessage.pluginId].addEvent(
                             taggedMessage.message,
-                            juce::jmax(0, offset));
-                        consumed = true;
+                            juce::jlimit(0, bufferToFill.numSamples - 1, offset));
+                        consumeMessage = true;
+                    }
+                    else if (offset < 0)
+                    {
+                        // Message arrived late, but still deliver it immediately instead of dropping
+                        scheduledPluginMessages[taggedMessage.pluginId].addEvent(
+                            taggedMessage.message,
+                            0);
+                        consumeMessage = true;
+                    }
+                    else if (offset >= bufferToFill.numSamples)
+                    {
+                        // Queue is sorted by timestamp, so everything beyond this is for a future block
+                        break;
                     }
                 }
 
-                if (!consumed)
-                    remainingMessages.push_back(std::move(taggedMessage));
+                if (consumeMessage)
+                    taggedMidiBuffer.pop_front();
+                else
+                    break;
             }
-
-            taggedMidiBuffer.swap(remainingMessages);
         }
 
         // 2) Process each plugin once, in a single loop
@@ -689,9 +708,41 @@ void PluginManager::printTaggedMidiBuffer()
 void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce::String& pluginId, juce::int64& adjustedTimestamp)
 {
     const juce::ScopedLock sl(midiCriticalSection); // Lock the critical section to ensure thread safety
-    // Add the tagged MIDI message to the buffer with a timestamp
-    
-    taggedMidiBuffer.emplace_back(message, pluginId, adjustedTimestamp);
+    // Maintain chronological order so the audio thread can bail out early once it reaches future events
+
+    if (taggedMidiBuffer.empty() || adjustedTimestamp >= taggedMidiBuffer.back().timestamp)
+    {
+        taggedMidiBuffer.emplace_back(message, pluginId, adjustedTimestamp);
+    }
+    else
+    {
+        auto insertPos = std::upper_bound(
+            taggedMidiBuffer.begin(),
+            taggedMidiBuffer.end(),
+            adjustedTimestamp,
+            [](juce::int64 stamp, const MyMidiMessage& msg)
+            {
+                return stamp < msg.timestamp;
+            });
+
+        taggedMidiBuffer.insert(insertPos, MyMidiMessage(message, pluginId, adjustedTimestamp));
+    }
+
+    if (taggedMidiBuffer.size() > kMaxTaggedMidiEvents)
+    {
+        const auto overflow = taggedMidiBuffer.size() - kMaxTaggedMidiEvents;
+        for (std::size_t i = 0; i < overflow && !taggedMidiBuffer.empty(); ++i)
+            taggedMidiBuffer.pop_back();
+
+        static juce::uint32 lastOverflowLog = 0;
+        const auto now = juce::Time::getMillisecondCounter();
+        if (now - lastOverflowLog > kMidiOverflowLogIntervalMs)
+        {
+            DBG("Warning: MIDI queue exceeded " << (int)kMaxTaggedMidiEvents
+                << " events; dropping " << (int)overflow << " far-future events.");
+            lastOverflowLog = now;
+        }
+    }
 	// DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));
 }
 

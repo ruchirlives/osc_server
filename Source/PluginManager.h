@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <deque>
 #include <map>
 #include <vector>
 
@@ -128,8 +129,8 @@ private:
     std::map<juce::String, std::unique_ptr<juce::AudioPluginInstance>> pluginInstances;
     std::map<juce::String, std::unique_ptr<PluginWindow>> pluginWindows;
 
-    // A vector to hold tagged MIDI messages
-    std::vector<MyMidiMessage> taggedMidiBuffer;
+    // Chronologically sorted MIDI queue
+    std::deque<MyMidiMessage> taggedMidiBuffer;
     std::map<juce::String, std::map<int, std::vector<juce::String>>> channelTagsMap;
 
     // juce::AudioDeviceManager deviceManager;  // Remove this line
