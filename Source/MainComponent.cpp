@@ -749,7 +749,7 @@ double MainComponent::getBpm() const
 
 void MainComponent::setBpm(double bpm)
 {
-\tbpmEditor.setText(juce::String(bpm, 3), juce::dontSendNotification);
+	bpmEditor.setText(juce::String(bpm, 3), juce::dontSendNotification);
 }
 
 void MainComponent::scanForPlugins()
