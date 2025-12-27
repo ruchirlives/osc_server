@@ -81,6 +81,7 @@ Conductor::Conductor(PluginManager &pm, MidiManager &mm, MainComponent *mainComp
 	// Add this instance as an OSC listener
 	addListener(this, "/midi/message");
 	addListener(this, "/orchestra");
+	addListener(this, "/orchestra/set_tempo");
 
 	// initial sync of orchestra with PluginManager
 	syncOrchestraWithPluginManager();
@@ -164,11 +165,48 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 	// DBG print the message
 	// DBG("Received OSC message: " + message.getAddressPattern().toString());
 
+	juce::String messageAddress = message.getAddressPattern().toString();
+
+	if (messageAddress == "/orchestra/set_tempo")
+	{
+		constexpr const char *context = "set_tempo";
+		if (!ensureMinOSCArguments(message, 1, context))
+		{
+			return;
+		}
+
+		const auto &tempoArg = message[0];
+		if (!(tempoArg.isFloat32() || tempoArg.isInt32() || tempoArg.isString()))
+		{
+			DBG("OSC set_tempo argument 0 expected numeric or string value");
+			return;
+		}
+
+		double bpm = parseOscDoubleArgument(tempoArg);
+		if (bpm <= 0.0)
+		{
+			DBG("OSC set_tempo ignored non-positive bpm: " << bpm);
+			return;
+		}
+
+		pluginManager.setBpm(bpm);
+		if (mainComponent != nullptr)
+		{
+			juce::MessageManager::callAsync([this, bpm]()
+											 {
+				if (mainComponent != nullptr)
+				{
+					mainComponent->setBpm(bpm);
+				}
+				});
+		}
+		return;
+	}
+
 	// Ensure the message has at least the necessary components for MIDI data and tags
 	if (message.size() > 0 && message[0].isString())
 	{
 		juce::String messageType = message[0].getString();
-		juce::String messageAddress = message.getAddressPattern().toString();
 
 		// Handle add_instrument command by checking the message address
 		if (messageAddress == "/orchestra")
@@ -217,12 +255,12 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
 			else if (messageType == "save_project")
 			{
-				// Create DawServer subfolder in user's documents directory
-				juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+					// Create OscServer subfolder in user's documents directory
+					juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
 				if (!dawServerDir.exists())
 					dawServerDir.createDirectory();
 
-				// Get the full file paths in DawServer subfolder
+					// Get the full file paths in OscServer subfolder
 				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 				juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 				juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
@@ -232,12 +270,12 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
                         else if (messageType == "restore_project")
                         {
-                                // Create DawServer subfolder in user's documents directory
-                                juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+                                // Create OscServer subfolder in user's documents directory
+                                juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
                                 if (!dawServerDir.exists())
                                         dawServerDir.createDirectory();
 
-				// Define the extraction locations in DawServer subfolder
+				// Define the extraction locations in OscServer subfolder
 				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
                                 juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
                                 juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");

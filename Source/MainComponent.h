@@ -225,6 +225,7 @@ public:
 
 	// Add a method to get the current BPM
 	double getBpm() const;
+	void setBpm(double bpm);
 
 	void scanForPlugins();
 	void initPlugins();

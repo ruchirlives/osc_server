@@ -518,12 +518,12 @@ void MidiManager::processRecordedMidi()
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-    // Create DawServer subfolder in user's documents directory
-    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    // Create OscServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
     if (!dawServerDir.exists())
         dawServerDir.createDirectory();
 
-    // Save MIDI file in DawServer subfolder
+    // Save MIDI file in OscServer subfolder
     juce::File midiFile = dawServerDir.getChildFile("recordedMIDI.mid");
 
     if (recordedMIDI.getNumEvents() == 0)
@@ -944,4 +944,3 @@ void MidiManager::removeMidiChannelFromOverdub(int midiChannel)
 
     DBG("Removed MIDI Channel " + juce::String(midiChannel) + " from overdub buffer.");
 }
-

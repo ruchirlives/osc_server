@@ -157,7 +157,7 @@ MainComponent::MainComponent()
 	{ midiManager.exportRecordBufferToMidiFile(); };
 
 	// Set up config file path
-	juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+	juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
 	if (!dawServerDir.exists())
 		dawServerDir.createDirectory();
 	configFile = dawServerDir.getChildFile("config.ini");
@@ -365,12 +365,12 @@ void MainComponent::updateProjectNameLabel(juce::String projectName)
 
 void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments)
 {
-	// Create DawServer subfolder in user's documents directory
-	juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+	// Create OscServer subfolder in user's documents directory
+	juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
 	if (!dawServerDir.exists())
 		dawServerDir.createDirectory();
 
-	// Get the full file paths in DawServer subfolder
+	// Get the full file paths in OscServer subfolder
 	juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 	juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 	juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
@@ -430,12 +430,12 @@ void MainComponent::restoreProject(bool append)
 			juce::ZipFile zip(inputStream);
 			DBG("Project Read.");
 
-			// Create DawServer subfolder in user's documents directory
-			juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+			// Create OscServer subfolder in user's documents directory
+			juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
 			if (!dawServerDir.exists())
 				dawServerDir.createDirectory();
 
-			// Define the extraction locations in DawServer subfolder
+			// Define the extraction locations in OscServer subfolder
 			juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 			juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 			juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
@@ -745,6 +745,11 @@ void MainComponent::paint(juce::Graphics &g)
 double MainComponent::getBpm() const
 {
 	return bpmEditor.getText().getDoubleValue(); // Or however you're storing user input
+}
+
+void MainComponent::setBpm(double bpm)
+{
+\tbpmEditor.setText(juce::String(bpm, 3), juce::dontSendNotification);
 }
 
 void MainComponent::scanForPlugins()

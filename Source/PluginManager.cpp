@@ -624,12 +624,12 @@ void PluginManager::scanPlugins(juce::FileSearchPath searchPaths)
 
 void PluginManager::savePluginListToFile()
 {
-    // Create DawServer subfolder in user's documents directory
-    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    // Create OscServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
     if (!dawServerDir.exists())
         dawServerDir.createDirectory();
 
-    // Use DawServer subfolder for PluginList.xml
+    // Use OscServer subfolder for PluginList.xml
     juce::File pluginListFile = dawServerDir.getChildFile("PluginList.xml");
 
     std::unique_ptr<juce::XmlElement> pluginListXml = knownPluginList.createXml();
@@ -656,12 +656,12 @@ void PluginManager::savePluginListToFile()
 
 bool PluginManager::loadPluginListFromFile()
 {
-    // Create DawServer subfolder in user's documents directory
-    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("DawServer");
+    // Create OscServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
     if (!dawServerDir.exists())
         dawServerDir.createDirectory();
 
-    // Use DawServer subfolder for PluginList.xml
+    // Use OscServer subfolder for PluginList.xml
     juce::File pluginListFile = dawServerDir.getChildFile("PluginList.xml");
 
     if (pluginListFile.existsAsFile())
@@ -1067,4 +1067,3 @@ void PluginManager::renamePluginInstance(const juce::String& oldId, const juce::
 // If you have any code that sets outputDeviceName to "No Device", remove or comment it out.
 
 // ...existing code...
-
