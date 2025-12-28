@@ -31,6 +31,10 @@
             file="Source/PluginScanModal.cpp"/>
       <FILE id="g8dX1J" name="PluginScanModal.h" compile="0" resource="0"
             file="Source/PluginScanModal.h"/>
+      <FILE id="sPJ3f0" name="PluginInstancesModal.cpp" compile="1" resource="0"
+            file="Source/PluginInstancesModal.cpp"/>
+      <FILE id="MX2nP6" name="PluginInstancesModal.h" compile="0" resource="0"
+            file="Source/PluginInstancesModal.h"/>
     </GROUP>
     <FILE id="ZCiG4M" name="icon.png" compile="0" resource="1" file="icon.png"/>
   </MAINGROUP>

@@ -1,5 +1,6 @@
 ﻿#include "MainComponent.h"
 #include "PluginScanModal.h"
+#include "PluginInstancesModal.h"
 
 #if JUCE_WINDOWS
 #include <windows.h>
@@ -75,7 +76,7 @@ MainComponent::MainComponent()
 	// Initialize the "List Plugin Instances" button
 	addAndMakeVisible(listPluginInstancesButton);
 	listPluginInstancesButton.onClick = [this]()
-	{ pluginManager.listPluginInstances(); }; // Use lambda for button click handling
+	{ showPluginInstancesModal(); }; // Use lambda for button click handling
 
 	// Initialize the "Send Test Note" button
 	addAndMakeVisible(sendTestNoteButton);
@@ -753,6 +754,22 @@ void MainComponent::setBpm(double bpm)
 	bpmEditor.setText(juce::String(bpm, 3), juce::dontSendNotification);
 }
 
+void MainComponent::showPluginInstancesModal()
+{
+	juce::DialogWindow::LaunchOptions options;
+	options.dialogTitle = "Plugin Instances";
+	options.dialogBackgroundColour = findColour(juce::ResizableWindow::backgroundColourId);
+	options.escapeKeyTriggersCloseButton = true;
+	options.useNativeTitleBar = true;
+	options.resizable = false;
+	options.componentToCentreAround = this;
+
+	auto* modalContent = new PluginInstancesModal(pluginManager);
+	modalContent->setSize(420, 360);
+	options.content.setOwned(modalContent);
+	options.launchAsync();
+}
+
 void MainComponent::showPluginScanModal()
 {
 	juce::DialogWindow::LaunchOptions options;
@@ -766,7 +783,8 @@ void MainComponent::showPluginScanModal()
 	auto* modalContent = new PluginScanModal(
 		pluginManager,
 		[this]() { scanForPlugins(PluginScanMode::Replace); },
-		[this]() { scanForPlugins(PluginScanMode::Add); });
+		[this]() { scanForPlugins(PluginScanMode::Add); },
+		[this]() { initPluginsList(); });
 
 	modalContent->setSize(420, 360);
 	options.content.setOwned(modalContent);

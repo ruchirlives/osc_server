@@ -375,6 +375,34 @@ juce::StringArray PluginManager::getPluginInstanceIds() const
     return instanceIds;
 }
 
+std::vector<PluginManager::PluginInstanceInfo> PluginManager::getPluginInstanceInfos() const
+{
+	const juce::ScopedLock pluginLock(pluginInstanceLock);
+	std::vector<PluginInstanceInfo> infos;
+	infos.reserve(pluginInstances.size());
+
+	for (const auto& pluginPair : pluginInstances)
+	{
+		PluginInstanceInfo info;
+		info.pluginId = pluginPair.first;
+
+		if (const auto* instance = pluginPair.second.get())
+			info.pluginName = instance->getName();
+		else
+			info.pluginName = "Unavailable";
+
+		infos.push_back(std::move(info));
+	}
+
+	std::sort(infos.begin(), infos.end(),
+		[](const PluginInstanceInfo& a, const PluginInstanceInfo& b)
+		{
+			return a.pluginId.compareIgnoreCase(b.pluginId) < 0;
+		});
+
+	return infos;
+}
+
 void PluginManager::instantiatePlugin(juce::PluginDescription* desc, const juce::String& pluginId)
 {
     juce::String errorMessage;
@@ -622,6 +650,32 @@ void PluginManager::scanPlugins(juce::FileSearchPath searchPaths, bool replaceEx
 	savePluginListToFile();
 	DBG("Plugin list saved to file.");
 
+}
+
+void PluginManager::removePluginsByIndexes(const juce::Array<int>& rowsToRemove)
+{
+	if (rowsToRemove.isEmpty())
+		return;
+
+	std::vector<int> sortedRows;
+	sortedRows.reserve(static_cast<size_t>(rowsToRemove.size()));
+
+	for (int i = 0; i < rowsToRemove.size(); ++i)
+		sortedRows.push_back(rowsToRemove[i]);
+
+	std::sort(sortedRows.begin(), sortedRows.end(), [](int a, int b) { return a > b; });
+
+	const auto snapshot = knownPluginList.getTypes();
+
+	for (int row : sortedRows)
+	{
+		if (!juce::isPositiveAndBelow(row, snapshot.size()))
+			continue;
+
+		knownPluginList.removeType(snapshot.getReference(row));
+	}
+
+	savePluginListToFile();
 }
 
 void PluginManager::savePluginListToFile()

@@ -312,7 +312,7 @@ private:
 
 	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
 	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
-	juce::TextButton listPluginInstancesButton{ "List Plugin Instances" }; // Button to list plugin instances
+	juce::TextButton listPluginInstancesButton{ "Plugin Instances" }; // Button to list plugin instances
 	juce::TextButton sendTestNoteButton{ "Send Test Note" }; // Button to send a test note
 
 	// Buttons to add and remove instruments from the orchestra
@@ -371,6 +371,7 @@ private:
     void loadConfig();
     void saveConfig();
 	void showPluginScanModal();
+	void showPluginInstancesModal();
 
     // Helpers for unique tag and instance id generation
     int getNextTagNumber() const;

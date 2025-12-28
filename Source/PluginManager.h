@@ -44,6 +44,11 @@ struct MyMidiMessage
 class PluginManager : public juce::AudioAppComponent
 {
 public:
+    struct PluginInstanceInfo
+    {
+        juce::String pluginId;
+        juce::String pluginName;
+    };
     // In PluginManager.h (or wherever you want to define it)
     struct PlayHeadImpl : public juce::AudioPlayHead
     {
@@ -73,6 +78,7 @@ public:
     void instantiatePluginByName(const juce::String& name, const juce::String& pluginId);
 
     juce::StringArray getPluginInstanceIds() const;
+    std::vector<PluginInstanceInfo> getPluginInstanceInfos() const;
 
     // Methods to manage plugins
     void instantiatePlugin(juce::PluginDescription* desc, const juce::String& pluginId);
@@ -104,6 +110,7 @@ public:
 
 	// Methods to manage plugin state, save and restore
 	void scanPlugins(juce::FileSearchPath searchPath, bool replaceExisting = true);
+    void removePluginsByIndexes(const juce::Array<int>& rowsToRemove);
     bool loadPluginListFromFile();
     void savePluginListToFile();
 
