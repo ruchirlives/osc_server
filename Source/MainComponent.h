@@ -211,7 +211,7 @@ public:
     MainComponent();
     ~MainComponent() override;
 
-    std::function<void()> onInitialised;
+	std::function<void()> onInitialised;
 
 	void moveSelectedRowsToEnd();
 	void updateProjectNameLabel(juce::String projectName);
@@ -348,14 +348,16 @@ private:
 	juce::TextEditor audioStreamingPortEditor; // Text editor for the audio streaming port
 
         // Buttons for overdub control
-    juce::TextButton startOverdubButton { "Start Overdub" };
+    juce::TextButton startOverdubButton { "Start" };
     juce::TextButton stopOverdubButton { "Stop Overdub" };
-	juce::TextButton playOverdubButton{ "Play Overdub" };
-	juce::TextButton triggerOverdubButton{ "Start On Trigger" };
+	juce::TextButton playOverdubButton{ "Play" };
+	juce::TextButton triggerOverdubButton{ "Trig" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
     juce::TextButton undoOverdubButton { "Undo Overdub" };
     juce::TextButton importMidiButton { "Import MIDI" };
-    juce::TextButton exportMidiButton { "Export MIDI" };
+	juce::TextButton exportMidiButton { "Export MIDI" };
+
+	juce::TooltipWindow tooltipWindow;
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class

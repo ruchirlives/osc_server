@@ -54,8 +54,9 @@ namespace
 }
 
 MainComponent::MainComponent()
+	: tooltipWindow(this, 600)
 {
-
+	tooltipWindow.setMillisecondsBeforeTipAppears(900);
 	setSize(600, 800);
 	juce::LookAndFeel::setDefaultLookAndFeel(&globalLNF);
 
@@ -98,54 +99,65 @@ MainComponent::MainComponent()
 	addAndMakeVisible(ScanButton);
 	ScanButton.onClick = [this]()
 	{ showPluginScanModal(); }; // Use lambda for button click handling
+	ScanButton.setTooltip("Scan the configured folder for plugins and refresh the list.");
 
 	addAndMakeVisible(aboutButton);
 	aboutButton.onClick = [this]()
 	{ showAboutDialog(); };
+	aboutButton.setTooltip("Show version information and project links.");
 
 	// Initialize the "Get Recorded" button
 	addAndMakeVisible(getRecordedButton);
 	getRecordedButton.onClick = [this]()
 	{ midiManager.getRecorded(); updateOverdubUI(); }; // Use lambda for button click handling
+	getRecordedButton.setTooltip("Fetch and clear the recorded overdub buffer.");
 
 	// Initialize the "List Plugin Instances" button
 	addAndMakeVisible(listPluginInstancesButton);
 	listPluginInstancesButton.onClick = [this]()
 	{ showPluginInstancesModal(); }; // Use lambda for button click handling
+	listPluginInstancesButton.setTooltip("Display every plugin instance and its ID.");
 
 	// Initialize the "Send Test Note" button
 	addAndMakeVisible(sendTestNoteButton);
 	sendTestNoteButton.onClick = [this]()
 	{ midiManager.sendTestNote(); }; // Use lambda for button click handling
+	sendTestNoteButton.setTooltip("Send a short MIDI ping through the selected instrument.");
 
 	// Initialize the "Open Plugin" button
 	addAndMakeVisible(openPluginButton);
 	openPluginButton.onClick = [this]()
 	{ openPlugins(orchestraTable); }; // Use lambda for button click handling
+	openPluginButton.setTooltip("Open the plugin UI for the selected instruments.");
 
 	// Initialize the "Add Instrument" and "Remove Instrument" buttons
 	addAndMakeVisible(addInstrumentButton);
 	addInstrumentButton.onClick = [this]()
 	{ addInstrument(); }; // Use lambda for button click handling
+	addInstrumentButton.setTooltip("Duplicate the selected instrument slot.");
 
 	// Initialize Add New Instrument button
 	addAndMakeVisible(addNewInstrumentButton);
 	addNewInstrumentButton.onClick = [this]()
 	{ addNewInstrument(); }; // Use lambda for button click handling
+	addNewInstrumentButton.setTooltip("Create a new instrument entry.");
 
 	// Initialize the "Remove Instrument" button
 	addAndMakeVisible(removeInstrumentButton);
 	removeInstrumentButton.onClick = [this]()
 	{ removeInstrument(); }; // Use lambda for button click handling
+	removeInstrumentButton.setTooltip("Remove the selected instruments from the orchestra.");
 
 	// Initialize the "Save" and "Restore" buttons
 	addAndMakeVisible(saveButton);
 	saveButton.onClick = [this]()
 	{ saveProject(); }; // Use lambda for button click handling
+	saveButton.setTooltip("Save the current project to an .oscdaw file.");
 
 	addAndMakeVisible(restoreButton);
 	restoreButton.onClick = [this]()
 	{ restoreProject(); }; // Use lambda for button click handling
+	restoreButton.setTooltip("Load or append a project from disk.");
 
 	// Add Project name label
 	addAndMakeVisible(projectNameLabel);
@@ -154,44 +166,53 @@ MainComponent::MainComponent()
 	addAndMakeVisible(moveToEndButton);
 	moveToEndButton.onClick = [this]()
 	{ moveSelectedRowsToEnd(); }; // Use lambda for button click handling
+	moveToEndButton.setTooltip("Move the selected instruments to the end of the table.");
 
 	// Initialize the "Start Overdub" button
 	addAndMakeVisible(startOverdubButton);
 	startOverdubButton.onClick = [this]()
 	{ midiManager.startOverdub(); updateOverdubUI(); };
+	startOverdubButton.setTooltip("Begin recording MIDI into the overdub buffer.");
 
 	// Initialize the "Stop Overdub" button
 	addAndMakeVisible(stopOverdubButton);
 	stopOverdubButton.onClick = [this]()
 	{ midiManager.stopOverdub(); updateOverdubUI(); };
+	stopOverdubButton.setTooltip("Stop the active overdub take.");
 
 	// Initialize the "Play Overdub" button
 	addAndMakeVisible(playOverdubButton);
 	playOverdubButton.onClick = [this]()
 	{ midiManager.playOverdub(); updateOverdubUI(); };
+	playOverdubButton.setTooltip("Play back the captured overdub buffer.");
 
 	// playOverdubOnTriggerButton
 	addAndMakeVisible(triggerOverdubButton);
 	triggerOverdubButton.onClick = [this]()
 	{ midiManager.triggerOverdub(); updateOverdubUI(); };
+	triggerOverdubButton.setTooltip("Arm overdub playback to trigger later.");
 
 	// Initialize the "Strip Silence" button
 	addAndMakeVisible(stripLeadingSilenceButton);
 	stripLeadingSilenceButton.onClick = [this]()
 	{ midiManager.stripLeadingSilence(); updateOverdubUI(); };
+	stripLeadingSilenceButton.setTooltip("Remove silence at the start of the overdub take.");
 
 	// Initialize the "Undo Overdub" button
 	addAndMakeVisible(undoOverdubButton);
 	undoOverdubButton.onClick = [this]()
 	{ midiManager.undoLastOverdub(); updateOverdubUI(); };
+	undoOverdubButton.setTooltip("Revert the most recent overdub pass.");
 
 	addAndMakeVisible(importMidiButton);
 	importMidiButton.onClick = [this]()
 	{ midiManager.importMidiFileToRecordBuffer(); updateOverdubUI(); };
+	importMidiButton.setTooltip("Import a MIDI file into the overdub buffer.");
 
 	addAndMakeVisible(exportMidiButton);
 	exportMidiButton.onClick = [this]()
 	{ midiManager.exportRecordBufferToMidiFile(); };
+	exportMidiButton.setTooltip("Export the overdub buffer as a MIDI file.");
 
 	// Set up config file path
 	juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
