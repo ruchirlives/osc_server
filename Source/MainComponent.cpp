@@ -764,10 +764,33 @@ void MainComponent::showPluginInstancesModal()
 	options.resizable = false;
 	options.componentToCentreAround = this;
 
-	auto* modalContent = new PluginInstancesModal(pluginManager);
+	auto* modalContent = new PluginInstancesModal(
+		pluginManager,
+		[this](const juce::String& oldId, const juce::String& newId)
+		{
+			updatePluginInstanceReferences(oldId, newId);
+		});
 	modalContent->setSize(420, 360);
 	options.content.setOwned(modalContent);
 	options.launchAsync();
+}
+
+void MainComponent::updatePluginInstanceReferences(const juce::String& oldId, const juce::String& newId)
+{
+	bool changed = false;
+	for (auto& instrument : conductor.orchestra)
+	{
+		if (instrument.pluginInstanceId == oldId)
+		{
+			instrument.pluginInstanceId = newId;
+			changed = true;
+		}
+	}
+
+	if (changed)
+	{
+		orchestraTable.updateContent();
+	}
 }
 
 void MainComponent::showPluginScanModal()

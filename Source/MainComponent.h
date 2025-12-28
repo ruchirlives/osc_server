@@ -368,10 +368,11 @@ private:
     juce::File configFile;
 
     // Helper methods for config
-    void loadConfig();
-    void saveConfig();
+	void loadConfig();
+	void saveConfig();
 	void showPluginScanModal();
 	void showPluginInstancesModal();
+	void updatePluginInstanceReferences(const juce::String& oldId, const juce::String& newId);
 
     // Helpers for unique tag and instance id generation
     int getNextTagNumber() const;

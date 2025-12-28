@@ -2,8 +2,9 @@
 #include "PluginManager.h"
 #include "RenamePluginDialog.h"
 
-PluginInstancesModal::PluginInstancesModal(PluginManager& managerRef)
-	: pluginManager(managerRef)
+PluginInstancesModal::PluginInstancesModal(PluginManager& managerRef,
+	std::function<void(const juce::String&, const juce::String&)> renameCallback)
+	: pluginManager(managerRef), renameReferencesCallback(std::move(renameCallback))
 {
 	titleLabel.setJustificationType(juce::Justification::centredLeft);
 	addAndMakeVisible(titleLabel);
@@ -115,7 +116,8 @@ void PluginInstancesModal::handleContextMenu(int row, const juce::MouseEvent& ev
 
 	menu.showMenuAsync(juce::PopupMenu::Options()
 		.withTargetComponent(&instanceList)
-		.withTargetScreenPosition(event.getScreenPosition()));
+		.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition().x,
+			event.getScreenPosition().y, 1, 1)));
 }
 
 void PluginInstancesModal::renameInstance(const juce::String& pluginId)
@@ -154,6 +156,9 @@ void PluginInstancesModal::renameInstance(const juce::String& pluginId)
 							"A plugin with this ID already exists.");
 						return;
 					}
+
+					if (renameReferencesCallback)
+						renameReferencesCallback(pluginId, newId);
 
 					pluginManager.renamePluginInstance(pluginId, newId);
 				}

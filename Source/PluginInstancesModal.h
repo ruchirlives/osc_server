@@ -2,13 +2,15 @@
 
 #include <JuceHeader.h>
 #include <vector>
+#include <functional>
 #include "PluginManager.h"
 
 class PluginInstancesModal : public juce::Component,
 							 private juce::ListBoxModel
 {
 public:
-	explicit PluginInstancesModal(PluginManager& managerRef);
+	PluginInstancesModal(PluginManager& managerRef,
+		std::function<void(const juce::String&, const juce::String&)> renameCallback);
 
 	void refreshInstances();
 
@@ -25,6 +27,7 @@ private:
 
 	PluginManager& pluginManager;
 	std::vector<PluginManager::PluginInstanceInfo> instances;
+	std::function<void(const juce::String&, const juce::String&)> renameReferencesCallback;
 
 	juce::Label titleLabel{ "titleLabel", "Plugin Instances" };
 	juce::Label countLabel;
