@@ -7,7 +7,79 @@
 */
 
 #include <JuceHeader.h>
+#include <functional>
 #include "MainComponent.h"
+
+namespace
+{
+    class SplashComponent : public juce::Component
+    {
+    public:
+        SplashComponent()
+        {
+            icon = juce::ImageCache::getFromMemory(BinaryData::icon_png, BinaryData::icon_pngSize);
+
+            const int border = 24;
+            const int width = icon.isValid() ? icon.getWidth() + border * 2 : 280;
+            const int height = icon.isValid() ? icon.getHeight() + border * 2 : 280;
+
+            setOpaque(true);
+            setAlwaysOnTop(true);
+            addToDesktop(juce::ComponentPeer::windowHasDropShadow | juce::ComponentPeer::windowIsTemporary);
+            centreWithSize(width, height);
+            setVisible(true);
+        }
+
+        void beginFadeOut(std::function<void()> onDismissed)
+        {
+            if (isDismissing)
+                return;
+
+            isDismissing = true;
+            dismissCallback = std::move(onDismissed);
+
+            juce::Desktop::getInstance().getAnimator().fadeOut(this, 250);
+            juce::Timer::callAfterDelay(260, [safe = juce::Component::SafePointer<SplashComponent>(this)]
+                                        {
+                                            if (auto* self = safe.getComponent())
+                                                self->dismiss();
+                                        });
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            g.fillAll(juce::Colours::black.withAlpha(0.82f));
+
+            if (icon.isValid())
+            {
+                auto bounds = getLocalBounds().reduced(18);
+                g.drawImageWithin(icon, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
+                                  juce::RectanglePlacement::centred);
+            }
+            else
+            {
+                g.setColour(juce::Colours::white);
+                g.setFont(20.0f);
+                g.drawFittedText("Loading...", getLocalBounds(), juce::Justification::centred, 1);
+            }
+        }
+
+    private:
+        void dismiss()
+        {
+            removeFromDesktop();
+            if (dismissCallback)
+            {
+                auto cb = std::move(dismissCallback);
+                cb();
+            }
+        }
+
+        juce::Image icon;
+        bool isDismissing { false };
+        std::function<void()> dismissCallback;
+    };
+}
 
 //==============================================================================
 class VSTHostMidiRecorderApplication  : public juce::JUCEApplication
@@ -15,6 +87,17 @@ class VSTHostMidiRecorderApplication  : public juce::JUCEApplication
 public:
     //==============================================================================
     VSTHostMidiRecorderApplication() {}
+
+    void dismissSplashScreen()
+    {
+        if (splashScreen != nullptr)
+        {
+            splashScreen->beginFadeOut([this]() mutable
+            {
+                splashScreen.reset();
+            });
+        }
+    }
 
     const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
     const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
@@ -24,6 +107,8 @@ public:
     void initialise (const juce::String& commandLine) override
     {
         juce::ignoreUnused(commandLine);
+
+        splashScreen = std::make_unique<SplashComponent>();
 
         mainWindow.reset (new MainWindow (getApplicationName()));
         // Create the system tray icon
@@ -39,6 +124,7 @@ public:
         // Add your application's shutdown code here..
         trayIconComponent = nullptr;
         mainWindow = nullptr; // (deletes our window)
+        splashScreen = nullptr;
     }
 
     //==============================================================================
@@ -72,7 +158,15 @@ public:
                               DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
-            setContentOwned (new MainComponent(), true);
+
+            auto* mainComponent = new MainComponent();
+            mainComponent->onInitialised = []
+            {
+                if (auto* app = dynamic_cast<VSTHostMidiRecorderApplication*>(juce::JUCEApplication::getInstance()))
+                    app->dismissSplashScreen();
+            };
+
+            setContentOwned (mainComponent, true);
 
            #if JUCE_IOS || JUCE_ANDROID
             setFullScreen (true);
@@ -175,6 +269,7 @@ public:
 private:
     std::unique_ptr<MainWindow> mainWindow;
     std::unique_ptr<TrayIconComponent> trayIconComponent;
+    std::unique_ptr<SplashComponent> splashScreen;
 };
 
 //==============================================================================

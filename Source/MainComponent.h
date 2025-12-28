@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <functional>
 #include "MidiManager.h"
 #include "PluginManager.h"
 #include "Conductor.h"
@@ -209,6 +210,8 @@ class MainComponent :   public juce::Component,
 public:
     MainComponent();
     ~MainComponent() override;
+
+    std::function<void()> onInitialised;
 
 	void moveSelectedRowsToEnd();
 	void updateProjectNameLabel(juce::String projectName);

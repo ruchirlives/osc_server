@@ -203,6 +203,15 @@ MainComponent::MainComponent()
 
 	resized();
 	updateOverdubUI();
+
+	juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MainComponent>(this)]()
+									{
+										if (auto* self = safe.getComponent())
+										{
+											if (self->onInitialised)
+												self->onInitialised();
+										}
+									});
 }
 
 MainComponent::~MainComponent()
