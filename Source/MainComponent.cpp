@@ -19,39 +19,38 @@ static bool isRunningInDebugger()
 
 namespace
 {
-class AboutContentComponent : public juce::Component
-{
-public:
-	AboutContentComponent()
-		: moreLink("More at github.com/ruchirlives", juce::URL("https://github.com/ruchirlives"))
+	class AboutContentComponent : public juce::Component
 	{
-		infoLabel.setText(
-			"Created by Ruchir Shah (c) 2024.\n"
-			"Built on JUCE and released as open source AGPL",
-			juce::dontSendNotification);
-		infoLabel.setJustificationType(juce::Justification::centred);
-		infoLabel.setFont(juce::Font(15.0f));
+	public:
+		AboutContentComponent()
+			: moreLink("More at github.com/ruchirlives", juce::URL("https://github.com/ruchirlives"))
+		{
+			infoLabel.setText(
+				juce::String("Created by Ruchir Shah (c) 2024.\nBuilt on JUCE\nOSCDawServer ") + juce::String(ProjectInfo::versionString),
+				juce::dontSendNotification);
+			infoLabel.setJustificationType(juce::Justification::centred);
+			infoLabel.setFont(juce::Font(15.0f));
 
-		addAndMakeVisible(infoLabel);
-		addAndMakeVisible(moreLink);
-	}
+			addAndMakeVisible(infoLabel);
+			addAndMakeVisible(moreLink);
+		}
 
-	void resized() override
-	{
-		auto bounds = getLocalBounds().reduced(16, 12);
-		const int linkHeight = 28;
+		void resized() override
+		{
+			auto bounds = getLocalBounds().reduced(16, 12);
+			const int linkHeight = 28;
 
-		auto labelBounds = bounds.removeFromTop(bounds.getHeight() - linkHeight - 6);
-		infoLabel.setBounds(labelBounds);
+			auto labelBounds = bounds.removeFromTop(bounds.getHeight() - linkHeight - 6);
+			infoLabel.setBounds(labelBounds);
 
-		bounds.removeFromTop(6);
-		moreLink.setBounds(bounds.removeFromTop(linkHeight));
-	}
+			bounds.removeFromTop(6);
+			moreLink.setBounds(bounds.removeFromTop(linkHeight));
+		}
 
-private:
-	juce::Label infoLabel;
-	juce::HyperlinkButton moreLink;
-};
+	private:
+		juce::Label infoLabel;
+		juce::HyperlinkButton moreLink;
+	};
 }
 
 MainComponent::MainComponent()
@@ -747,7 +746,7 @@ void MainComponent::paint(juce::Graphics &g)
 {
 	auto base = findColour(juce::ResizableWindow::backgroundColourId);
 	auto gradient = juce::ColourGradient(base.brighter(0.1f), 0, 0,
-		base.darker(0.2f), 0, (float)getHeight(), false);
+										 base.darker(0.2f), 0, (float)getHeight(), false);
 	g.setGradientFill(gradient);
 	g.fillAll();
 
@@ -761,8 +760,8 @@ void MainComponent::paint(juce::Graphics &g)
 		auto tableGradientEnd = tablePanelBounds.getBottomLeft();
 		auto colour = base.brighter(0.08f);
 		auto tableGradient = juce::ColourGradient(colour.brighter(0.1f),
-			tableGradientStart.x, tableGradientStart.y,
-			colour.darker(0.15f), tableGradientEnd.x, tableGradientEnd.y, false);
+												  tableGradientStart.x, tableGradientStart.y,
+												  colour.darker(0.15f), tableGradientEnd.x, tableGradientEnd.y, false);
 		g.setGradientFill(tableGradient);
 		g.fillRoundedRectangle(tablePanelBounds, 12.0f);
 		g.setColour(juce::Colours::white.withAlpha(0.15f));
@@ -799,9 +798,9 @@ void MainComponent::showPluginInstancesModal()
 	options.resizable = false;
 	options.componentToCentreAround = this;
 
-	auto* modalContent = new PluginInstancesModal(
+	auto *modalContent = new PluginInstancesModal(
 		pluginManager,
-		[this](const juce::String& oldId, const juce::String& newId)
+		[this](const juce::String &oldId, const juce::String &newId)
 		{
 			updatePluginInstanceReferences(oldId, newId);
 		});
@@ -817,10 +816,10 @@ void MainComponent::showAboutDialog()
 	juce::CallOutBox::launchAsynchronously(std::move(content), aboutButton.getScreenBounds(), nullptr);
 }
 
-void MainComponent::updatePluginInstanceReferences(const juce::String& oldId, const juce::String& newId)
+void MainComponent::updatePluginInstanceReferences(const juce::String &oldId, const juce::String &newId)
 {
 	bool changed = false;
-	for (auto& instrument : conductor.orchestra)
+	for (auto &instrument : conductor.orchestra)
 	{
 		if (instrument.pluginInstanceId == oldId)
 		{
@@ -845,11 +844,14 @@ void MainComponent::showPluginScanModal()
 	options.resizable = false;
 	options.componentToCentreAround = this;
 
-	auto* modalContent = new PluginScanModal(
+	auto *modalContent = new PluginScanModal(
 		pluginManager,
-		[this]() { scanForPlugins(PluginScanMode::Replace); },
-		[this]() { scanForPlugins(PluginScanMode::Add); },
-		[this]() { initPluginsList(); });
+		[this]()
+		{ scanForPlugins(PluginScanMode::Replace); },
+		[this]()
+		{ scanForPlugins(PluginScanMode::Add); },
+		[this]()
+		{ initPluginsList(); });
 
 	modalContent->setSize(420, 360);
 	options.content.setOwned(modalContent);
@@ -1364,7 +1366,7 @@ MainComponent::LayoutMetrics MainComponent::getLayoutMetrics() const
 	return LayoutMetrics{};
 }
 
-juce::Rectangle<float> MainComponent::computeTablePanelBounds(const LayoutMetrics& metrics, const juce::Rectangle<int>& tableBounds) const
+juce::Rectangle<float> MainComponent::computeTablePanelBounds(const LayoutMetrics &metrics, const juce::Rectangle<int> &tableBounds) const
 {
 	const float panelInset = 6.0f;
 
@@ -1378,7 +1380,7 @@ juce::Rectangle<float> MainComponent::computeTablePanelBounds(const LayoutMetric
 		tableBounds.getHeight() + panelInset * 2.0f);
 }
 
-MainComponent::ButtonPanelLayout MainComponent::computeButtonPanelLayout(const LayoutMetrics& metrics, const juce::Rectangle<float>& tablePanelBounds) const
+MainComponent::ButtonPanelLayout MainComponent::computeButtonPanelLayout(const LayoutMetrics &metrics, const juce::Rectangle<float> &tablePanelBounds) const
 {
 	ButtonPanelLayout layout;
 	const float panelInset = 6.0f;
