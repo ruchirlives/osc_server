@@ -63,11 +63,6 @@ MainComponent::MainComponent()
 	ScanButton.onClick = [this]()
 	{ showPluginScanModal(); }; // Use lambda for button click handling
 
-	// Initialize the "Refresh" button
-	addAndMakeVisible(updateButton);
-	updateButton.onClick = [this]()
-	{ conductor.syncOrchestraWithPluginManager(); }; // Use lambda for button click handling
-
 	// Initialize the "Get Recorded" button
 	addAndMakeVisible(getRecordedButton);
 	getRecordedButton.onClick = [this]()
@@ -237,8 +232,7 @@ void MainComponent::resized()
 	const int row1Y = buttonLayout.rowY[3];
 	ScanButton.setBounds(margin, row1Y, buttonWidth, buttonHeight);
 	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	updateButton.setBounds(pluginBox.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	openPluginButton.setBounds(updateButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	openPluginButton.setBounds(pluginBox.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 
 	// Row 2 - Instrument management and recording
@@ -528,12 +522,11 @@ void MainComponent::addDataToTable()
 	// Add the instrument to the orchestra
 	// fill orchestra with dummy data
 	InstrumentInfo instrument1;
-	instrument1.instrumentName = "My Soundcase Test Instrument";
-	instrument1.pluginName = "Soundcase";
+	instrument1.instrumentName = "My Instrument";
+	instrument1.pluginName = "Click Select Plugin button below --->";
 	instrument1.pluginInstanceId = "Selection 1";
 	instrument1.midiChannel = 1;
-	instrument1.tags.push_back("tag1");
-	instrument1.tags.push_back("tag2");
+	instrument1.tags.push_back("myTag");
 
 	conductor.orchestra.push_back(instrument1);
 }

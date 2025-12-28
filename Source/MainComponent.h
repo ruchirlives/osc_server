@@ -311,7 +311,6 @@ private:
     juce::Label audioDeviceLabel{ "Audio Device", "Audio Device" };
 
 	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
-	juce::TextButton updateButton{ "Update" }; // Button to refresh the orchestra table
 	juce::TextButton listPluginInstancesButton{ "Plugin Instances" }; // Button to list plugin instances
 	juce::TextButton sendTestNoteButton{ "Send Test Note" }; // Button to send a test note
 
