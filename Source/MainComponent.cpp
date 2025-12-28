@@ -273,16 +273,20 @@ void MainComponent::resized()
 	};
 
 	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText()) + 24);
-	const int bpmLabelWidth = 38;
-	const int bpmFieldWidth = 90;
 	const int audioPortLabelWidth = 150;
 	const int audioPortFieldWidth = 100;
+	const int bpmLabelWidth = 38;
+	const int bpmFieldWidth = 90;
+	const int bpmSpacing = spacingX / 2;
 
 	placeTopControl(projectNameLabel, projectNameWidth);
-	placeTopControl(bpmLabel, bpmLabelWidth);
-	placeTopControl(bpmEditor, bpmFieldWidth);
 	placeTopControl(audioStreamingPortLabel, audioPortLabelWidth);
 	placeTopControl(audioStreamingPortEditor, audioPortFieldWidth);
+
+	const int bpmEditorRight = windowWidth - margin;
+	const int bpmEditorX = bpmEditorRight - bpmFieldWidth;
+	bpmEditor.setBounds(bpmEditorX, topRowY, bpmFieldWidth, labelHeight);
+	bpmLabel.setBounds(bpmEditorX - bpmSpacing - bpmLabelWidth, topRowY, bpmLabelWidth, labelHeight);
 
 	const int driverRowY = projectNameLabel.getBottom() + spacingY / 2;
 	audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
