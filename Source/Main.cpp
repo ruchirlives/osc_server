@@ -173,6 +173,7 @@ public:
            #else
             setResizable (true, true);
             setBounds(50, 50, 750, 460);
+            positionBottomRight();
            #endif
 
             setVisible (true);
@@ -195,6 +196,23 @@ public:
            subclass also calls the superclass's method.
         */
 
+
+        void positionBottomRight()
+        {
+            auto bounds = getBounds();
+            auto& displays = juce::Desktop::getInstance().getDisplays();
+            auto userArea = [&]() -> juce::Rectangle<int>
+            {
+                if (auto* display = displays.getDisplayForRect(bounds))
+                    return display->userArea;
+                return displays.getMainDisplay().userArea;
+            }();
+
+            constexpr int margin = 20;
+            bounds.setPosition(userArea.getRight() - bounds.getWidth() - margin,
+                               userArea.getBottom() - bounds.getHeight() - margin);
+            setBounds(bounds);
+        }
 
 
     private:

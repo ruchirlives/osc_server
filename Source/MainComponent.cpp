@@ -238,9 +238,6 @@ void MainComponent::resized()
 	const int windowWidth = getWidth();
 	const int windowHeight = getHeight();
 
-	// Set main window position (if needed)
-	getTopLevelComponent()->setTopLeftPosition(1800, 500);
-
 	// --- Top controls ---
 	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);
 	bpmEditor.setBounds(projectNameLabel.getRight() + spacingX, margin, 75, labelHeight);
