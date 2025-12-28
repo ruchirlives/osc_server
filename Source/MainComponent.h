@@ -227,7 +227,12 @@ public:
 	double getBpm() const;
 	void setBpm(double bpm);
 
-	void scanForPlugins();
+	enum class PluginScanMode
+	{
+		Replace,
+		Add
+	};
+	void scanForPlugins(PluginScanMode mode = PluginScanMode::Replace);
 	void initPlugins();
 	void initPluginsList();
 	void initMidiInputs();
@@ -253,7 +258,7 @@ public:
 	void addDataToTable();
 	void openPlugins(juce::TableListBox& table);
 
-	void getFolder();
+	bool getFolder();
 	Conductor& getConductor() { return conductor; }
 
 	// Getter for orchestraTableModel
@@ -365,6 +370,7 @@ private:
     // Helper methods for config
     void loadConfig();
     void saveConfig();
+	void showPluginScanModal();
 
     // Helpers for unique tag and instance id generation
     int getNextTagNumber() const;

@@ -596,10 +596,12 @@ juce::String PluginManager::getPluginUniqueId(const juce::String& pluginId)
 	
 }
 
-void PluginManager::scanPlugins(juce::FileSearchPath searchPaths)
+void PluginManager::scanPlugins(juce::FileSearchPath searchPaths, bool replaceExisting)
 {
-    knownPluginList.clear();
-    DBG("Scanning for VST3 plugins in " << searchPaths.toString());
+    if (replaceExisting)
+        knownPluginList.clear();
+
+    DBG((replaceExisting ? "Scanning (replace) for VST3 plugins in " : "Scanning (add) for VST3 plugins in ") << searchPaths.toString());
 
     // Create a persistent VST3PluginFormat instance
     juce::VST3PluginFormat vst3Format;

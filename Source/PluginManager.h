@@ -103,7 +103,7 @@ public:
 	void upsertPluginDescriptionsFromFile(const juce::String& dataFilePath);
 
 	// Methods to manage plugin state, save and restore
-	void scanPlugins(juce::FileSearchPath searchPath);
+	void scanPlugins(juce::FileSearchPath searchPath, bool replaceExisting = true);
     bool loadPluginListFromFile();
     void savePluginListToFile();
 

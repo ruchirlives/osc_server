@@ -1,4 +1,5 @@
 ﻿#include "MainComponent.h"
+#include "PluginScanModal.h"
 
 #if JUCE_WINDOWS
 #include <windows.h>
@@ -59,7 +60,7 @@ MainComponent::MainComponent()
 	// Initialize the "Scan" button
 	addAndMakeVisible(ScanButton);
 	ScanButton.onClick = [this]()
-	{ scanForPlugins(); }; // Use lambda for button click handling
+	{ showPluginScanModal(); }; // Use lambda for button click handling
 
 	// Initialize the "Refresh" button
 	addAndMakeVisible(updateButton);
@@ -692,18 +693,18 @@ void MainComponent::removeInstrument()
 	orchestraTable.updateContent();
 }
 
-void MainComponent::getFolder()
+bool MainComponent::getFolder()
 {
-	juce::FileChooser fileChooser("Select a directory with plugins");
+	juce::FileChooser fileChooser("Select a directory with plugins", pluginFolder);
 	if (fileChooser.browseForDirectory())
 	{
 		DBG("Scanning for plugins VST3...");
 		pluginFolder = fileChooser.getResult();
+		return pluginFolder.isDirectory();
 	}
-	else
-	{
-		DBG("No folder selected");
-	}
+
+	DBG("No folder selected");
+	return false;
 }
 
 void MainComponent::paint(juce::Graphics &g)
@@ -752,18 +753,39 @@ void MainComponent::setBpm(double bpm)
 	bpmEditor.setText(juce::String(bpm, 3), juce::dontSendNotification);
 }
 
-void MainComponent::scanForPlugins()
+void MainComponent::showPluginScanModal()
 {
-	// get folder
-	getFolder();
+	juce::DialogWindow::LaunchOptions options;
+	options.dialogTitle = "Plugin Scanner";
+	options.dialogBackgroundColour = findColour(juce::ResizableWindow::backgroundColourId);
+	options.escapeKeyTriggersCloseButton = true;
+	options.useNativeTitleBar = true;
+	options.resizable = false;
+	options.componentToCentreAround = this;
 
-	// Get the full path of the plugin folder
+	auto* modalContent = new PluginScanModal(
+		pluginManager,
+		[this]() { scanForPlugins(PluginScanMode::Replace); },
+		[this]() { scanForPlugins(PluginScanMode::Add); });
+
+	modalContent->setSize(420, 360);
+	options.content.setOwned(modalContent);
+	options.launchAsync();
+}
+
+void MainComponent::scanForPlugins(PluginScanMode mode)
+{
+	if (!getFolder())
+		return;
+
 	auto pluginFolderName = pluginFolder.getFullPathName();
+	if (pluginFolderName.isEmpty())
+		return;
 
-	// Scan for plugins in the specified directory
-	auto searchPaths(pluginFolderName);
+	juce::FileSearchPath searchPaths(pluginFolderName);
+	const bool replaceExisting = (mode == PluginScanMode::Replace);
 
-	pluginManager.scanPlugins(searchPaths);
+	pluginManager.scanPlugins(searchPaths, replaceExisting);
 
 	DBG("Scanning completed.");
 

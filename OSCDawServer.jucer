@@ -27,6 +27,10 @@
       <FILE id="vCHErj" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="CqDNgS" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
+      <FILE id="mK3oFN" name="PluginScanModal.cpp" compile="1" resource="0"
+            file="Source/PluginScanModal.cpp"/>
+      <FILE id="g8dX1J" name="PluginScanModal.h" compile="0" resource="0"
+            file="Source/PluginScanModal.h"/>
     </GROUP>
     <FILE id="ZCiG4M" name="icon.png" compile="0" resource="1" file="icon.png"/>
   </MAINGROUP>
