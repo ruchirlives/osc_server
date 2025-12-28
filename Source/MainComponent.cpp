@@ -26,7 +26,7 @@ namespace
 			: moreLink("More at github.com/ruchirlives", juce::URL("https://github.com/ruchirlives"))
 		{
 			infoLabel.setText(
-				juce::String("Created by Ruchir Shah (c) 2024.\nBuilt on JUCE\nOSCDawServer ") + juce::String(ProjectInfo::versionString),
+				juce::String("Created by Ruchir Shah (c) 2024.\nBuilt on JUCE and released as open source AGPL\nOSCDawServer ") + juce::String(ProjectInfo::versionString),
 				juce::dontSendNotification);
 			infoLabel.setJustificationType(juce::Justification::centred);
 			infoLabel.setFont(juce::Font(15.0f));
