@@ -80,10 +80,14 @@ MainComponent::MainComponent()
 	addDataToTable();
 
 	// Initialize the BPM editor
+	addAndMakeVisible(bpmLabel);
+	bpmLabel.setText("BPM", juce::dontSendNotification);
+	bpmLabel.setJustificationType(juce::Justification::centredLeft);
 	addAndMakeVisible(bpmEditor);
 	bpmEditor.setText("120"); // Default BPM
 	bpmEditor.setJustification(juce::Justification::centred);
 	bpmEditor.setInputRestrictions(5, "0123456789."); // Allow only numbers and a decimal point
+	bpmEditor.setTooltip("Set the session tempo in beats per minute.");
 
 	//// Initialise the audio streaming port editor
 	// addAndMakeVisible(audioStreamingPortLabel);
@@ -260,13 +264,27 @@ void MainComponent::resized()
 	const int windowHeight = getHeight();
 
 	// --- Top controls ---
-	projectNameLabel.setBounds(margin, margin, buttonWidth, labelHeight);
-	bpmEditor.setBounds(projectNameLabel.getRight() + spacingX, margin, 75, labelHeight);
+	const int topRowY = margin;
+	auto nextX = margin;
+	const auto placeTopControl = [&](juce::Component &comp, int width)
+	{
+		comp.setBounds(nextX, topRowY, width, labelHeight);
+		nextX += width + spacingX;
+	};
 
-	audioStreamingPortLabel.setBounds(bpmEditor.getRight() + spacingX, margin, 150, labelHeight);
-	audioStreamingPortEditor.setBounds(audioStreamingPortLabel.getRight() + spacingX, margin, 75, labelHeight);
+	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText()) + 24);
+	const int bpmLabelWidth = 38;
+	const int bpmFieldWidth = 90;
+	const int audioPortLabelWidth = 150;
+	const int audioPortFieldWidth = 100;
 
-	const int driverRowY = audioStreamingPortEditor.getBottom() + spacingY / 2;
+	placeTopControl(projectNameLabel, projectNameWidth);
+	placeTopControl(bpmLabel, bpmLabelWidth);
+	placeTopControl(bpmEditor, bpmFieldWidth);
+	placeTopControl(audioStreamingPortLabel, audioPortLabelWidth);
+	placeTopControl(audioStreamingPortEditor, audioPortFieldWidth);
+
+	const int driverRowY = projectNameLabel.getBottom() + spacingY / 2;
 	audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
 	audioDriverList.setBounds(audioDriverLabel.getRight() + spacingX, driverRowY, 200, labelHeight);
 

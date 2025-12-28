@@ -224,6 +224,7 @@ public:
 	void handleAudioPortChange();
 
 	// Add a TextEditor for BPM input
+	juce::Label bpmLabel { "BPM", "BPM" };
 	juce::TextEditor bpmEditor;
 
 	// Add a method to get the current BPM

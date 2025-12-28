@@ -186,7 +186,6 @@ public:
             // whatever you need.
             // Instead of quitting the application, hide the main window
             setVisible(false);
-            //JUCEApplication::getInstance()->systemRequestedQuit();
         }
 
         /* Note: Be careful if you override any DocumentWindow methods - the base
