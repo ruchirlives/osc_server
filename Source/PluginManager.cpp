@@ -680,12 +680,12 @@ void PluginManager::removePluginsByIndexes(const juce::Array<int>& rowsToRemove)
 
 void PluginManager::savePluginListToFile()
 {
-    // Create OscServer subfolder in user's documents directory
-    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
+    // Create OSCDawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
     if (!dawServerDir.exists())
         dawServerDir.createDirectory();
 
-    // Use OscServer subfolder for PluginList.xml
+    // Use OSCDawServer subfolder for PluginList.xml
     juce::File pluginListFile = dawServerDir.getChildFile("PluginList.xml");
 
     std::unique_ptr<juce::XmlElement> pluginListXml = knownPluginList.createXml();
@@ -712,12 +712,12 @@ void PluginManager::savePluginListToFile()
 
 bool PluginManager::loadPluginListFromFile()
 {
-    // Create OscServer subfolder in user's documents directory
-    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
+    // Create OSCDawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
     if (!dawServerDir.exists())
         dawServerDir.createDirectory();
 
-    // Use OscServer subfolder for PluginList.xml
+    // Use OSCDawServer subfolder for PluginList.xml
     juce::File pluginListFile = dawServerDir.getChildFile("PluginList.xml");
 
     if (pluginListFile.existsAsFile())

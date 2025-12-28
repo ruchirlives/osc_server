@@ -255,12 +255,12 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
 			else if (messageType == "save_project")
 			{
-					// Create OscServer subfolder in user's documents directory
-					juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
+					// Create OSCDawServer subfolder in user's documents directory
+					juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
 				if (!dawServerDir.exists())
 					dawServerDir.createDirectory();
 
-					// Get the full file paths in OscServer subfolder
+					// Get the full file paths in OSCDawServer subfolder
 				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 				juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 				juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
@@ -270,12 +270,12 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
                         else if (messageType == "restore_project")
                         {
-                                // Create OscServer subfolder in user's documents directory
-                                juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
+                                // Create OSCDawServer subfolder in user's documents directory
+                                juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
                                 if (!dawServerDir.exists())
                                         dawServerDir.createDirectory();
 
-				// Define the extraction locations in OscServer subfolder
+				// Define the extraction locations in OSCDawServer subfolder
 				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
                                 juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
                                 juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");

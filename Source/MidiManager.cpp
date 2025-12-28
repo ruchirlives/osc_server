@@ -518,12 +518,12 @@ void MidiManager::processRecordedMidi()
 
 void MidiManager::saveToMidiFile(juce::MidiMessageSequence& recordedMIDI)
 {
-    // Create OscServer subfolder in user's documents directory
-    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OscServer");
+    // Create OSCDawServer subfolder in user's documents directory
+    juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
     if (!dawServerDir.exists())
         dawServerDir.createDirectory();
 
-    // Save MIDI file in OscServer subfolder
+    // Save MIDI file in OSCDawServer subfolder
     juce::File midiFile = dawServerDir.getChildFile("recordedMIDI.mid");
 
     if (recordedMIDI.getNumEvents() == 0)
