@@ -4,7 +4,7 @@ Several DAWs can use the same Server this way.
 
 Copyright (c) 2024 Ruchir Shah
 
-This software is provided for non-commercial use only. Commercial use is strictly prohibited without explicit written permission from the author.
+OSCDawServer is released under the terms of the GNU Affero General Public License v3.0. You are free to use, modify, and redistribute it as long as you comply with the AGPL, including sharing source changes. See [LICENSE](LICENSE) for the full text.
 The VST3 Plugin client is also available at [OSC_Client](https://github.com/ruchirlives/OSC_Client)
 
 ## Installation
