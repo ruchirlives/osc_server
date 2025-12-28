@@ -1,4 +1,4 @@
-# OSC_Server
+# OSCDawServer
 VST3 plugin host which communicates via OSC with a VST3 Plugin client that can be dropped into another DAW.
 Several DAWs can use the same Server this way.
 
