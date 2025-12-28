@@ -1114,7 +1114,9 @@ void MainComponent::comboBoxChanged(juce::ComboBox *comboBoxThatHasChanged)
 					addNewInstrument();
 					auto &instrument = conductor.orchestra.back();
 					instrument.pluginName = desc->name;
+					orchestraTable.updateContent();
 				}
+				orchestraTable.repaint();
 				conductor.syncOrchestraWithPluginManager();
 
 				// Finally, deselect the pluginbox entry
