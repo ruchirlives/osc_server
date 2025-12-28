@@ -322,7 +322,7 @@ private:
 	juce::TextButton openPluginButton{ "Open Plugin" }; // Button to open the plugin window
 
 	// Scan for plugins button
-	juce::TextButton ScanButton{ "Scan" }; // Button to Scan for plugins
+	juce::TextButton ScanButton{ "Scan for plugins" }; // Button to Scan for plugins
 
 	// Save and restore buttons
 	juce::TextButton saveButton{ "Save" }; // Button to save plugin states
