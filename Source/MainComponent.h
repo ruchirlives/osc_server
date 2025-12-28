@@ -327,6 +327,7 @@ private:
 
 	// Scan for plugins button
 	juce::TextButton ScanButton{ "Scan for plugins" }; // Button to Scan for plugins
+	juce::TextButton aboutButton{ "About" }; // Button to show app info
 
 	// Save and restore buttons
 	juce::TextButton saveButton{ "Save" }; // Button to save plugin states
@@ -371,6 +372,7 @@ private:
 	void saveConfig();
 	void showPluginScanModal();
 	void showPluginInstancesModal();
+	void showAboutDialog();
 	void updatePluginInstanceReferences(const juce::String& oldId, const juce::String& newId);
 
     // Helpers for unique tag and instance id generation

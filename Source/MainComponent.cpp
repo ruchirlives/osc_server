@@ -17,6 +17,43 @@ static bool isRunningInDebugger()
 #endif
 }
 
+namespace
+{
+class AboutContentComponent : public juce::Component
+{
+public:
+	AboutContentComponent()
+		: moreLink("More at github.com/ruchirlives", juce::URL("https://github.com/ruchirlives"))
+	{
+		infoLabel.setText(
+			"Created by Ruchir Shah (c) 2024.\n"
+			"Built on JUCE and released as open source AGPL",
+			juce::dontSendNotification);
+		infoLabel.setJustificationType(juce::Justification::centred);
+		infoLabel.setFont(juce::Font(15.0f));
+
+		addAndMakeVisible(infoLabel);
+		addAndMakeVisible(moreLink);
+	}
+
+	void resized() override
+	{
+		auto bounds = getLocalBounds().reduced(16, 12);
+		const int linkHeight = 28;
+
+		auto labelBounds = bounds.removeFromTop(bounds.getHeight() - linkHeight - 6);
+		infoLabel.setBounds(labelBounds);
+
+		bounds.removeFromTop(6);
+		moreLink.setBounds(bounds.removeFromTop(linkHeight));
+	}
+
+private:
+	juce::Label infoLabel;
+	juce::HyperlinkButton moreLink;
+};
+}
+
 MainComponent::MainComponent()
 {
 
@@ -62,6 +99,10 @@ MainComponent::MainComponent()
 	addAndMakeVisible(ScanButton);
 	ScanButton.onClick = [this]()
 	{ showPluginScanModal(); }; // Use lambda for button click handling
+
+	addAndMakeVisible(aboutButton);
+	aboutButton.onClick = [this]()
+	{ showAboutDialog(); };
 
 	// Initialize the "Get Recorded" button
 	addAndMakeVisible(getRecordedButton);
@@ -234,6 +275,7 @@ void MainComponent::resized()
 	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 	openPluginButton.setBounds(pluginBox.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	aboutButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
 
 	// Row 2 - Instrument management and recording
 	const int row2Y = buttonLayout.rowY[2];
@@ -766,6 +808,13 @@ void MainComponent::showPluginInstancesModal()
 	modalContent->setSize(420, 360);
 	options.content.setOwned(modalContent);
 	options.launchAsync();
+}
+
+void MainComponent::showAboutDialog()
+{
+	auto content = std::make_unique<AboutContentComponent>();
+	content->setSize(320, 150);
+	juce::CallOutBox::launchAsynchronously(std::move(content), aboutButton.getScreenBounds(), nullptr);
 }
 
 void MainComponent::updatePluginInstanceReferences(const juce::String& oldId, const juce::String& newId)
