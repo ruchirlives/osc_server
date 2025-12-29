@@ -156,6 +156,10 @@ public:
     void beginExclusiveRender(double sampleRate, int blockSize);
     void endExclusiveRender();
     bool isRenderInProgress() const { return renderInProgress.load(); }
+    bool renderMaster(const juce::File& outFolder,
+        const juce::String& projectName,
+        int blockSize,
+        double tailSeconds = 2.0);
 
     void previewPlay();
     void previewPause();

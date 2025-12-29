@@ -15,6 +15,7 @@
 #include "VST3Visitor.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>
+#include "RenderTimeline.h"
 
 namespace
 {
@@ -62,6 +63,41 @@ void insertSortedMidiMessage(std::deque<MyMidiMessage>& buffer, MyMidiMessage me
         });
 
     buffer.insert(insertPos, std::move(message));
+}
+
+juce::String sanitiseRenderName(juce::String s)
+{
+    s = s.trim();
+    if (s.isEmpty())
+        s = "Render";
+
+    const juce::String badChars = "\\/:?\"<>|*";
+    for (auto c : badChars)
+        s = s.replaceCharacter(c, '_');
+
+    return s.replaceCharacter(' ', '_');
+}
+
+std::unique_ptr<juce::AudioFormatWriter> createMasterWriter(const juce::File& file,
+    double sampleRate,
+    int numChannels)
+{
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::FileOutputStream> stream(file.createOutputStream());
+    if (stream == nullptr || !stream->openedOk())
+        return {};
+
+    auto* raw = wav.createWriterFor(stream.get(),
+        sampleRate,
+        (unsigned int)juce::jmax(1, numChannels),
+        24,
+        {},
+        0);
+    if (raw == nullptr)
+        return {};
+
+    stream.release();
+    return std::unique_ptr<juce::AudioFormatWriter>(raw);
 }
 }
 
@@ -1177,6 +1213,141 @@ void PluginManager::endExclusiveRender()
     }
 
     renderInProgress.store(false);
+}
+
+bool PluginManager::renderMaster(const juce::File& outFolder,
+    const juce::String& projectName,
+    int blockSize,
+    double tailSeconds)
+{
+    juce::File targetFolder = outFolder;
+    if (!targetFolder.exists())
+        targetFolder.createDirectory();
+    if (!targetFolder.isDirectory())
+        return false;
+
+    double sampleRate = currentSampleRate;
+    if (sampleRate <= 0.0)
+    {
+        if (auto* device = deviceManager.getCurrentAudioDevice())
+            sampleRate = device->getCurrentSampleRate();
+    }
+    if (sampleRate <= 0.0)
+        return false;
+
+    if (blockSize <= 0)
+        blockSize = currentBlockSize > 0 ? currentBlockSize : 512;
+
+    auto snapshot = snapshotMasterTaggedMidiBuffer();
+    if (snapshot.empty())
+        return false;
+
+    const double renderZeroMs = static_cast<double>(snapshot.front().timestamp);
+    auto renderEvents = buildRenderTimelineFromSnapshot(snapshot, renderZeroMs, sampleRate);
+    if (renderEvents.empty())
+        return false;
+
+    const auto endSample = computeEndSampleWithTail(renderEvents, sampleRate, tailSeconds);
+    if (endSample <= 0)
+        return false;
+
+    DBG("RenderMaster: events=" << (int)renderEvents.size()
+        << " endSample=" << endSample
+        << " duration=" << (endSample / sampleRate) << "s");
+    const size_t detailCount = juce::jmin<size_t>(renderEvents.size(), 32);
+    for (size_t i = 0; i < detailCount; ++i)
+    {
+        const auto& ev = renderEvents[i];
+        DBG("  [" << (int)i << "] plugin=" << ev.pluginId
+            << " samplePos=" << ev.samplePos
+            << " msg=" << ev.message.getDescription());
+    }
+    if (renderEvents.size() > detailCount)
+        DBG("  ... " << (int)(renderEvents.size() - detailCount) << " additional events");
+
+    const juce::String fileName = sanitiseRenderName(projectName) + "_Master.wav";
+    auto masterFile = targetFolder.getChildFile(fileName);
+    auto writer = createMasterWriter(masterFile, sampleRate, 2);
+    if (!writer)
+        return false;
+
+    beginExclusiveRender(sampleRate, blockSize);
+
+    juce::AudioBuffer<float> mixBuffer(2, blockSize);
+    std::unordered_map<juce::String, juce::MidiBuffer> midiByPlugin;
+    size_t eventIndex = 0;
+    juce::AudioBuffer<float> pluginBuffer;
+
+    auto writeBlock = [&](int numSamples)
+    {
+        std::vector<const float*> channelPointers;
+        channelPointers.reserve(mixBuffer.getNumChannels());
+        for (int ch = 0; ch < mixBuffer.getNumChannels(); ++ch)
+            channelPointers.push_back(mixBuffer.getReadPointer(ch));
+        writer->writeFromFloatArrays(channelPointers.data(), (int)channelPointers.size(), numSamples);
+    };
+
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    for (int64 blockStart = 0; blockStart < endSample; blockStart += blockSize)
+    {
+        const int numSamples = (int)juce::jmin<int64>(blockSize, endSample - blockStart);
+        mixBuffer.setSize(mixBuffer.getNumChannels(), numSamples, false, false, true);
+        mixBuffer.clear();
+        midiByPlugin.clear();
+
+        const int64 blockEnd = blockStart + numSamples;
+        while (eventIndex < renderEvents.size() && renderEvents[eventIndex].samplePos < blockEnd)
+        {
+            const auto& ev = renderEvents[eventIndex];
+            if (ev.samplePos >= blockStart)
+            {
+                const int offset = (int)(ev.samplePos - blockStart);
+                midiByPlugin[ev.pluginId].addEvent(ev.message, offset);
+            }
+            ++eventIndex;
+        }
+
+        for (const auto& [pluginId, pluginInstance] : pluginInstances)
+        {
+            if (pluginInstance == nullptr)
+                continue;
+
+            juce::MidiBuffer midi;
+            if (auto it = midiByPlugin.find(pluginId); it != midiByPlugin.end())
+                midi = std::move(it->second);
+
+            const int pluginChannels = juce::jmax(1, pluginInstance->getTotalNumOutputChannels());
+            pluginBuffer.setSize(pluginChannels, numSamples, false, false, true);
+            pluginBuffer.clear();
+
+            try
+            {
+                pluginInstance->processBlock(pluginBuffer, midi);
+            }
+            catch (const std::exception& e)
+            {
+                DBG("RenderMaster: exception processing " << pluginId << ": " << e.what());
+                pluginBuffer.clear();
+            }
+            catch (...)
+            {
+                DBG("RenderMaster: unknown exception processing " << pluginId);
+                pluginBuffer.clear();
+            }
+
+            for (int ch = 0; ch < mixBuffer.getNumChannels(); ++ch)
+            {
+                const int srcCh = juce::jlimit(0, pluginBuffer.getNumChannels() - 1, ch);
+                mixBuffer.addFrom(ch, 0, pluginBuffer, srcCh, 0, numSamples);
+            }
+        }
+
+        writeBlock(numSamples);
+    }
+
+    writer.reset();
+    endExclusiveRender();
+    return true;
 }
 
 PluginManager::MasterBufferSummary PluginManager::getMasterTaggedMidiSummary() const
