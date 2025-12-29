@@ -14,15 +14,23 @@ class ProjectRestoreModal : public juce::Component
 public:
 	ProjectRestoreModal()
 	{
-		statusLabel.setJustificationType(juce::Justification::centredLeft);
-		statusLabel.setFont(juce::Font(15.0f, juce::Font::bold));
+		setSize(420, 64);
+		statusLabel.setJustificationType(juce::Justification::centred);
+		statusLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 		statusLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 		addAndMakeVisible(statusLabel);
 	}
 
+	void paint(juce::Graphics& g) override
+	{
+		g.fillAll(juce::Colours::darkslategrey.darker(0.15f));
+		g.setColour(juce::Colours::white.withAlpha(0.12f));
+		g.drawRect(getLocalBounds(), 1);
+	}
+
 	void resized() override
 	{
-		statusLabel.setBounds(getLocalBounds().reduced(16));
+		statusLabel.setBounds(getLocalBounds().reduced(12, 8));
 	}
 
 	void setMessage(const juce::String& message)
@@ -31,7 +39,7 @@ public:
 	}
 
 private:
-	juce::Label statusLabel{ "restoreStatus", "Restoring..." };
+	juce::Label statusLabel{ "restoreStatus", "Restoring project..." };
 };
 
 static bool isRunningInDebugger()
@@ -556,7 +564,7 @@ void MainComponent::restoreProject(bool append)
 		return;
 
 	auto* statusComponent = new ProjectRestoreModal();
-	statusComponent->setSize(420, 120);
+	statusComponent->setSize(420, 64);
 	juce::DialogWindow::LaunchOptions opts;
 	opts.content.setOwned(statusComponent);
 	opts.dialogTitle = "Restoring Project";

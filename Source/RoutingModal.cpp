@@ -220,7 +220,6 @@ void RoutingModal::showStemContextMenu(int row, const juce::MouseEvent& event)
     menu.addItem(2, "Remove Stem");
     menu.addSeparator();
     menu.addItem(3, "Add Rule");
-    menu.addItem(4, "Remove Rule");
 
     juce::PopupMenu::Options opts;
     opts.withTargetComponent(&stemsList);
@@ -280,7 +279,10 @@ void RoutingModal::startEditingRule(int row)
     if (!juce::isPositiveAndBelow(row, getNumRows()))
         return;
 
-    const int stemRow = stemsList.getSelectedRow();
+    int stemRow = stemsList.getSelectedRow();
+    if (!juce::isPositiveAndBelow(stemRow, stems.size()))
+        stemRow = selectedStem;
+
     if (!juce::isPositiveAndBelow(stemRow, stems.size()))
         return;
 
