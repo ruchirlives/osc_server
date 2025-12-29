@@ -1,5 +1,6 @@
 #include "RoutingModal.h"
 #include "PreviewModal.h"
+#include <initializer_list>
 
 RoutingModal::RoutingModal(PluginManager& manager)
     : pluginManager(manager), rulesList("rulesList", &rulesModel)
@@ -181,6 +182,19 @@ void RoutingModal::listBoxItemClicked(int row, const juce::MouseEvent& event)
     refreshRules();
 }
 
+void RoutingModal::listBoxItemDoubleClicked(int row, const juce::MouseEvent& /*event*/)
+{
+    if (!juce::isPositiveAndBelow(row, stems.size()))
+        return;
+
+    selectedStem = row;
+    stemsList.selectRow(row);
+    stemNameEditor.setText(stems[(size_t)row].name, juce::dontSendNotification);
+    stemNameEditor.grabKeyboardFocus();
+    stemNameEditor.selectAll();
+    statusLabel.setText("Editing stem name...", juce::dontSendNotification);
+}
+
 void RoutingModal::selectedRowsChanged(int lastRowSelected)
 {
     juce::ignoreUnused(lastRowSelected);
@@ -209,42 +223,47 @@ void RoutingModal::resized()
     rulesLabel.setBounds(listsArea.removeFromTop(22));
     rulesList.setBounds(listsArea.reduced(0, 4));
 
-    bounds.removeFromTop(6);
-    auto stemButtons = bounds.removeFromTop(28);
-    addStemButton.setBounds(stemButtons.removeFromLeft(100));
-    stemButtons.removeFromLeft(8);
-    renameStemButton.setBounds(stemButtons.removeFromLeft(100));
-    stemButtons.removeFromLeft(8);
-    removeStemButton.setBounds(stemButtons.removeFromLeft(110));
+    const int actionRowHeight = 34;
+    const int captureStatusHeight = 24;
+    const int statusHeight = 28;
+    const int buttonSpacing = 8;
 
-    bounds.removeFromTop(6);
-    auto ruleButtons = bounds.removeFromTop(28);
-    addRuleButton.setBounds(ruleButtons.removeFromLeft(100));
-    ruleButtons.removeFromLeft(8);
-    removeRuleButton.setBounds(ruleButtons.removeFromLeft(110));
+    const int buttonBlockHeight = captureStatusHeight + actionRowHeight * 2 + buttonSpacing + statusHeight + 12;
+    auto buttonBlock = bounds.removeFromBottom(buttonBlockHeight);
 
-    bounds.removeFromTop(6);
-    auto captureRow = bounds.removeFromTop(28);
-    recordCaptureButton.setBounds(captureRow.removeFromLeft(80));
-    captureRow.removeFromLeft(6);
-    stopCaptureButton.setBounds(captureRow.removeFromLeft(80));
-    captureRow.removeFromLeft(6);
-    debugCaptureButton.setBounds(captureRow.removeFromLeft(80));
-    captureRow.removeFromLeft(6);
-    previewButton.setBounds(captureRow.removeFromLeft(80));
-    captureRow.removeFromLeft(10);
-    captureStatusLabel.setBounds(captureRow);
+    auto layoutButtonRow = [&](juce::Rectangle<int> row, std::initializer_list<juce::TextButton*> buttons)
+    {
+        const int count = static_cast<int>(buttons.size());
+        if (count == 0)
+            return;
 
-    bounds.removeFromTop(6);
-    auto footer = bounds.removeFromTop(30);
-    saveButton.setBounds(footer.removeFromLeft(100));
-    footer.removeFromLeft(8);
-    saveXmlButton.setBounds(footer.removeFromLeft(100));
-    footer.removeFromLeft(8);
-    loadXmlButton.setBounds(footer.removeFromLeft(100));
-    footer.removeFromLeft(8);
-    closeButton.setBounds(footer.removeFromLeft(100));
-    statusLabel.setBounds(bounds);
+        const int totalSpacing = buttonSpacing * (count - 1);
+        const int buttonWidth = juce::jmax(1, (row.getWidth() - totalSpacing) / count);
+        int index = 0;
+        for (auto it = buttons.begin(); it != buttons.end(); ++it, ++index)
+        {
+            (*it)->setBounds(row.removeFromLeft(buttonWidth));
+            if (index < count - 1)
+                row.removeFromLeft(buttonSpacing);
+        }
+    };
+
+    auto captureStatusArea = buttonBlock.removeFromTop(captureStatusHeight);
+    captureStatusLabel.setBounds(captureStatusArea.reduced(4));
+
+    buttonBlock.removeFromTop(6);
+    auto row1 = buttonBlock.removeFromTop(actionRowHeight);
+    layoutButtonRow(row1, { &addStemButton, &renameStemButton, &removeStemButton,
+                            &addRuleButton, &removeRuleButton, &recordCaptureButton,
+                            &stopCaptureButton, &debugCaptureButton, &previewButton });
+
+    buttonBlock.removeFromTop(buttonSpacing);
+    auto row2 = buttonBlock.removeFromTop(actionRowHeight);
+    layoutButtonRow(row2, { &saveButton, &saveXmlButton, &loadXmlButton, &closeButton });
+
+    buttonBlock.removeFromTop(6);
+    auto statusArea = buttonBlock.removeFromTop(statusHeight);
+    statusLabel.setBounds(statusArea.reduced(4));
 }
 
 void RoutingModal::addStem()

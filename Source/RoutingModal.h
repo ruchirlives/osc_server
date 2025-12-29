@@ -30,6 +30,7 @@ private:
     int getNumRows() override;
     void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) override;
     void listBoxItemClicked(int row, const juce::MouseEvent& event) override;
+    void listBoxItemDoubleClicked(int row, const juce::MouseEvent& event) override;
     void selectedRowsChanged(int lastRowSelected) override;
 
     void addStem();
