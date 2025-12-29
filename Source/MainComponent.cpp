@@ -569,11 +569,16 @@ void MainComponent::restoreProject(bool append)
 	auto safeStatus = juce::Component::SafePointer<ProjectRestoreModal>(statusComponent);
 	auto updateStatus = [safeStatus](const juce::String& message)
 	{
-		juce::MessageManager::callAsync([safeStatus, message]()
+		if (auto* comp = safeStatus.getComponent())
 		{
-			if (auto* comp = safeStatus.getComponent())
+			if (juce::MessageManager::getInstance()->isThisTheMessageThread())
 				comp->setMessage(message);
-		});
+			else
+				juce::MessageManager::callAsync([comp, message]()
+				{
+					comp->setMessage(message);
+				});
+		}
 	};
 
 	auto closeStatus = [safeStatus]()
@@ -608,13 +613,9 @@ void MainComponent::restoreProject(bool append)
 	updateStatus("Selected Project: " + zipFile.getFileName());
 	DBG("Selected Project: " + zipFile.getFullPathName());
 
-	pluginManager.setRestoreStatusCallback([safeStatus](const juce::String& message)
+	pluginManager.setRestoreStatusCallback([updateStatus](const juce::String& message)
 	{
-		juce::MessageManager::callAsync([safeStatus, message]()
-		{
-			if (auto* comp = safeStatus.getComponent())
-				comp->setMessage(message);
-		});
+		updateStatus(message);
 	});
 
 	std::thread([this, zipFile, updateStatus, closeStatus, runOnMessageThreadBlocking, append]()
