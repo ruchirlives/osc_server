@@ -4,21 +4,23 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" defines="JUCE_MODAL_LOOPS_PERMITTED=1"
               bundleIdentifier="com.ruchirlives.OSCDawServer" binaryDataNamespace="BinaryData"
               headerPath="F:\asiosdk_2.3.3_2019-06-14\common" companyCopyright="Ruchir Shah (c) 2024"
-              companyEmail="@ruchirlives" companyWebsite="https://github.com/ruchirlives">
+              companyEmail="@ruchirlives" companyWebsite="https://github.com/ruchirlives"
+              version="1.5.0">
   <MAINGROUP id="pN3WCX" name="OSCDawServer">
     <GROUP id="{AA5004D7-8BC2-FCC1-C271-B3AAE1415B2A}" name="Source">
       <FILE id="WjYzAf" name="AudioRouter.h" compile="0" resource="0" file="Source/AudioRouter.h"/>
       <FILE id="mx45n4" name="AudioRouter.cpp" compile="1" resource="0" file="Source/AudioRouter.cpp"/>
       <FILE id="VeJmQ4" name="RoutingModal.h" compile="0" resource="0" file="Source/RoutingModal.h"/>
-      <FILE id="HUgucD" name="RoutingModal.cpp" compile="1" resource="0" file="Source/RoutingModal.cpp"/>
-      <FILE id="{6D0D3F49-9F4D-12B0-84F4-AB1BF0AC63C5}" name="PreviewModal.h" compile="0" resource="0"
-            file="Source/PreviewModal.h"/>
-      <FILE id="{21C7C6D0-F962-64E1-07DF-15B7B460DDD5}" name="PreviewModal.cpp" compile="1" resource="0"
-            file="Source/PreviewModal.cpp"/>
-      <FILE id="{37B0E2F8-7D83-2D4B-87DE-93B5270B39FE}" name="RenderTimeline.h" compile="0" resource="0"
-            file="Source/RenderTimeline.h"/>
-      <FILE id="{9F14B8D4-5F9D-5248-8D91-AD5C1395170A}" name="RenderTimeline.cpp" compile="1" resource="0"
-            file="Source/RenderTimeline.cpp"/>
+      <FILE id="HUgucD" name="RoutingModal.cpp" compile="1" resource="0"
+            file="Source/RoutingModal.cpp"/>
+      <FILE id="{6D0D3F49-9F4D-12B0-84F4-AB1BF0AC63C5}" name="PreviewModal.h"
+            compile="0" resource="0" file="Source/PreviewModal.h"/>
+      <FILE id="{21C7C6D0-F962-64E1-07DF-15B7B460DDD5}" name="PreviewModal.cpp"
+            compile="1" resource="0" file="Source/PreviewModal.cpp"/>
+      <FILE id="{37B0E2F8-7D83-2D4B-87DE-93B5270B39FE}" name="RenderTimeline.h"
+            compile="0" resource="0" file="Source/RenderTimeline.h"/>
+      <FILE id="{9F14B8D4-5F9D-5248-8D91-AD5C1395170A}" name="RenderTimeline.cpp"
+            compile="1" resource="0" file="Source/RenderTimeline.cpp"/>
       <FILE id="GRNlv0" name="HostPlayHead.h" compile="0" resource="0" file="Source/HostPlayHead.h"/>
       <FILE id="FkV1NB" name="RenamePluginDialog.cpp" compile="1" resource="0"
             file="Source/RenamePluginDialog.cpp"/>
