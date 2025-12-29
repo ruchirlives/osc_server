@@ -254,6 +254,11 @@ void RoutingModal::showRuleContextMenu(int row, const juce::MouseEvent& event)
     if (!juce::isPositiveAndBelow(row, getNumRows()))
         return;
 
+    const int stemRow = stemsList.getSelectedRow();
+    if (!juce::isPositiveAndBelow(stemRow, stems.size()))
+        return;
+    selectedStem = stemRow;
+
     rulesList.selectRow(row);
     juce::PopupMenu menu;
     menu.addItem(1, "Edit Rule");
@@ -275,10 +280,11 @@ void RoutingModal::startEditingRule(int row)
     if (!juce::isPositiveAndBelow(row, getNumRows()))
         return;
 
-    if (!juce::isPositiveAndBelow(selectedStem, stems.size()))
+    const int stemRow = stemsList.getSelectedRow();
+    if (!juce::isPositiveAndBelow(stemRow, stems.size()))
         return;
 
-    selectedStem = stemsList.getSelectedRow();
+    selectedStem = stemRow;
     const auto& rule = stems[(size_t)selectedStem].rules[(size_t)row];
     juce::StringArray tagText;
     for (const auto& tag : rule.tags)

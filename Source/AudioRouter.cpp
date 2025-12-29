@@ -171,7 +171,11 @@ juce::String AudioRouter::chooseStemBusFor(const TagSet& tags) const
             const bool matches = std::all_of(rule.begin(), rule.end(),
                 [&tags](const auto& required)
                 {
-                    return tags.find(required) != tags.end();
+                    return std::any_of(tags.begin(), tags.end(),
+                        [&required](const auto& tag)
+                        {
+                            return tag.find(required) != std::string::npos;
+                        });
                 });
 
             if (matches)
