@@ -1125,7 +1125,10 @@ void PluginManager::enqueueMasterForPreview(double offsetMs, double nowHostMs)
             continue;
 
         MyMidiMessage scheduled = message;
-        scheduled.timestamp = static_cast<juce::int64>(nowHostMs + (static_cast<double>(message.timestamp) - playbackStartTimestamp));
+        auto relativeMs = static_cast<juce::int64>(message.timestamp - playbackStartTimestamp);
+        if (relativeMs < 0)
+            relativeMs = 0;
+        scheduled.timestamp = relativeMs;
         insertSortedMidiMessage(taggedMidiBuffer, std::move(scheduled));
     }
 }
@@ -1159,6 +1162,7 @@ void PluginManager::previewPlay()
 
         previewStartHostMs = nowMs;
         enqueueMasterForPreview(previewOffsetMs, nowMs);
+        playbackSamplePosition = 0;
     }
 }
 
