@@ -429,7 +429,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         }
     }
 
-    //logBusRmsIfNeeded(bufferToFill.numSamples);
+    // logBusRmsIfNeeded(bufferToFill.numSamples);
 
     // clear incoming MIDI and advance the host clock
     incomingMidi.clear();
