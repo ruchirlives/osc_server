@@ -1152,6 +1152,13 @@ double PluginManager::getMasterFirstEventMs() const
     return static_cast<double>(masterTaggedMidiBuffer.front().timestamp);
 }
 
+juce::String PluginManager::getRenderProjectName() const
+{
+    if (mainComponent != nullptr)
+        return mainComponent->getCurrentProjectName();
+    return "Capture";
+}
+
 void PluginManager::prepareAllPlugins(double sampleRate, int blockSize)
 {
     if (sampleRate <= 0.0 || blockSize <= 0)
@@ -1314,6 +1321,8 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
 
     const juce::String fileName = sanitiseRenderName(projectName) + "_Master.wav";
     auto masterFile = targetFolder.getChildFile(fileName);
+    if (masterFile.existsAsFile())
+        masterFile.deleteFile();
     auto writer = createMasterWriter(masterFile, sampleRate, 2);
     if (!writer)
     {

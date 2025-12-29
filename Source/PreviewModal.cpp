@@ -159,19 +159,23 @@ void PreviewModal::handleRenderRequest()
 
     const int blockSize = pluginManager.getCurrentBlockSize();
     constexpr double tailSeconds = 2.0;
-    launchRenderJob(lastRenderFolder, blockSize > 0 ? blockSize : 512, tailSeconds);
+    const juce::String projectName = pluginManager.getRenderProjectName();
+    launchRenderJob(lastRenderFolder, blockSize > 0 ? blockSize : 512, tailSeconds, projectName);
 }
 
-void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds)
+void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds, juce::String projectName)
 {
     if (renderJobRunning.load())
         return;
 
+    PluginManager& pm = pluginManager;
+
     double sampleRate = pm.getCurrentSampleRate();
     if (sampleRate <= 0.0)
     {
-        if (auto* device = pm.getAudioDeviceManager().getCurrentAudioDevice())
-            sampleRate = device->getCurrentSampleRate();
+        if (auto* device = pm.getDeviceManager().getCurrentAudioDevice())
+            if (device != nullptr)
+                sampleRate = device->getCurrentSampleRate();
     }
     if (sampleRate <= 0.0)
     {
@@ -183,13 +187,11 @@ void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, doub
     renderInfoLabel.setText("Render starting...", juce::dontSendNotification);
 
     auto safeThis = juce::Component::SafePointer<PreviewModal>(this);
-    PluginManager& pm = pluginManager;
-    const double sampleRate = pm.getCurrentSampleRate();
     pm.beginExclusiveRender(sampleRate, blockSize);
 
-    std::thread([safeThis, &pm, folder, blockSize, tailSeconds]()
+    std::thread([safeThis, &pm, folder, blockSize, tailSeconds, projectName]()
     {
-        const bool ok = pm.renderMaster(folder, "Capture", blockSize, tailSeconds);
+        const bool ok = pm.renderMaster(folder, projectName, blockSize, tailSeconds);
         pm.endExclusiveRender();
         juce::MessageManager::callAsync([safeThis, ok, folder]()
         {

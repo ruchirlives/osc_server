@@ -41,5 +41,5 @@ private:
     std::atomic<bool> renderJobRunning{ false };
 
     void handleRenderRequest();
-    void launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds);
+    void launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds, juce::String projectName);
 };

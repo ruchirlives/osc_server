@@ -235,6 +235,7 @@ private:
     void enqueueMasterForPreview(const std::vector<MyMidiMessage>& source,
         double offsetMs,
         double baseTimestamp);
+    juce::String getRenderProjectName() const;
     void prepareAllPlugins(double sampleRate, int blockSize);
     void invokeOnMessageThreadBlocking(std::function<void()> fn);
 

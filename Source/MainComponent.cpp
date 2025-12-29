@@ -456,7 +456,13 @@ void MainComponent::moveSelectedRowsToEnd()
 
 void MainComponent::updateProjectNameLabel(juce::String projectName)
 {
-	projectNameLabel.setText("Project Name: " + projectName, juce::dontSendNotification);
+	currentProjectName = projectName.trim();
+	projectNameLabel.setText("Project Name: " + currentProjectName, juce::dontSendNotification);
+}
+
+juce::String MainComponent::getCurrentProjectName() const
+{
+	return currentProjectName.isNotEmpty() ? currentProjectName : "Capture";
 }
 
 void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments)

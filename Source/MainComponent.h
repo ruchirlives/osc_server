@@ -215,6 +215,7 @@ public:
 
 	void moveSelectedRowsToEnd();
 	void updateProjectNameLabel(juce::String projectName);
+	juce::String getCurrentProjectName() const;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -345,6 +346,7 @@ private:
 
 	// Label for the Project Name
 	juce::Label projectNameLabel{ "Project Name", "Project Name" }; // Label for the project name
+	juce::String currentProjectName;
 
 	// Create a label and text editor for audio streaming port
 	juce::Label audioStreamingPortLabel{ "Audio Streaming Port", "Audio Streaming Port" }; // Label for the audio streaming port
