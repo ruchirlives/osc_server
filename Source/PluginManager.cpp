@@ -587,6 +587,14 @@ void PluginManager::setStemConfigs(const std::vector<StemConfig>& configs)
     audioRouter.setStemRules(definitions);
 }
 
+void PluginManager::rebuildRouterTagIndexFromConductor()
+{
+    if (mainComponent == nullptr)
+        return;
+
+    audioRouter.rebuildTagIndex(mainComponent->getConductor().orchestra);
+}
+
 void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)
 {
     juce::Uuid uuid;

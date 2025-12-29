@@ -139,6 +139,7 @@ public:
     void logBusRmsIfNeeded(int numSamples);
     std::vector<StemConfig> getStemConfigs() const;
     void setStemConfigs(const std::vector<StemConfig>& configs);
+    void rebuildRouterTagIndexFromConductor();
 
     // Update getter method to return inherited device manager
     juce::AudioDeviceManager& getDeviceManager() { return deviceManager; }

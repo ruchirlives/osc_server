@@ -233,6 +233,7 @@ void RoutingModal::removeRule()
 void RoutingModal::saveAndApply()
 {
     pluginManager.setStemConfigs(stems);
+    pluginManager.rebuildRouterTagIndexFromConductor();
     stems = pluginManager.getStemConfigs(); // reload after sanitisation
     statusLabel.setText("Routing updated.", juce::dontSendNotification);
     refreshed();
