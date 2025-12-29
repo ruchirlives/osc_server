@@ -119,6 +119,9 @@ PluginManager::~PluginManager()
 void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
     currentSampleRate = sampleRate;
+    currentBlockSize = samplesPerBlockExpected;
+    liveSampleRateBackup = sampleRate;
+    liveBlockSizeBackup = samplesPerBlockExpected;
 
     int outputChannels = 2;
     if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
@@ -146,6 +149,12 @@ void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate
 
 void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
 {
+    if (renderInProgress.load())
+    {
+        bufferToFill.clearActiveBufferRegion();
+        return;
+    }
+
     // 1) Update the shared play-head before any plugin processes
 
     auto& pos = hostPlayHead.positionInfo;
@@ -1091,6 +1100,85 @@ std::vector<MyMidiMessage> PluginManager::snapshotMasterTaggedMidiBuffer()
     return { masterTaggedMidiBuffer.begin(), masterTaggedMidiBuffer.end() };
 }
 
+bool PluginManager::hasMasterTaggedMidiData() const
+{
+    auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+    const juce::ScopedLock sl(lock);
+    return !masterTaggedMidiBuffer.empty();
+}
+
+double PluginManager::getMasterFirstEventMs() const
+{
+    auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+    const juce::ScopedLock sl(lock);
+    if (masterTaggedMidiBuffer.empty())
+        return 0.0;
+    return static_cast<double>(masterTaggedMidiBuffer.front().timestamp);
+}
+
+void PluginManager::prepareAllPlugins(double sampleRate, int blockSize)
+{
+    if (sampleRate <= 0.0 || blockSize <= 0)
+        return;
+
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    for (auto& [pluginId, pluginInstance] : pluginInstances)
+    {
+        juce::ignoreUnused(pluginId);
+        if (pluginInstance != nullptr)
+        {
+            pluginInstance->prepareToPlay(sampleRate, blockSize);
+        }
+    }
+}
+
+void PluginManager::beginExclusiveRender(double sampleRate, int blockSize)
+{
+    jassert(sampleRate > 0.0);
+    jassert(blockSize > 0);
+
+    const bool wasRendering = renderInProgress.exchange(true);
+    if (wasRendering)
+        return;
+
+    liveSampleRateBackup = currentSampleRate;
+    liveBlockSizeBackup = currentBlockSize;
+
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        taggedMidiBuffer.clear();
+        incomingMidi.clear();
+    }
+
+    currentSampleRate = sampleRate;
+    currentBlockSize = blockSize;
+
+    prepareAllPlugins(sampleRate, blockSize);
+}
+
+void PluginManager::endExclusiveRender()
+{
+    if (!renderInProgress.load())
+        return;
+
+    stopAllNotes();
+
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        taggedMidiBuffer.clear();
+        incomingMidi.clear();
+    }
+
+    if (liveSampleRateBackup > 0.0 && liveBlockSizeBackup > 0)
+    {
+        currentSampleRate = liveSampleRateBackup;
+        currentBlockSize = liveBlockSizeBackup;
+        prepareAllPlugins(currentSampleRate, currentBlockSize);
+    }
+
+    renderInProgress.store(false);
+}
+
 PluginManager::MasterBufferSummary PluginManager::getMasterTaggedMidiSummary() const
 {
     auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
@@ -1238,8 +1326,39 @@ bool PluginManager::isPreviewPaused() const
 
 void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce::String& pluginId, juce::int64& adjustedTimestamp)
 {
+    auto enqueueMaster = [this](const juce::MidiMessage& msg, const juce::String& id, juce::int64 timestamp)
+    {
+        if (masterTaggedMidiBuffer.empty())
+            captureStartMs = static_cast<double>(timestamp);
+
+        insertSortedMidiMessage(masterTaggedMidiBuffer, MyMidiMessage(msg, id, timestamp));
+
+        if (masterTaggedMidiBuffer.size() > masterCaptureLimit)
+        {
+            const auto excess = masterTaggedMidiBuffer.size() - masterCaptureLimit;
+            for (std::size_t i = 0; i < excess && !masterTaggedMidiBuffer.empty(); ++i)
+                masterTaggedMidiBuffer.pop_back();
+
+            static juce::uint32 lastCaptureOverflowLog = 0;
+            const auto now = juce::Time::getMillisecondCounter();
+            if (now - lastCaptureOverflowLog > kMidiOverflowLogIntervalMs)
+            {
+                DBG("Warning: master MIDI capture exceeded " << (int)masterCaptureLimit
+                    << " events; trimming " << (int)excess << " events.");
+                lastCaptureOverflowLog = now;
+            }
+        }
+    };
+
+    const bool rendering = renderInProgress.load();
     const juce::ScopedLock sl(midiCriticalSection); // Lock the critical section to ensure thread safety
-    // Maintain chronological order so the audio thread can bail out early once it reaches future events
+
+    if (rendering)
+    {
+        if (captureEnabled)
+            enqueueMaster(message, pluginId, adjustedTimestamp);
+        return;
+    }
 
     insertSortedMidiMessage(taggedMidiBuffer, MyMidiMessage(message, pluginId, adjustedTimestamp));
 
@@ -1260,28 +1379,7 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
     }
 
     if (captureEnabled)
-    {
-        if (masterTaggedMidiBuffer.empty())
-            captureStartMs = static_cast<double>(adjustedTimestamp);
-
-        insertSortedMidiMessage(masterTaggedMidiBuffer, MyMidiMessage(message, pluginId, adjustedTimestamp));
-
-        if (masterTaggedMidiBuffer.size() > masterCaptureLimit)
-        {
-            const auto excess = masterTaggedMidiBuffer.size() - masterCaptureLimit;
-            for (std::size_t i = 0; i < excess && !masterTaggedMidiBuffer.empty(); ++i)
-                masterTaggedMidiBuffer.pop_back();
-
-            static juce::uint32 lastCaptureOverflowLog = 0;
-            const auto now = juce::Time::getMillisecondCounter();
-            if (now - lastCaptureOverflowLog > kMidiOverflowLogIntervalMs)
-            {
-                DBG("Warning: master MIDI capture exceeded " << (int)masterCaptureLimit
-                    << " events; trimming " << (int)excess << " events.");
-                lastCaptureOverflowLog = now;
-            }
-        }
-    }
+        enqueueMaster(message, pluginId, adjustedTimestamp);
 	// DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));
 }
 

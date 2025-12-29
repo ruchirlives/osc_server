@@ -4,6 +4,7 @@
 #include <deque>
 #include <map>
 #include <vector>
+#include <atomic>
 
 #include "MidiManager.h"
 #include "PluginWindow.h"
@@ -140,12 +141,21 @@ public:
     void clearMasterTaggedMidiBuffer();
     void printMasterTaggedMidiBufferSummary();
     void debugPrintMasterTaggedMidiBuffer();
+    bool hasMasterTaggedMidiData() const;
+    double getMasterFirstEventMs() const;
 
     void startCapture(double startMs);
     void stopCapture();
     bool isCaptureEnabled() const;
     std::vector<MyMidiMessage> snapshotMasterTaggedMidiBuffer();
     MasterBufferSummary getMasterTaggedMidiSummary() const;
+
+    double getCurrentSampleRate() const { return currentSampleRate; }
+    int getCurrentBlockSize() const { return currentBlockSize; }
+
+    void beginExclusiveRender(double sampleRate, int blockSize);
+    void endExclusiveRender();
+    bool isRenderInProgress() const { return renderInProgress.load(); }
 
     void previewPlay();
     void previewPause();
@@ -209,10 +219,15 @@ private:
 	juce::int64 playbackSamplePosition = 0;
     double currentBpm = 125.0; // Default BPM
     double currentSampleRate = 44100.0;
+    int currentBlockSize = 0;
     juce::int64  totalSamplesProcessed{ 0 };
     MainComponent* mainComponent;
+    double liveSampleRateBackup = 0.0;
+    int liveBlockSizeBackup = 0;
+    std::atomic<bool> renderInProgress{ false };
 
     void enqueueMasterForPreview(double offsetMs, double nowHostMs);
+    void prepareAllPlugins(double sampleRate, int blockSize);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

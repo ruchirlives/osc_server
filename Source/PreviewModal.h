@@ -26,9 +26,15 @@ private:
     juce::Label ccLabel{ "ccLabel", "CC: 0" };
     juce::Label otherLabel{ "otherLabel", "Other: 0" };
     juce::Label transportLabel{ "transportLabel", "State: Stopped" };
+    juce::Label renderInfoLabel{ "renderInfoLabel", "" };
 
     juce::TextButton playButton{ "Play" };
     juce::TextButton pauseButton{ "Pause" };
     juce::TextButton stopButton{ "Stop" };
     juce::TextButton closeButton{ "Close" };
+    juce::TextButton renderButton{ "Render" };
+
+    juce::File lastRenderFolder;
+
+    void handleRenderRequest();
 };

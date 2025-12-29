@@ -15,6 +15,10 @@
             file="Source/PreviewModal.h"/>
       <FILE id="{21C7C6D0-F962-64E1-07DF-15B7B460DDD5}" name="PreviewModal.cpp" compile="1" resource="0"
             file="Source/PreviewModal.cpp"/>
+      <FILE id="{37B0E2F8-7D83-2D4B-87DE-93B5270B39FE}" name="RenderTimeline.h" compile="0" resource="0"
+            file="Source/RenderTimeline.h"/>
+      <FILE id="{9F14B8D4-5F9D-5248-8D91-AD5C1395170A}" name="RenderTimeline.cpp" compile="1" resource="0"
+            file="Source/RenderTimeline.cpp"/>
       <FILE id="GRNlv0" name="HostPlayHead.h" compile="0" resource="0" file="Source/HostPlayHead.h"/>
       <FILE id="FkV1NB" name="RenamePluginDialog.cpp" compile="1" resource="0"
             file="Source/RenamePluginDialog.cpp"/>
