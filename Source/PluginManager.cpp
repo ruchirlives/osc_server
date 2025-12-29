@@ -12,6 +12,7 @@
 #include "MainComponent.h"
 #include <unordered_map>
 #include <unordered_set>
+#include <string>
 #include "VST3Visitor.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>
@@ -667,6 +668,83 @@ void PluginManager::rebuildRouterTagIndexFromConductor()
         return;
 
     audioRouter.rebuildTagIndex(mainComponent->getConductor().orchestra);
+}
+
+namespace
+{
+std::vector<std::string> normaliseStringList(const std::vector<juce::String>& tags)
+{
+    std::vector<std::string> out;
+    out.reserve(tags.size());
+
+    for (const auto& tag : tags)
+    {
+        auto trimmed = tag.trim();
+        if (trimmed.isEmpty())
+            continue;
+
+        out.push_back(trimmed.toLowerCase().toStdString());
+    }
+
+    return out;
+}
+}
+
+std::vector<std::vector<int>> PluginManager::getStemRuleMatchCounts() const
+{
+    std::vector<std::vector<int>> counts;
+    if (mainComponent == nullptr)
+        return counts;
+
+    const auto& orchestra = mainComponent->getConductor().orchestra;
+    counts.reserve(stemConfigs.size());
+
+    for (const auto& stem : stemConfigs)
+    {
+        std::vector<int> ruleCounts(stem.rules.size(), 0);
+        std::vector<std::vector<std::string>> normalizedRules;
+        normalizedRules.reserve(stem.rules.size());
+
+        for (const auto& rule : stem.rules)
+            normalizedRules.push_back(normaliseStringList(rule.tags));
+
+        if (normalizedRules.empty())
+        {
+            counts.push_back(std::move(ruleCounts));
+            continue;
+        }
+
+        for (const auto& instrument : orchestra)
+        {
+            const auto instrumentTags = normaliseStringList(instrument.tags);
+            if (instrumentTags.empty())
+                continue;
+
+            for (size_t r = 0; r < normalizedRules.size(); ++r)
+            {
+                const auto& required = normalizedRules[r];
+                if (required.empty())
+                    continue;
+
+                const bool matches = std::all_of(required.begin(), required.end(),
+                    [&instrumentTags](const auto& requiredTag)
+                    {
+                        return std::any_of(instrumentTags.begin(), instrumentTags.end(),
+                            [&requiredTag](const auto& tag)
+                            {
+                                return tag.find(requiredTag) != std::string::npos;
+                            });
+                    });
+
+                if (matches)
+                    ++ruleCounts[r];
+            }
+        }
+
+        counts.push_back(std::move(ruleCounts));
+    }
+
+    return counts;
 }
 
 bool PluginManager::saveRoutingConfigToFile(const juce::File& file) const

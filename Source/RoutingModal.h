@@ -48,12 +48,14 @@ private:
     void showStemContextMenu(int row, const juce::MouseEvent& event);
     void showRuleContextMenu(int row, const juce::MouseEvent& event);
     void startEditingRule(int row);
+    void updateRuleMatchCounts();
 
     PluginManager& pluginManager;
     std::vector<PluginManager::StemConfig> stems;
     int selectedStem = -1;
     int editingRuleIndex = -1;
     juce::Colour recordButtonDefaultColour;
+    std::vector<int> currentRuleMatchCounts;
 
     juce::Label titleLabel{ "titleLabel", "Routing Setup" };
     juce::Label stemsLabel{ "stemsLabel", "Stems" };

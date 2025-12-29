@@ -133,9 +133,25 @@ void RoutingModal::refreshed()
 
 void RoutingModal::refreshRules()
 {
+    updateRuleMatchCounts();
+
     rulesList.deselectAllRows();
     rulesList.updateContent();
     rulesList.repaint();
+}
+
+void RoutingModal::updateRuleMatchCounts()
+{
+    currentRuleMatchCounts.clear();
+
+    if (!juce::isPositiveAndBelow(selectedStem, stems.size()))
+        return;
+
+    const auto counts = pluginManager.getStemRuleMatchCounts();
+    if (!juce::isPositiveAndBelow(selectedStem, counts.size()))
+        return;
+
+    currentRuleMatchCounts = counts[(size_t)selectedStem];
 }
 
 int RoutingModal::getNumRows()
@@ -558,7 +574,23 @@ void RoutingModal::RulesListModel::paintListBoxItem(int rowNumber, juce::Graphic
 
     const auto text = rules[(size_t)rowNumber].label.isNotEmpty() ? rules[(size_t)rowNumber].label
         : tagText.joinIntoString(", ");
-    g.drawFittedText(text, 8, 0, width - 16, height, juce::Justification::centredLeft, 1);
+
+    const int countWidth = juce::jmin(width / 3, 96);
+    const int textWidth = juce::jmax(0, width - countWidth - 16);
+    g.drawFittedText(text, 8, 0, textWidth, height, juce::Justification::centredLeft, 1);
+
+    int matchCount = 0;
+    if (juce::isPositiveAndBelow(rowNumber, owner.currentRuleMatchCounts.size()))
+        matchCount = owner.currentRuleMatchCounts[rowNumber];
+
+    juce::String countText = juce::String(matchCount);
+    if (matchCount == 1)
+        countText << " match";
+    else
+        countText << " matches";
+
+    g.setColour(juce::Colours::lightgreen.withAlpha(0.9f));
+    g.drawFittedText(countText, width - countWidth - 8, 0, countWidth, height, juce::Justification::centredRight, 1);
 }
 
 void RoutingModal::RulesListModel::listBoxItemClicked(int row, const juce::MouseEvent& event)
