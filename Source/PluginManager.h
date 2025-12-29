@@ -185,7 +185,7 @@ private:
     std::deque<MyMidiMessage> taggedMidiBuffer;
     std::deque<MyMidiMessage> masterTaggedMidiBuffer;
     bool captureEnabled = false;
-    double captureStartMs = 0.0;
+    double captureStartMs = -1.0;
     static constexpr std::size_t masterCaptureLimit = 500000;
     bool previewActive = false;
     bool previewPaused = false;

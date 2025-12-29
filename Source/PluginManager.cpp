@@ -243,6 +243,11 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                         scheduledPluginMessages[taggedMessage.pluginId].addEvent(
                             taggedMessage.message,
                             juce::jlimit(0, bufferToFill.numSamples - 1, offset));
+                        DBG("Scheduling preview event plugin=" << taggedMessage.pluginId
+                            << " offset=" << offset
+                            << " blockSamples=" << bufferToFill.numSamples
+                            << " playbackPos=" << playbackSamplePosition
+                            << " msg=" << taggedMessage.message.getDescription());
                         consumeMessage = true;
                     }
                     else if (offset < 0)
@@ -251,6 +256,9 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                         scheduledPluginMessages[taggedMessage.pluginId].addEvent(
                             taggedMessage.message,
                             0);
+                        DBG("Scheduling late preview event plugin=" << taggedMessage.pluginId
+                            << " offset=" << offset
+                            << " msg=" << taggedMessage.message.getDescription());
                         consumeMessage = true;
                     }
                     else if (offset >= bufferToFill.numSamples)
@@ -1054,10 +1062,14 @@ void PluginManager::debugPrintMasterTaggedMidiBuffer()
 
 void PluginManager::startCapture(double startMs)
 {
+    juce::ignoreUnused(startMs);
     const juce::ScopedLock sl(midiCriticalSection);
     masterTaggedMidiBuffer.clear();
-    captureStartMs = startMs;
+    captureStartMs = -1.0;
     captureEnabled = true;
+    previewActive = false;
+    previewPaused = false;
+    previewOffsetMs = 0.0;
 }
 
 void PluginManager::stopCapture()
@@ -1116,8 +1128,13 @@ PluginManager::MasterBufferSummary PluginManager::getMasterTaggedMidiSummary() c
 
 void PluginManager::enqueueMasterForPreview(double offsetMs, double nowHostMs)
 {
-    const double playbackStartTimestamp = captureStartMs + offsetMs;
+    double baseTimestamp = captureStartMs;
+    if (baseTimestamp < 0.0 && !masterTaggedMidiBuffer.empty())
+        baseTimestamp = static_cast<double>(masterTaggedMidiBuffer.front().timestamp);
+    const double playbackStartTimestamp = baseTimestamp + offsetMs;
     taggedMidiBuffer.clear();
+    DBG("enqueueMasterForPreview: offsetMs=" << offsetMs << " captureStartMs=" << captureStartMs
+        << " playbackStart=" << playbackStartTimestamp << " events=" << (int)masterTaggedMidiBuffer.size());
 
     for (const auto& message : masterTaggedMidiBuffer)
     {
@@ -1129,8 +1146,13 @@ void PluginManager::enqueueMasterForPreview(double offsetMs, double nowHostMs)
         if (relativeMs < 0)
             relativeMs = 0;
         scheduled.timestamp = relativeMs;
+        DBG(" preview enqueue plugin=" << scheduled.pluginId
+            << " relativeMs=" << relativeMs
+            << " originalTs=" << message.timestamp
+            << " msg=" << scheduled.message.getDescription());
         insertSortedMidiMessage(taggedMidiBuffer, std::move(scheduled));
     }
+    DBG(" enqueue complete: taggedMidiBuffer size=" << (int)taggedMidiBuffer.size());
 }
 
 void PluginManager::previewPlay()
@@ -1239,6 +1261,9 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
 
     if (captureEnabled)
     {
+        if (masterTaggedMidiBuffer.empty())
+            captureStartMs = static_cast<double>(adjustedTimestamp);
+
         insertSortedMidiMessage(masterTaggedMidiBuffer, MyMidiMessage(message, pluginId, adjustedTimestamp));
 
         if (masterTaggedMidiBuffer.size() > masterCaptureLimit)
