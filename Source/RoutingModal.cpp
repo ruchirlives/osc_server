@@ -44,6 +44,22 @@ RoutingModal::RoutingModal(PluginManager& manager)
         else
             setVisible(false);
     };
+    recordCaptureButton.onClick = [this]()
+    {
+        pluginManager.startCapture(juce::Time::getMillisecondCounterHiRes());
+        statusLabel.setText("Capture recording started.", juce::dontSendNotification);
+        updateCaptureControls();
+    };
+    stopCaptureButton.onClick = [this]()
+    {
+        pluginManager.stopCapture();
+        statusLabel.setText("Capture recording stopped.", juce::dontSendNotification);
+        updateCaptureControls();
+    };
+    debugCaptureButton.onClick = [this]()
+    {
+        pluginManager.printMasterTaggedMidiBufferSummary();
+    };
 
     addAndMakeVisible(addStemButton);
     addAndMakeVisible(removeStemButton);
@@ -55,9 +71,19 @@ RoutingModal::RoutingModal(PluginManager& manager)
     addAndMakeVisible(loadXmlButton);
     addAndMakeVisible(closeButton);
     addAndMakeVisible(statusLabel);
+    addAndMakeVisible(recordCaptureButton);
+    addAndMakeVisible(stopCaptureButton);
+    addAndMakeVisible(debugCaptureButton);
+    addAndMakeVisible(captureStatusLabel);
 
     stems = pluginManager.getStemConfigs();
     refreshed();
+    updateCaptureControls();
+}
+
+RoutingModal::~RoutingModal()
+{
+    pluginManager.stopCapture();
 }
 
 void RoutingModal::refreshed()
@@ -157,6 +183,16 @@ void RoutingModal::resized()
     removeRuleButton.setBounds(ruleButtons.removeFromLeft(110));
 
     bounds.removeFromTop(6);
+    auto captureRow = bounds.removeFromTop(28);
+    recordCaptureButton.setBounds(captureRow.removeFromLeft(80));
+    captureRow.removeFromLeft(6);
+    stopCaptureButton.setBounds(captureRow.removeFromLeft(80));
+    captureRow.removeFromLeft(6);
+    debugCaptureButton.setBounds(captureRow.removeFromLeft(80));
+    captureRow.removeFromLeft(10);
+    captureStatusLabel.setBounds(captureRow);
+
+    bounds.removeFromTop(6);
     auto footer = bounds.removeFromTop(30);
     saveButton.setBounds(footer.removeFromLeft(100));
     footer.removeFromLeft(8);
@@ -245,6 +281,15 @@ void RoutingModal::saveAndApply()
     stems = pluginManager.getStemConfigs(); // reload after sanitisation
     statusLabel.setText("Routing updated.", juce::dontSendNotification);
     refreshed();
+}
+
+void RoutingModal::updateCaptureControls()
+{
+    const bool recording = pluginManager.isCaptureEnabled();
+    recordCaptureButton.setEnabled(!recording);
+    stopCaptureButton.setEnabled(recording);
+    captureStatusLabel.setText(recording ? "Recording: ON" : "Recording: OFF",
+        juce::dontSendNotification);
 }
 
 void RoutingModal::saveRoutingToFile()

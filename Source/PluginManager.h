@@ -127,6 +127,13 @@ public:
 
     void clearTaggedMidiBuffer();
     void printTaggedMidiBuffer();
+    void clearMasterTaggedMidiBuffer();
+    void printMasterTaggedMidiBufferSummary();
+
+    void startCapture(double startMs);
+    void stopCapture();
+    bool isCaptureEnabled() const;
+    std::vector<MyMidiMessage> snapshotMasterTaggedMidiBuffer();
 
     juce::MemoryBlock getPluginState(const juce::String& pluginId);
     void restorePluginState(const juce::String& pluginId, const juce::MemoryBlock& state);
@@ -158,6 +165,11 @@ private:
 
     // Chronologically sorted MIDI queue
     std::deque<MyMidiMessage> taggedMidiBuffer;
+    std::deque<MyMidiMessage> masterTaggedMidiBuffer;
+    bool captureEnabled = false;
+    double captureStartMs = 0.0;
+    static constexpr std::size_t masterCaptureLimit = 500000;
+
     std::map<juce::String, std::map<int, std::vector<juce::String>>> channelTagsMap;
 
     // juce::AudioDeviceManager deviceManager;  // Remove this line

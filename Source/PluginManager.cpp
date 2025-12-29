@@ -43,6 +43,25 @@ std::vector<juce::String> sanitiseTags(const std::vector<juce::String>& tags)
 
     return cleaned;
 }
+
+void insertSortedMidiMessage(std::deque<MyMidiMessage>& buffer, MyMidiMessage message)
+{
+    if (buffer.empty() || message.timestamp >= buffer.back().timestamp)
+    {
+        buffer.push_back(std::move(message));
+        return;
+    }
+
+    auto insertPos = std::upper_bound(buffer.begin(),
+        buffer.end(),
+        message.timestamp,
+        [](juce::int64 stamp, const MyMidiMessage& msg)
+        {
+            return stamp < msg.timestamp;
+        });
+
+    buffer.insert(insertPos, std::move(message));
+}
 }
 
 HostPlayHead hostPlayHead;
@@ -982,6 +1001,12 @@ void PluginManager::clearTaggedMidiBuffer()
     taggedMidiBuffer.clear();
 }
 
+void PluginManager::clearMasterTaggedMidiBuffer()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    masterTaggedMidiBuffer.clear();
+}
+
 void PluginManager::printTaggedMidiBuffer()
 {
 	const juce::ScopedLock sl(midiCriticalSection);
@@ -994,28 +1019,56 @@ void PluginManager::printTaggedMidiBuffer()
 	}
 }
 
+void PluginManager::printMasterTaggedMidiBufferSummary()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    if (masterTaggedMidiBuffer.empty())
+    {
+        DBG("Master MIDI capture buffer empty. Recording "
+            << (captureEnabled ? "ON" : "OFF"));
+        return;
+    }
+
+    const auto first = masterTaggedMidiBuffer.front().timestamp;
+    const auto last = masterTaggedMidiBuffer.back().timestamp;
+    DBG("Master MIDI capture size: " << (int)masterTaggedMidiBuffer.size()
+        << ", first ts: " << first << "ms, last ts: " << last << "ms, Recording "
+        << (captureEnabled ? "ON" : "OFF"));
+}
+
+void PluginManager::startCapture(double startMs)
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    masterTaggedMidiBuffer.clear();
+    captureStartMs = startMs;
+    captureEnabled = true;
+}
+
+void PluginManager::stopCapture()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    captureEnabled = false;
+}
+
+bool PluginManager::isCaptureEnabled() const
+{
+    auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+    const juce::ScopedLock sl(lock);
+    return captureEnabled;
+}
+
+std::vector<MyMidiMessage> PluginManager::snapshotMasterTaggedMidiBuffer()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    return { masterTaggedMidiBuffer.begin(), masterTaggedMidiBuffer.end() };
+}
+
 void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce::String& pluginId, juce::int64& adjustedTimestamp)
 {
     const juce::ScopedLock sl(midiCriticalSection); // Lock the critical section to ensure thread safety
     // Maintain chronological order so the audio thread can bail out early once it reaches future events
 
-    if (taggedMidiBuffer.empty() || adjustedTimestamp >= taggedMidiBuffer.back().timestamp)
-    {
-        taggedMidiBuffer.emplace_back(message, pluginId, adjustedTimestamp);
-    }
-    else
-    {
-        auto insertPos = std::upper_bound(
-            taggedMidiBuffer.begin(),
-            taggedMidiBuffer.end(),
-            adjustedTimestamp,
-            [](juce::int64 stamp, const MyMidiMessage& msg)
-            {
-                return stamp < msg.timestamp;
-            });
-
-        taggedMidiBuffer.insert(insertPos, MyMidiMessage(message, pluginId, adjustedTimestamp));
-    }
+    insertSortedMidiMessage(taggedMidiBuffer, MyMidiMessage(message, pluginId, adjustedTimestamp));
 
     if (taggedMidiBuffer.size() > kMaxTaggedMidiEvents)
     {
@@ -1030,6 +1083,27 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
             DBG("Warning: MIDI queue exceeded " << (int)kMaxTaggedMidiEvents
                 << " events; dropping " << (int)overflow << " far-future events.");
             lastOverflowLog = now;
+        }
+    }
+
+    if (captureEnabled)
+    {
+        insertSortedMidiMessage(masterTaggedMidiBuffer, MyMidiMessage(message, pluginId, adjustedTimestamp));
+
+        if (masterTaggedMidiBuffer.size() > masterCaptureLimit)
+        {
+            const auto excess = masterTaggedMidiBuffer.size() - masterCaptureLimit;
+            for (std::size_t i = 0; i < excess && !masterTaggedMidiBuffer.empty(); ++i)
+                masterTaggedMidiBuffer.pop_back();
+
+            static juce::uint32 lastCaptureOverflowLog = 0;
+            const auto now = juce::Time::getMillisecondCounter();
+            if (now - lastCaptureOverflowLog > kMidiOverflowLogIntervalMs)
+            {
+                DBG("Warning: master MIDI capture exceeded " << (int)masterCaptureLimit
+                    << " events; trimming " << (int)excess << " events.");
+                lastCaptureOverflowLog = now;
+            }
         }
     }
 	// DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));

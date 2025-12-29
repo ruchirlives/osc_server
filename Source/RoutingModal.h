@@ -8,6 +8,7 @@ class RoutingModal : public juce::Component,
 {
 public:
     explicit RoutingModal(PluginManager& manager);
+    ~RoutingModal() override;
 
 private:
     class RulesListModel : public juce::ListBoxModel
@@ -39,6 +40,7 @@ private:
     void saveAndApply();
     void saveRoutingToFile();
     void loadRoutingFromFile();
+    void updateCaptureControls();
 
     std::vector<juce::String> parseTags(const juce::String& text) const;
     int getSelectedRule() const;
@@ -68,4 +70,8 @@ private:
     juce::TextButton saveXmlButton{ "Save XML" };
     juce::TextButton loadXmlButton{ "Load XML" };
     juce::TextButton closeButton{ "Close" };
+    juce::TextButton recordCaptureButton{ "Record" };
+    juce::TextButton stopCaptureButton{ "Stop" };
+    juce::TextButton debugCaptureButton{ "Debug" };
+    juce::Label captureStatusLabel{ "captureStatusLabel", "Recording: OFF" };
 };
