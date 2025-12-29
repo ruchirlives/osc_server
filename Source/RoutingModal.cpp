@@ -72,7 +72,7 @@ RoutingModal::RoutingModal(PluginManager& manager)
         }
 
         auto* content = new PreviewModal(pluginManager);
-        content->setSize(500, 260);
+        content->setSize(500, 500);
         juce::DialogWindow::LaunchOptions options;
         options.dialogTitle = "Capture Preview";
         options.content.setOwned(content);

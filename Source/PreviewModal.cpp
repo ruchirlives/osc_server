@@ -4,7 +4,7 @@
 PreviewModal::PreviewModal(PluginManager& manager)
     : pluginManager(manager)
 {
-    setSize(560, 420);
+    setSize(500, 500);
     titleLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(titleLabel);
 
@@ -73,38 +73,54 @@ void PreviewModal::resized()
     auto bounds = getLocalBounds().reduced(16);
     titleLabel.setBounds(bounds.removeFromTop(34));
 
-    const int lineHeight = 26;
-    totalEventsLabel.setBounds(bounds.removeFromTop(lineHeight));
-    uniquePluginsLabel.setBounds(bounds.removeFromTop(lineHeight));
-    durationLabel.setBounds(bounds.removeFromTop(lineHeight));
-    noteOnLabel.setBounds(bounds.removeFromTop(lineHeight));
-    noteOffLabel.setBounds(bounds.removeFromTop(lineHeight));
-    ccLabel.setBounds(bounds.removeFromTop(lineHeight));
-    otherLabel.setBounds(bounds.removeFromTop(lineHeight));
-    transportLabel.setBounds(bounds.removeFromTop(lineHeight));
+    const double infoRowHeight = 26.0;
+    const int infoRows = 8;
+    auto infoArea = bounds.removeFromTop(static_cast<int>(infoRowHeight * infoRows + 12));
 
-    bounds.removeFromTop(12);
-    auto buttonRowOne = bounds.removeFromTop(40);
-    const int wideButton = 110;
-    playButton.setBounds(buttonRowOne.removeFromLeft(wideButton));
-    buttonRowOne.removeFromLeft(8);
-    pauseButton.setBounds(buttonRowOne.removeFromLeft(wideButton));
-    buttonRowOne.removeFromLeft(8);
-    stopButton.setBounds(buttonRowOne.removeFromLeft(wideButton));
+    juce::Grid infoGrid;
+    infoGrid.templateColumns = { juce::Grid::TrackInfo(juce::Grid::Fr(1)) };
+    infoGrid.templateRows = {};
+    infoGrid.rowGap = juce::Grid::Px(4);
+    infoGrid.columnGap = juce::Grid::Px(0);
+    infoGrid.autoRows = { juce::Grid::TrackInfo(juce::Grid::Px(static_cast<float>(infoRowHeight))) };
+    infoGrid.items = {
+        juce::GridItem(totalEventsLabel),
+        juce::GridItem(uniquePluginsLabel),
+        juce::GridItem(durationLabel),
+        juce::GridItem(noteOnLabel),
+        juce::GridItem(noteOffLabel),
+        juce::GridItem(ccLabel),
+        juce::GridItem(otherLabel),
+        juce::GridItem(transportLabel)
+    };
+    infoGrid.performLayout(infoArea);
 
-    bounds.removeFromTop(10);
-    auto buttonRowTwo = bounds.removeFromTop(40);
-    const int secondaryButton = 140;
-    renderButton.setBounds(buttonRowTwo.removeFromLeft(secondaryButton));
-    buttonRowTwo.removeFromLeft(8);
-    openFolderButton.setBounds(buttonRowTwo.removeFromLeft(secondaryButton));
+    bounds.removeFromTop(24);
+    auto buttonArea = bounds.removeFromTop(110);
+    juce::Grid buttonGrid;
+    buttonGrid.templateColumns = {
+        juce::Grid::TrackInfo(juce::Grid::Fr(1)),
+        juce::Grid::TrackInfo(juce::Grid::Fr(1)),
+        juce::Grid::TrackInfo(juce::Grid::Fr(1))
+    };
+    buttonGrid.templateRows = {
+        juce::Grid::TrackInfo(juce::Grid::Px(40)),
+        juce::Grid::TrackInfo(juce::Grid::Px(40))
+    };
+    buttonGrid.rowGap = juce::Grid::Px(8.0f);
+    buttonGrid.columnGap = juce::Grid::Px(8.0f);
+    buttonGrid.items = {
+        juce::GridItem(playButton),
+        juce::GridItem(pauseButton),
+        juce::GridItem(stopButton),
+        juce::GridItem(renderButton),
+        juce::GridItem(openFolderButton),
+        juce::GridItem(closeButton)
+    };
+    buttonGrid.performLayout(buttonArea);
 
-    bounds.removeFromTop(12);
-    auto closeRow = bounds.removeFromTop(36);
-    closeButton.setBounds(closeRow.withSizeKeepingCentre(140, 32));
-
-    bounds.removeFromTop(12);
-    renderInfoLabel.setBounds(bounds.removeFromTop(50));
+    bounds.removeFromTop(24);
+    renderInfoLabel.setBounds(bounds);
 }
 
 void PreviewModal::timerCallback()

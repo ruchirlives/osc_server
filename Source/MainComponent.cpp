@@ -305,7 +305,7 @@ void MainComponent::resized()
 		nextX += width + spacingX;
 	};
 
-	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText()) + 24);
+	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText())+200);
 	const int audioPortLabelWidth = 150;
 	const int audioPortFieldWidth = 100;
 	const int bpmLabelWidth = 38;
