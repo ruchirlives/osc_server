@@ -586,7 +586,7 @@ void MidiManager::exportRecordBufferToMidiFile()
                 bufferCopy = recordBuffer;
         }
 
-        juce::FileChooser fileChooser("Export MIDI File", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.mid");
+        juce::FileChooser fileChooser("Export dub File", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.mid");
         if (!fileChooser.browseForFileToSave(true))
                 return;
 
@@ -627,7 +627,7 @@ void MidiManager::exportRecordBufferToMidiFile()
 
 void MidiManager::importMidiFileToRecordBuffer()
 {
-        juce::FileChooser fileChooser("Import MIDI File", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.mid");
+        juce::FileChooser fileChooser("Import dub File", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.mid");
         if (!fileChooser.browseForFileToOpen())
                 return;
 

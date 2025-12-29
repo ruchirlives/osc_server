@@ -357,8 +357,8 @@ private:
 	juce::TextButton triggerOverdubButton{ "Trig" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
     juce::TextButton undoOverdubButton { "Undo Overdub" };
-    juce::TextButton importMidiButton { "Import MIDI" };
-	juce::TextButton exportMidiButton { "Export MIDI" };
+    juce::TextButton importMidiButton { "Import dub" };
+	juce::TextButton exportMidiButton { "Export dub" };
 
 	juce::TooltipWindow tooltipWindow;
 
