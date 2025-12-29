@@ -144,19 +144,37 @@ void RoutingModal::paintListBoxItem(int rowNumber, juce::Graphics& g, int width,
 
     const auto backgroundColour = rowIsSelected ? juce::Colours::darkcyan.withAlpha(0.3f)
         : findColour(juce::ListBox::backgroundColourId);
+    const int toggleSize = 16;
+    const int toggleX = 8;
+    const int toggleY = (height - toggleSize) / 2;
 
     g.setColour(backgroundColour);
-    g.fillRoundedRectangle(2.0f, 2.0f, (float)width - 4.0f, (float)height - 4.0f, 4.0f);
+    g.fillRoundedRectangle(toggleX + toggleSize + 4.0f, 2.0f, (float)width - toggleX - toggleSize - 6.0f, (float)height - 4.0f, 4.0f);
 
     g.setColour(juce::Colours::white);
     g.setFont(14.0f);
-    g.drawFittedText(stems[(size_t)rowNumber].name, 8, 0, width - 16, height, juce::Justification::centredLeft, 1);
+
+    g.setColour(stems[(size_t)rowNumber].renderEnabled ? juce::Colours::green : juce::Colours::darkgrey);
+    g.fillRect(toggleX, toggleY, toggleSize, toggleSize);
+    g.setColour(juce::Colours::black);
+    g.drawRect(toggleX, toggleY, toggleSize, toggleSize, 1);
+
+    g.setColour(juce::Colours::white);
+    g.drawFittedText(stems[(size_t)rowNumber].name, toggleX + toggleSize + 12, 0, width - toggleX - toggleSize - 16, height, juce::Justification::centredLeft, 1);
 }
 
 void RoutingModal::listBoxItemClicked(int row, const juce::MouseEvent& event)
 {
     if (!juce::isPositiveAndBelow(row, stems.size()))
         return;
+
+    const int toggleAreaWidth = 24;
+    if (event.x < toggleAreaWidth)
+    {
+        stems[(size_t)row].renderEnabled = !stems[(size_t)row].renderEnabled;
+        stemsList.updateContent();
+        return;
+    }
 
     stemsList.selectRow(row);
     selectedStem = row;

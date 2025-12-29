@@ -620,6 +620,7 @@ void PluginManager::setStemConfigs(const std::vector<StemConfig>& configs)
 
         StemConfig dest;
         dest.name = stemName;
+        dest.renderEnabled = cfg.renderEnabled;
 
         for (const auto& rule : cfg.rules)
         {
@@ -681,6 +682,7 @@ bool PluginManager::saveRoutingConfigToFile(const juce::File& file) const
     {
         auto* stemElement = root.createNewChildElement("Stem");
         stemElement->setAttribute("name", stem.name);
+        stemElement->setAttribute("render", stem.renderEnabled ? 1 : 0);
 
         for (const auto& rule : stem.rules)
         {
@@ -722,6 +724,7 @@ bool PluginManager::loadRoutingConfigFromFile(const juce::File& file)
 
         StemConfig stem;
         stem.name = stemName;
+        stem.renderEnabled = stemElement->getBoolAttribute("render", true);
 
         for (auto* ruleElement = stemElement->getFirstChildElement(); ruleElement != nullptr; ruleElement = ruleElement->getNextElement())
         {

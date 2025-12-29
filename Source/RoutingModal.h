@@ -41,7 +41,6 @@ private:
     void saveRoutingToFile();
     void loadRoutingFromFile();
     void updateCaptureControls();
-
     std::vector<juce::String> parseTags(const juce::String& text) const;
     int getSelectedRule() const;
 

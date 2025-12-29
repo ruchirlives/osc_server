@@ -61,6 +61,7 @@ public:
     {
         juce::String name;
         std::vector<StemRule> rules;
+        bool renderEnabled = true;
     };
     struct MasterBufferSummary
     {
