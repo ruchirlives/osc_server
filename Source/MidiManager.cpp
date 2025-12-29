@@ -44,12 +44,12 @@ void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce:
 
 		// Use high-resolution ticks for accurate MIDI event timing
 		juce::int64 currentTimeTicks = juce::Time::getHighResolutionTicks()-recordStartTime;
-		DBG("Current Time Ticks: " + juce::String(currentTimeTicks));
+		//DBG("Current Time Ticks: " + juce::String(currentTimeTicks));
 
 		// Get the current midi channel from selected row in the table from MainComponent
 		int midiChannel = mainComponent->getOrchestraTableModel().getSelectedMidiChannel(); // Get the selected MIDI channel from the table
 
-		DBG("MIDI Channel: " + juce::String(midiChannel));
+		//DBG("MIDI Channel: " + juce::String(midiChannel));
 
 		// Create a new MIDI message with the selected MIDI channel
 		juce::MidiMessage messageWithChannel = message;
