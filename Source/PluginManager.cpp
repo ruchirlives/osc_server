@@ -1206,10 +1206,17 @@ void PluginManager::beginExclusiveRender(double sampleRate, int blockSize)
     currentSampleRate = sampleRate;
     currentBlockSize = blockSize;
 
-    invokeOnMessageThreadBlocking([this, sampleRate, blockSize]()
-        {
-            prepareAllPlugins(sampleRate, blockSize);
-        });
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+    {
+        prepareAllPlugins(sampleRate, blockSize);
+    }
+    else
+    {
+        invokeOnMessageThreadBlocking([this, sampleRate, blockSize]()
+            {
+                prepareAllPlugins(sampleRate, blockSize);
+            });
+    }
     renderProgress.store(0.0f);
 }
 
@@ -1314,8 +1321,6 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
         return false;
     }
 
-    beginExclusiveRender(sampleRate, blockSize);
-
     juce::AudioBuffer<float> mixBuffer(2, blockSize);
     std::unordered_map<juce::String, juce::MidiBuffer> midiByPlugin;
     size_t eventIndex = 0;
@@ -1391,7 +1396,6 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
 
     writer.reset();
     renderProgress.store(1.0f);
-    endExclusiveRender();
     return true;
 }
 

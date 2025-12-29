@@ -167,15 +167,30 @@ void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, doub
     if (renderJobRunning.load())
         return;
 
+    double sampleRate = pm.getCurrentSampleRate();
+    if (sampleRate <= 0.0)
+    {
+        if (auto* device = pm.getAudioDeviceManager().getCurrentAudioDevice())
+            sampleRate = device->getCurrentSampleRate();
+    }
+    if (sampleRate <= 0.0)
+    {
+        renderInfoLabel.setText("Render failed: invalid sample rate.", juce::dontSendNotification);
+        return;
+    }
+
     renderJobRunning.store(true);
     renderInfoLabel.setText("Render starting...", juce::dontSendNotification);
 
     auto safeThis = juce::Component::SafePointer<PreviewModal>(this);
     PluginManager& pm = pluginManager;
+    const double sampleRate = pm.getCurrentSampleRate();
+    pm.beginExclusiveRender(sampleRate, blockSize);
 
     std::thread([safeThis, &pm, folder, blockSize, tailSeconds]()
     {
         const bool ok = pm.renderMaster(folder, "Capture", blockSize, tailSeconds);
+        pm.endExclusiveRender();
         juce::MessageManager::callAsync([safeThis, ok, folder]()
         {
             if (auto* self = safeThis.getComponent())
@@ -193,3 +208,5 @@ void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, doub
         });
     }).detach();
 }
+
+PreviewModal::~PreviewModal() = default;
