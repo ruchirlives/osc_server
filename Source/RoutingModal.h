@@ -19,6 +19,7 @@ private:
         int getNumRows() override;
         void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) override;
         void listBoxItemClicked(int row, const juce::MouseEvent& event) override;
+        void listBoxItemDoubleClicked(int row, const juce::MouseEvent& event) override;
 
     private:
         RoutingModal& owner;
@@ -44,10 +45,14 @@ private:
     void updateCaptureControls();
     std::vector<juce::String> parseTags(const juce::String& text) const;
     int getSelectedRule() const;
+    void showStemContextMenu(int row, const juce::MouseEvent& event);
+    void showRuleContextMenu(int row, const juce::MouseEvent& event);
+    void startEditingRule(int row);
 
     PluginManager& pluginManager;
     std::vector<PluginManager::StemConfig> stems;
     int selectedStem = -1;
+    int editingRuleIndex = -1;
     juce::Colour recordButtonDefaultColour;
 
     juce::Label titleLabel{ "titleLabel", "Routing Setup" };
@@ -63,10 +68,6 @@ private:
     juce::TextEditor ruleEditor;
 
     juce::TextButton addStemButton{ "Add Stem" };
-    juce::TextButton removeStemButton{ "Remove Stem" };
-    juce::TextButton renameStemButton{ "Rename Stem" };
-    juce::TextButton addRuleButton{ "Add Rule" };
-    juce::TextButton removeRuleButton{ "Remove Rule" };
     juce::TextButton saveButton{ "Save" };
     juce::TextButton saveXmlButton{ "Save XML" };
     juce::TextButton loadXmlButton{ "Load XML" };

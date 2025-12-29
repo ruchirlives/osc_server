@@ -31,11 +31,20 @@ RoutingModal::RoutingModal(PluginManager& manager)
     ruleEditor.setText("strings, long", juce::dontSendNotification);
     addAndMakeVisible(ruleEditor);
 
+    stemNameEditor.onReturnKey = [this]() { renameStem(); };
+    stemNameEditor.onEscapeKey = [this]()
+    {
+        if (juce::isPositiveAndBelow(selectedStem, (int)stems.size()))
+            stemNameEditor.setText(stems[(size_t)selectedStem].name, juce::dontSendNotification);
+    };
+    ruleEditor.onReturnKey = [this]() { addRule(); };
+    ruleEditor.onEscapeKey = [this]()
+    {
+        editingRuleIndex = -1;
+        ruleEditor.clear();
+    };
+
     addStemButton.onClick = [this]() { addStem(); };
-    removeStemButton.onClick = [this]() { removeStem(); };
-    renameStemButton.onClick = [this]() { renameStem(); };
-    addRuleButton.onClick = [this]() { addRule(); };
-    removeRuleButton.onClick = [this]() { removeRule(); };
     saveButton.onClick = [this]() { saveAndApply(); };
     saveXmlButton.onClick = [this]() { saveRoutingToFile(); };
     loadXmlButton.onClick = [this]() { loadRoutingFromFile(); };
@@ -85,10 +94,6 @@ RoutingModal::RoutingModal(PluginManager& manager)
     };
 
     addAndMakeVisible(addStemButton);
-    addAndMakeVisible(removeStemButton);
-    addAndMakeVisible(renameStemButton);
-    addAndMakeVisible(addRuleButton);
-    addAndMakeVisible(removeRuleButton);
     addAndMakeVisible(saveButton);
     addAndMakeVisible(saveXmlButton);
     addAndMakeVisible(loadXmlButton);
@@ -169,6 +174,12 @@ void RoutingModal::listBoxItemClicked(int row, const juce::MouseEvent& event)
     if (!juce::isPositiveAndBelow(row, stems.size()))
         return;
 
+    if (event.mods.isPopupMenu())
+    {
+        showStemContextMenu(row, event);
+        return;
+    }
+
     const int toggleAreaWidth = 24;
     if (event.x < toggleAreaWidth)
     {
@@ -193,6 +204,91 @@ void RoutingModal::listBoxItemDoubleClicked(int row, const juce::MouseEvent& /*e
     stemNameEditor.grabKeyboardFocus();
     stemNameEditor.selectAll();
     statusLabel.setText("Editing stem name...", juce::dontSendNotification);
+}
+
+void RoutingModal::showStemContextMenu(int row, const juce::MouseEvent& event)
+{
+    if (!juce::isPositiveAndBelow(row, stems.size()))
+        return;
+
+    selectedStem = row;
+    stemsList.selectRow(row);
+    refreshRules();
+
+    juce::PopupMenu menu;
+    menu.addItem(1, "Rename Stem");
+    menu.addItem(2, "Remove Stem");
+    menu.addSeparator();
+    menu.addItem(3, "Add Rule");
+    menu.addItem(4, "Remove Rule");
+
+    juce::PopupMenu::Options opts;
+    opts.withTargetComponent(&stemsList);
+    opts.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition(), { 1, 1 }));
+
+    const int result = menu.showMenu(opts);
+    switch (result)
+    {
+        case 1:
+            stemNameEditor.setText(stems[(size_t)row].name, juce::dontSendNotification);
+            stemNameEditor.selectAll();
+            stemNameEditor.grabKeyboardFocus();
+            statusLabel.setText("Edit the name and press Enter.", juce::dontSendNotification);
+            break;
+        case 2:
+            removeStem();
+            break;
+        case 3:
+            addRule();
+            break;
+        case 4:
+            removeRule();
+            break;
+        default:
+            break;
+    }
+}
+
+void RoutingModal::showRuleContextMenu(int row, const juce::MouseEvent& event)
+{
+    if (!juce::isPositiveAndBelow(row, getNumRows()))
+        return;
+
+    rulesList.selectRow(row);
+    juce::PopupMenu menu;
+    menu.addItem(1, "Edit Rule");
+    menu.addItem(2, "Remove Rule");
+
+    juce::PopupMenu::Options opts;
+    opts.withTargetComponent(&rulesList);
+    opts.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition(), { 1, 1 }));
+
+    const int result = menu.showMenu(opts);
+    if (result == 1)
+        startEditingRule(row);
+    else if (result == 2)
+        removeRule();
+}
+
+void RoutingModal::startEditingRule(int row)
+{
+    if (!juce::isPositiveAndBelow(row, getNumRows()))
+        return;
+
+    if (!juce::isPositiveAndBelow(selectedStem, stems.size()))
+        return;
+
+    selectedStem = stemsList.getSelectedRow();
+    const auto& rule = stems[(size_t)selectedStem].rules[(size_t)row];
+    juce::StringArray tagText;
+    for (const auto& tag : rule.tags)
+        tagText.add(tag);
+    juce::String text = rule.label.isNotEmpty() ? rule.label : tagText.joinIntoString(", ");
+    ruleEditor.setText(text, juce::dontSendNotification);
+    ruleEditor.grabKeyboardFocus();
+    ruleEditor.selectAll();
+    editingRuleIndex = row;
+    statusLabel.setText("Editing rule – press Enter to save.", juce::dontSendNotification);
 }
 
 void RoutingModal::selectedRowsChanged(int lastRowSelected)
@@ -238,7 +334,7 @@ void RoutingModal::resized()
             return;
 
         const int totalSpacing = buttonSpacing * (count - 1);
-        const int buttonWidth = juce::jmax(1, (row.getWidth() - totalSpacing) / count);
+        const int buttonWidth = std::max(1, (row.getWidth() - totalSpacing) / count);
         int index = 0;
         for (auto it = buttons.begin(); it != buttons.end(); ++it, ++index)
         {
@@ -253,9 +349,8 @@ void RoutingModal::resized()
 
     buttonBlock.removeFromTop(6);
     auto row1 = buttonBlock.removeFromTop(actionRowHeight);
-    layoutButtonRow(row1, { &addStemButton, &renameStemButton, &removeStemButton,
-                            &addRuleButton, &removeRuleButton, &recordCaptureButton,
-                            &stopCaptureButton, &debugCaptureButton, &previewButton });
+    layoutButtonRow(row1, { &addStemButton, &recordCaptureButton, &stopCaptureButton,
+                            &debugCaptureButton, &previewButton });
 
     buttonBlock.removeFromTop(buttonSpacing);
     auto row2 = buttonBlock.removeFromTop(actionRowHeight);
@@ -319,8 +414,20 @@ void RoutingModal::addRule()
     PluginManager::StemRule rule;
     rule.label = ruleEditor.getText().trim();
     rule.tags = tags;
-    stems[(size_t)selectedStem].rules.push_back(std::move(rule));
+    auto& rules = stems[(size_t)selectedStem].rules;
+    if (editingRuleIndex >= 0 && juce::isPositiveAndBelow(editingRuleIndex, rules.size()))
+    {
+        rules[(size_t)editingRuleIndex] = std::move(rule);
+        statusLabel.setText("Rule updated.", juce::dontSendNotification);
+        editingRuleIndex = -1;
+    }
+    else
+    {
+        rules.push_back(std::move(rule));
+        statusLabel.setText("Rule added.", juce::dontSendNotification);
+    }
     refreshRules();
+    ruleEditor.clear();
 }
 
 void RoutingModal::removeRule()
@@ -334,6 +441,8 @@ void RoutingModal::removeRule()
 
     stems[(size_t)selectedStem].rules.erase(stems[(size_t)selectedStem].rules.begin() + ruleIndex);
     refreshRules();
+    if (editingRuleIndex == ruleIndex)
+        editingRuleIndex = -1;
 }
 
 void RoutingModal::saveAndApply()
@@ -446,9 +555,22 @@ void RoutingModal::RulesListModel::paintListBoxItem(int rowNumber, juce::Graphic
 
 void RoutingModal::RulesListModel::listBoxItemClicked(int row, const juce::MouseEvent& event)
 {
-    juce::ignoreUnused(event);
+    if (event.mods.isPopupMenu())
+    {
+        owner.showRuleContextMenu(row, event);
+        return;
+    }
+
     if (!juce::isPositiveAndBelow(row, getNumRows()))
         return;
 
     owner.rulesList.selectRow(row);
+}
+
+void RoutingModal::RulesListModel::listBoxItemDoubleClicked(int row, const juce::MouseEvent& event)
+{
+    if (!juce::isPositiveAndBelow(row, getNumRows()))
+        return;
+
+    owner.startEditingRule(row);
 }
