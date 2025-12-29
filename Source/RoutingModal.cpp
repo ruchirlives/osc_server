@@ -288,7 +288,7 @@ void RoutingModal::startEditingRule(int row)
     ruleEditor.grabKeyboardFocus();
     ruleEditor.selectAll();
     editingRuleIndex = row;
-    statusLabel.setText("Editing rule – press Enter to save.", juce::dontSendNotification);
+    statusLabel.setText("Editing rule - press Enter to save.", juce::dontSendNotification);
 }
 
 void RoutingModal::selectedRowsChanged(int lastRowSelected)
