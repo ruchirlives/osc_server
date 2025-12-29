@@ -1203,6 +1203,31 @@ void PluginManager::notifyRenderProgress(float progress)
     });
 }
 
+void PluginManager::setRestoreStatusCallback(std::function<void(const juce::String&)> callback)
+{
+    const juce::ScopedLock sl(restoreStatusLock);
+    restoreStatusCallback = std::move(callback);
+}
+
+void PluginManager::clearRestoreStatusCallback()
+{
+    const juce::ScopedLock sl(restoreStatusLock);
+    restoreStatusCallback = {};
+}
+
+void PluginManager::notifyRestoreStatus(const juce::String& message)
+{
+    std::function<void(const juce::String&)> callback;
+    {
+        const juce::ScopedLock sl(restoreStatusLock);
+        callback = restoreStatusCallback;
+    }
+    if (!callback)
+        return;
+
+    callback(message);
+}
+
 void PluginManager::invokeOnMessageThreadBlocking(std::function<void()> fn)
 {
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
@@ -1834,6 +1859,7 @@ void PluginManager::restorePluginState(const juce::String& pluginId, const juce:
     const juce::ScopedLock pluginLock(pluginInstanceLock);
     if (pluginInstances.find(pluginId) != pluginInstances.end())
     {
+        notifyRestoreStatus("Restoring state for plugin: " + pluginId);
         pluginInstances[pluginId]->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
         
         DBG("Plugin state restored for: " << pluginId);

@@ -7,6 +7,8 @@
 #include <windows.h>
 #endif
 
+#include <thread>
+
 class ProjectRestoreModal : public juce::Component
 {
 public:
@@ -564,122 +566,159 @@ void MainComponent::restoreProject(bool append)
 	opts.resizable = false;
 	opts.launchAsync();
 
-	juce::DialogWindow* statusDialog = nullptr;
-	const auto pumpMessages = []()
+	auto safeStatus = juce::Component::SafePointer<ProjectRestoreModal>(statusComponent);
+	auto updateStatus = [safeStatus](const juce::String& message)
 	{
-		const double deadline = juce::Time::getMillisecondCounterHiRes() / 1000.0 + 0.02;
-		juce::MessageManager::getInstance()->runDispatchLoopUntil(deadline);
-	};
-	pumpMessages();
-	statusDialog = dynamic_cast<juce::DialogWindow*>(statusComponent->getTopLevelComponent());
-
-	auto updateStatus = [&](const juce::String& message)
-	{
-		if (statusComponent != nullptr)
+		juce::MessageManager::callAsync([safeStatus, message]()
 		{
-			statusComponent->setMessage(message);
-			pumpMessages();
-		}
+			if (auto* comp = safeStatus.getComponent())
+				comp->setMessage(message);
+		});
 	};
 
-	auto closeStatus = [&]()
+	auto closeStatus = [safeStatus]()
 	{
-		if (statusDialog != nullptr)
+		juce::MessageManager::callAsync([safeStatus]()
 		{
-			statusDialog->exitModalState(0);
-			statusDialog = nullptr;
+			if (auto* comp = safeStatus.getComponent())
+			{
+				if (auto* dialog = comp->findParentComponentOfClass<juce::DialogWindow>())
+					dialog->exitModalState(0);
+			}
+		});
+	};
+
+	auto runOnMessageThreadBlocking = [](std::function<void()> fn)
+	{
+		if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+		{
+			fn();
+			return;
 		}
-		statusComponent = nullptr;
+		juce::WaitableEvent done;
+		juce::MessageManager::callAsync([fn = std::move(fn), &done]() mutable
+		{
+			fn();
+			done.signal();
+		});
+		done.wait();
 	};
 
 	const juce::File zipFile = fileChooser.getResult();
 	updateStatus("Selected Project: " + zipFile.getFileName());
 	DBG("Selected Project: " + zipFile.getFullPathName());
 
-	bool restoreSucceeded = false;
-	juce::FileInputStream inputStream(zipFile);
-	if (inputStream.openedOk())
+	pluginManager.setRestoreStatusCallback([safeStatus](const juce::String& message)
 	{
-		updateStatus("Reading Project...");
-		DBG("Reading Project...");
-		juce::ZipFile zip(inputStream);
-		updateStatus("Project Read.");
-		DBG("Project Read.");
-
-		juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-		if (!dawServerDir.exists())
-			dawServerDir.createDirectory();
-
-		juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-		juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-		juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-		juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
-
-		updateStatus("Unzipping Project...");
-		auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
+		juce::MessageManager::callAsync([safeStatus, message]()
 		{
-			auto index = zip.getIndexOfFileName(fileName);
-			if (index >= 0)
+			if (auto* comp = safeStatus.getComponent())
+				comp->setMessage(message);
+		});
+	});
+
+	std::thread([this, zipFile, updateStatus, closeStatus, runOnMessageThreadBlocking, append]()
+	{
+		bool restoreSucceeded = false;
+		juce::FileInputStream inputStream(zipFile);
+		if (inputStream.openedOk())
+		{
+			updateStatus("Reading Project...");
+			DBG("Reading Project...");
+			juce::ZipFile zip(inputStream);
+			updateStatus("Project Read.");
+			DBG("Project Read.");
+
+			juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+			if (!dawServerDir.exists())
+				dawServerDir.createDirectory();
+
+			juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+			juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+			juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+			juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+
+			updateStatus("Unzipping Project...");
+			auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
 			{
-				auto* fileStream = zip.createStreamForEntry(index);
-				if (fileStream != nullptr)
+				auto index = zip.getIndexOfFileName(fileName);
+				if (index >= 0)
 				{
-					if (destination.exists())
-						destination.deleteFile();
-					juce::FileOutputStream outStream(destination);
-					if (outStream.openedOk())
-						outStream.writeFromInputStream(*fileStream, -1);
-					delete fileStream;
-					return true;
+					auto* fileStream = zip.createStreamForEntry(index);
+					if (fileStream != nullptr)
+					{
+						if (destination.exists())
+							destination.deleteFile();
+						juce::FileOutputStream outStream(destination);
+						if (outStream.openedOk())
+							outStream.writeFromInputStream(*fileStream, -1);
+						delete fileStream;
+						return true;
+					}
 				}
-			}
-			return false;
-		};
+				return false;
+			};
 
-		DBG("Unzipping Project...");
-		extractFile("projectData.dat", dataFile);
-		extractFile("projectPlugins.dat", pluginsFile);
-		extractFile("projectMeta.xml", metaFile);
-		const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
-		updateStatus("Project Unzipped.");
-		DBG("Project Unzipped.");
+			DBG("Unzipping Project...");
+			extractFile("projectData.dat", dataFile);
+			extractFile("projectPlugins.dat", pluginsFile);
+			extractFile("projectMeta.xml", metaFile);
+			const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
+			updateStatus("Project Unzipped.");
+			DBG("Project Unzipped.");
 
-		if (!append)
-		{
-			conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-			if (routingExtracted)
-				pluginManager.loadRoutingConfigFromFile(routingFile);
-			pluginManager.rebuildRouterTagIndexFromConductor();
+			runOnMessageThreadBlocking([this, &dataFile, &pluginsFile, &metaFile, routingExtracted, &routingFile, append]()
+			{
+				if (!append)
+				{
+					conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+					if (routingExtracted)
+						pluginManager.loadRoutingConfigFromFile(routingFile);
+					pluginManager.rebuildRouterTagIndexFromConductor();
+				}
+				else
+				{
+					conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+					pluginManager.rebuildRouterTagIndexFromConductor();
+				}
+			});
+
+			runOnMessageThreadBlocking([this, &zipFile]()
+			{
+				refreshOrchestraTableUI();
+				const juce::String projectName = zipFile.getFileNameWithoutExtension();
+				DBG("Project Restored: " + projectName);
+				updateProjectNameLabel(projectName);
+				repaint();
+			});
+
+			restoreSucceeded = true;
 		}
 		else
 		{
-			conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-			pluginManager.rebuildRouterTagIndexFromConductor();
+			updateStatus("Failed to open project file.");
+			DBG("Failed to open file for restoring project states.");
 		}
 
-		refreshOrchestraTableUI();
-
-		const juce::String projectName = zipFile.getFileNameWithoutExtension();
-		DBG("Project Restored: " + projectName);
-		updateStatus("Project Restored");
-		updateProjectNameLabel(projectName);
-		repaint();
-		restoreSucceeded = true;
-	}
-
-	if (!restoreSucceeded)
-	{
-		repaint();
-		if (auto* top = getTopLevelComponent())
+		if (!restoreSucceeded)
 		{
-			auto w = top->getWidth();
-			auto h = top->getHeight();
-			top->setSize(w + 1, h);
-			top->setSize(w, h);
+			runOnMessageThreadBlocking([this]()
+			{
+				repaint();
+				if (auto* top = getTopLevelComponent())
+				{
+					auto w = top->getWidth();
+					auto h = top->getHeight();
+					top->setSize(w + 1, h);
+					top->setSize(w, h);
+				}
+			});
 		}
-	}
 
-	closeStatus();
+		pluginManager.clearRestoreStatusCallback();
+		closeStatus();
+	}).detach();
+}
 }
 
 void MainComponent::refreshOrchestraTableUI()

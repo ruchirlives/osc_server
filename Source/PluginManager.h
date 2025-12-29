@@ -165,6 +165,8 @@ public:
         double tailSeconds = 2.0);
     void setRenderProgressCallback(std::function<void(float)> callback);
     void clearRenderProgressCallback();
+    void setRestoreStatusCallback(std::function<void(const juce::String&)> callback);
+    void clearRestoreStatusCallback();
 
     void previewPlay();
     void previewPause();
@@ -237,6 +239,8 @@ private:
     std::atomic<float> renderProgress{ 0.0f };
     juce::CriticalSection renderCallbackLock;
     std::function<void(float)> renderProgressCallback;
+    juce::CriticalSection restoreStatusLock;
+    std::function<void(const juce::String&)> restoreStatusCallback;
 
     void enqueueMasterForPreview(const std::vector<MyMidiMessage>& source,
         double offsetMs,
@@ -244,6 +248,8 @@ private:
     void prepareAllPlugins(double sampleRate, int blockSize);
     void invokeOnMessageThreadBlocking(std::function<void()> fn);
     void notifyRenderProgress(float progress);
+
+    void notifyRestoreStatus(const juce::String& message);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };
