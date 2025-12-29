@@ -205,8 +205,7 @@ private:
 };
 
 class MainComponent :   public juce::Component, 
-                        public juce::ComboBox::Listener,
-                        private juce::Timer
+                        public juce::ComboBox::Listener
 {
 public:
     MainComponent();
@@ -277,9 +276,9 @@ public:
         juce::TableListBox orchestraTable; // TableListBox to display orchestra information
 
         void removeMidiChannelFromOverdub(int midiChannel);
-	// Refresh the orchestra table and layout after data changes
-	void refreshOrchestraTableUI();
-	void timerCallback() override;
+
+        // Refresh the orchestra table and layout after data changes
+        void refreshOrchestraTableUI();
 
 
 private:
@@ -348,11 +347,6 @@ private:
     // Label for the Project Name
     juce::Label projectNameLabel{ "Project Name", "Project Name" }; // Label for the project name
     juce::String currentProjectName;
-    juce::String projectStatusMessage;
-    juce::CriticalSection projectStatusLock;
-    void setProjectStatusMessage(const juce::String& message);
-    void clearProjectStatusMessage();
-    void refreshProjectLabelText();
 
 	// Create a label and text editor for audio streaming port
 	juce::Label audioStreamingPortLabel{ "Audio Streaming Port", "Audio Streaming Port" }; // Label for the audio streaming port

@@ -7,6 +7,31 @@
 #include <windows.h>
 #endif
 
+class ProjectRestoreModal : public juce::Component
+{
+public:
+	ProjectRestoreModal()
+	{
+		statusLabel.setJustificationType(juce::Justification::centredLeft);
+		statusLabel.setFont(juce::Font(15.0f, juce::Font::bold));
+		statusLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+		addAndMakeVisible(statusLabel);
+	}
+
+	void resized() override
+	{
+		statusLabel.setBounds(getLocalBounds().reduced(16));
+	}
+
+	void setMessage(const juce::String& message)
+	{
+		statusLabel.setText(message, juce::dontSendNotification);
+	}
+
+private:
+	juce::Label statusLabel{ "restoreStatus", "Restoring..." };
+};
+
 static bool isRunningInDebugger()
 {
 #if JUCE_WINDOWS
@@ -234,7 +259,6 @@ MainComponent::MainComponent()
 
 	resized();
 	updateOverdubUI();
-	startTimerHz(5);
 
 	juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MainComponent>(this)]()
 									{
@@ -248,7 +272,6 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
-	stopTimer();
 	saveConfig();
 	pluginManager.releaseResources();
 	midiManager.closeMidiInput();
@@ -459,7 +482,7 @@ void MainComponent::moveSelectedRowsToEnd()
 void MainComponent::updateProjectNameLabel(juce::String projectName)
 {
 	currentProjectName = projectName.trim();
-	refreshProjectLabelText();
+	projectNameLabel.setText("Project Name: " + currentProjectName, juce::dontSendNotification);
 }
 
 juce::String MainComponent::getCurrentProjectName() const
@@ -467,54 +490,6 @@ juce::String MainComponent::getCurrentProjectName() const
 	return currentProjectName.isNotEmpty() ? currentProjectName : "Capture";
 }
 
-void MainComponent::setProjectStatusMessage(const juce::String& message)
-{
-	{
-		const juce::ScopedLock lock(projectStatusLock);
-		projectStatusMessage = message;
-	}
-
-	if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-		refreshProjectLabelText();
-	else
-		juce::MessageManager::callAsync([this]() { refreshProjectLabelText(); });
-}
-
-void MainComponent::clearProjectStatusMessage()
-{
-	{
-		const juce::ScopedLock lock(projectStatusLock);
-		projectStatusMessage.clear();
-	}
-
-	if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-		refreshProjectLabelText();
-	else
-		juce::MessageManager::callAsync([this]() { refreshProjectLabelText(); });
-}
-
-void MainComponent::refreshProjectLabelText()
-{
-	juce::String statusText;
-	{
-		const juce::ScopedLock lock(projectStatusLock);
-		statusText = projectStatusMessage;
-	}
-
-	const juce::String baseName = currentProjectName.isNotEmpty() ? currentProjectName : "Capture";
-	juce::String text = "Project Name: " + baseName;
-
-	if (statusText.isNotEmpty())
-		text += " (" + statusText + ")";
-
-	if (projectNameLabel.getText() != text)
-		projectNameLabel.setText(text, juce::dontSendNotification);
-}
-
-void MainComponent::timerCallback()
-{
-	refreshProjectLabelText();
-}
 
 void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments)
 {
@@ -574,115 +549,137 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 
 void MainComponent::restoreProject(bool append)
 {
-	// Open a file chooser dialog to select the zip file
 	juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
-	setProjectStatusMessage("Restoring...");
-	if (fileChooser.browseForFileToOpen())
+	if (!fileChooser.browseForFileToOpen())
+		return;
+
+	auto* statusComponent = new ProjectRestoreModal();
+	statusComponent->setSize(420, 120);
+	juce::DialogWindow::LaunchOptions opts;
+	opts.content.setOwned(statusComponent);
+	opts.dialogTitle = "Restoring Project";
+	opts.dialogBackgroundColour = juce::Colours::darkslategrey;
+	opts.useNativeTitleBar = true;
+	opts.escapeKeyTriggersCloseButton = false;
+	opts.resizable = false;
+	opts.launchAsync();
+
+	juce::DialogWindow* statusDialog = nullptr;
+	const auto pumpMessages = []()
 	{
-		bool restoreSucceeded = false;
+		const double deadline = juce::Time::getMillisecondCounterHiRes() / 1000.0 + 0.02;
+		juce::MessageManager::getInstance()->runDispatchLoopUntil(deadline);
+	};
+	pumpMessages();
+	statusDialog = dynamic_cast<juce::DialogWindow*>(statusComponent->getTopLevelComponent());
 
-		juce::File zipFile = fileChooser.getResult();
-		setProjectStatusMessage("Selected Project: " + zipFile.getFileName());
-		DBG("Selected Project: " + zipFile.getFullPathName());
-		juce::FileInputStream inputStream(zipFile);
-		if (inputStream.openedOk())
+	auto updateStatus = [&](const juce::String& message)
+	{
+		if (statusComponent != nullptr)
 		{
-			setProjectStatusMessage("Reading Project...");
-			DBG("Reading Project...");
-			juce::ZipFile zip(inputStream);
-			setProjectStatusMessage("Project Read.");
-			DBG("Project Read.");
+			statusComponent->setMessage(message);
+			pumpMessages();
+		}
+	};
 
-			// Create OSCDawServer subfolder in user's documents directory
-			juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-			if (!dawServerDir.exists())
-				dawServerDir.createDirectory();
+	auto closeStatus = [&]()
+	{
+		if (statusDialog != nullptr)
+		{
+			statusDialog->exitModalState(0);
+			statusDialog = nullptr;
+		}
+		statusComponent = nullptr;
+	};
 
-			// Define the extraction locations in OSCDawServer subfolder
-			juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-			juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-			juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-			juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+	const juce::File zipFile = fileChooser.getResult();
+	updateStatus("Selected Project: " + zipFile.getFileName());
+	DBG("Selected Project: " + zipFile.getFullPathName());
 
-			// Extract each file
-			setProjectStatusMessage("Unzipping Project...");
-			auto extractFile = [&](const juce::String &fileName, const juce::File &destination)
+	bool restoreSucceeded = false;
+	juce::FileInputStream inputStream(zipFile);
+	if (inputStream.openedOk())
+	{
+		updateStatus("Reading Project...");
+		DBG("Reading Project...");
+		juce::ZipFile zip(inputStream);
+		updateStatus("Project Read.");
+		DBG("Project Read.");
+
+		juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+		if (!dawServerDir.exists())
+			dawServerDir.createDirectory();
+
+		juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+		juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+		juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+		juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+
+		updateStatus("Unzipping Project...");
+		auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
+		{
+			auto index = zip.getIndexOfFileName(fileName);
+			if (index >= 0)
 			{
-				auto index = zip.getIndexOfFileName(fileName);
-				if (index >= 0)
+				auto* fileStream = zip.createStreamForEntry(index);
+				if (fileStream != nullptr)
 				{
-					auto *fileStream = zip.createStreamForEntry(index);
-					if (fileStream != nullptr)
-					{
-						if (destination.exists())
-						{
-							// Delete the existing file before overwriting
-							destination.deleteFile();
-						}
-						juce::FileOutputStream outStream(destination);
-						if (outStream.openedOk())
-							outStream.writeFromInputStream(*fileStream, -1);
-
-						delete fileStream;
-						return true;
-					}
+					if (destination.exists())
+						destination.deleteFile();
+					juce::FileOutputStream outStream(destination);
+					if (outStream.openedOk())
+						outStream.writeFromInputStream(*fileStream, -1);
+					delete fileStream;
+					return true;
 				}
-				return false;
-			};
-
-			DBG("Unzipping Project...");
-			extractFile("projectData.dat", dataFile);
-			extractFile("projectPlugins.dat", pluginsFile);
-			extractFile("projectMeta.xml", metaFile);
-			const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
-			setProjectStatusMessage("Project Unzipped.");
-			DBG("Project Unzipped.");
-
-			if (!append)
-			{
-				// Restore project state
-				conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-				if (routingExtracted)
-					pluginManager.loadRoutingConfigFromFile(routingFile);
-				pluginManager.rebuildRouterTagIndexFromConductor();
 			}
-			else
-			{
-				// Append project state
-				conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-				pluginManager.rebuildRouterTagIndexFromConductor();
-			}
+			return false;
+		};
 
-			// Update the orchestra table
-			refreshOrchestraTableUI();
+		DBG("Unzipping Project...");
+		extractFile("projectData.dat", dataFile);
+		extractFile("projectPlugins.dat", pluginsFile);
+		extractFile("projectMeta.xml", metaFile);
+		const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
+		updateStatus("Project Unzipped.");
+		DBG("Project Unzipped.");
 
-			// Get the restored project name
-			juce::String projectName = zipFile.getFileNameWithoutExtension();
-			DBG("Project Restored: " + projectName);
-			setProjectStatusMessage("Project Restored");
-			updateProjectNameLabel(projectName);
-			repaint();
-			restoreSucceeded = true;
-			juce::Timer::callAfterDelay(1500, [this]() { clearProjectStatusMessage(); });
-		}
-
-		if (!restoreSucceeded)
+		if (!append)
 		{
-			clearProjectStatusMessage();
-			repaint();
-			if (auto *top = getTopLevelComponent())
-			{
-				auto w = top->getWidth();
-				auto h = top->getHeight();
-				top->setSize(w + 1, h);
-				top->setSize(w, h);
-			}
+			conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+			if (routingExtracted)
+				pluginManager.loadRoutingConfigFromFile(routingFile);
+			pluginManager.rebuildRouterTagIndexFromConductor();
+		}
+		else
+		{
+			conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+			pluginManager.rebuildRouterTagIndexFromConductor();
+		}
+
+		refreshOrchestraTableUI();
+
+		const juce::String projectName = zipFile.getFileNameWithoutExtension();
+		DBG("Project Restored: " + projectName);
+		updateStatus("Project Restored");
+		updateProjectNameLabel(projectName);
+		repaint();
+		restoreSucceeded = true;
+	}
+
+	if (!restoreSucceeded)
+	{
+		repaint();
+		if (auto* top = getTopLevelComponent())
+		{
+			auto w = top->getWidth();
+			auto h = top->getHeight();
+			top->setSize(w + 1, h);
+			top->setSize(w, h);
 		}
 	}
-	else
-	{
-		clearProjectStatusMessage();
-	}
+
+	closeStatus();
 }
 
 void MainComponent::refreshOrchestraTableUI()
