@@ -78,7 +78,7 @@ juce::String sanitiseRenderName(juce::String s)
     return s.replaceCharacter(' ', '_');
 }
 
-std::unique_ptr<juce::AudioFormatWriter> createMasterWriter(const juce::File& file,
+std::unique_ptr<juce::AudioFormatWriter> createWavWriter(const juce::File& file,
     double sampleRate,
     int numChannels)
 {
@@ -1362,36 +1362,47 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
     }
 
     const juce::String fileName = sanitiseRenderName(projectName) + "_Master.wav";
-    auto masterFile = targetFolder.getChildFile(fileName);
-    if (masterFile.existsAsFile())
-        masterFile.deleteFile();
-    auto writer = createMasterWriter(masterFile, sampleRate, 2);
-    if (!writer)
+    std::map<juce::String, std::unique_ptr<juce::AudioFormatWriter>> writers;
+    auto addWriter = [&](const juce::String& busName, const juce::String& fileSuffix) -> bool
     {
-        DBG("RenderMaster: failed to create writer for " << masterFile.getFullPathName());
+        const juce::String busFileName = sanitiseRenderName(projectName) + fileSuffix;
+        auto targetFile = targetFolder.getChildFile(busFileName);
+        if (targetFile.existsAsFile())
+            targetFile.deleteFile();
+
+        auto writer = createWavWriter(targetFile, sampleRate, 2);
+        if (!writer)
+        {
+            DBG("RenderMaster: failed to create writer for " << targetFile.getFullPathName());
+            return false;
+        }
+
+        writers.emplace(busName, std::move(writer));
+        return true;
+    };
+
+    if (!addWriter("Master", "_Master.wav"))
         return false;
+
+    for (const auto& stem : stemConfigs)
+    {
+        if (!stem.renderEnabled)
+            continue;
+
+        if (!addWriter(stem.name, "_" + sanitiseRenderName(stem.name) + ".wav"))
+            return false;
     }
 
-    juce::AudioBuffer<float> mixBuffer(2, blockSize);
     std::unordered_map<juce::String, juce::MidiBuffer> midiByPlugin;
     size_t eventIndex = 0;
     juce::AudioBuffer<float> pluginBuffer;
 
-    auto writeBlock = [&](int numSamples)
-    {
-        std::vector<const float*> channelPointers;
-        channelPointers.reserve(mixBuffer.getNumChannels());
-        for (int ch = 0; ch < mixBuffer.getNumChannels(); ++ch)
-            channelPointers.push_back(mixBuffer.getReadPointer(ch));
-        writer->writeFromFloatArrays(channelPointers.data(), (int)channelPointers.size(), numSamples);
-    };
-
     const juce::ScopedLock pluginLock(pluginInstanceLock);
+    audioRouter.prepare(sampleRate, blockSize, 2);
     for (int64 blockStart = 0; blockStart < endSample; blockStart += blockSize)
     {
         const int numSamples = (int)juce::jmin<int64>(blockSize, endSample - blockStart);
-        mixBuffer.setSize(mixBuffer.getNumChannels(), numSamples, false, false, true);
-        mixBuffer.clear();
+        audioRouter.beginBlock(numSamples);
         midiByPlugin.clear();
 
         const int64 blockEnd = blockStart + numSamples;
@@ -1434,20 +1445,31 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
                 pluginBuffer.clear();
             }
 
-            for (int ch = 0; ch < mixBuffer.getNumChannels(); ++ch)
-            {
-                const int srcCh = juce::jlimit(0, pluginBuffer.getNumChannels() - 1, ch);
-                mixBuffer.addFrom(ch, 0, pluginBuffer, srcCh, 0, numSamples);
-            }
+            audioRouter.routeAudio(pluginId, pluginBuffer, numSamples);
         }
 
-        writeBlock(numSamples);
+        for (auto& [busName, writer] : writers)
+        {
+            if (!writer)
+                continue;
+
+            const auto* busBuf = audioRouter.getBusBuffer(busName);
+            if (busBuf == nullptr || busBuf->getNumChannels() == 0)
+                continue;
+
+            const float* channelPointers[2] = {
+                busBuf->getNumChannels() > 0 ? busBuf->getReadPointer(0) : nullptr,
+                busBuf->getNumChannels() > 1 ? busBuf->getReadPointer(1) : (busBuf->getNumChannels() > 0 ? busBuf->getReadPointer(0) : nullptr)
+            };
+
+            writer->writeFromFloatArrays(channelPointers, 2, numSamples);
+        }
         float progressValue = static_cast<float>(blockStart) / static_cast<float>(endSample);
         renderProgress.store(progressValue);
         notifyRenderProgress(progressValue);
     }
 
-    writer.reset();
+    writers.clear();
     renderProgress.store(1.0f);
     notifyRenderProgress(1.0f);
     return true;
