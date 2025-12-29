@@ -569,16 +569,16 @@ void MainComponent::restoreProject(bool append)
 	auto safeStatus = juce::Component::SafePointer<ProjectRestoreModal>(statusComponent);
 	auto updateStatus = [safeStatus](const juce::String& message)
 	{
-		if (auto* comp = safeStatus.getComponent())
+		auto deliver = [safeStatus, message]() mutable
 		{
-			if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+			if (auto* comp = safeStatus.getComponent())
 				comp->setMessage(message);
-			else
-				juce::MessageManager::callAsync([comp, message]()
-				{
-					comp->setMessage(message);
-				});
-		}
+		};
+
+		if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+			deliver();
+		else
+			juce::MessageManager::callAsync(std::move(deliver));
 	};
 
 	auto closeStatus = [safeStatus]()
