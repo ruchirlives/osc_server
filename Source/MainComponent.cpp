@@ -470,6 +470,13 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 	juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 	juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 	juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+	juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+	const bool includeRoutingData = selectedInstruments.empty();
+	if (includeRoutingData)
+	{
+		if (!pluginManager.saveRoutingConfigToFile(routingFile))
+			DBG("Warning: Failed to write routing configuration file.");
+	}
 
 	// Save the project state files
 	conductor.saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName(), selectedInstruments);
@@ -495,6 +502,8 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 			zipBuilder.addFile(dataFile, 5, "projectData.dat"); // Using moderate compression
 			zipBuilder.addFile(pluginsFile, 5, "projectPlugins.dat");
 			zipBuilder.addFile(metaFile, 1, "projectMeta.xml");
+			if (includeRoutingData && routingFile.existsAsFile())
+				zipBuilder.addFile(routingFile, 1, "projectRouting.xml");
 
 			// Write the compressed data to the file
 			zipBuilder.writeToStream(outputStream, nullptr);
@@ -535,6 +544,7 @@ void MainComponent::restoreProject(bool append)
 			juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 			juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 			juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+			juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
 
 			// Extract each file
 			auto extractFile = [&](const juce::String &fileName, const juce::File &destination)
@@ -555,25 +565,32 @@ void MainComponent::restoreProject(bool append)
 							outStream.writeFromInputStream(*fileStream, -1);
 
 						delete fileStream;
+						return true;
 					}
 				}
+				return false;
 			};
 
 			DBG("Unzipping Project...");
 			extractFile("projectData.dat", dataFile);
 			extractFile("projectPlugins.dat", pluginsFile);
 			extractFile("projectMeta.xml", metaFile);
+			const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
 			DBG("Project Unzipped.");
 
 			if (!append)
 			{
 				// Restore project state
 				conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+				if (routingExtracted)
+					pluginManager.loadRoutingConfigFromFile(routingFile);
+				pluginManager.rebuildRouterTagIndexFromConductor();
 			}
 			else
 			{
 				// Append project state
 				conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+				pluginManager.rebuildRouterTagIndexFromConductor();
 			}
 
 			// Update the orchestra table

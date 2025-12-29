@@ -140,6 +140,8 @@ public:
     std::vector<StemConfig> getStemConfigs() const;
     void setStemConfigs(const std::vector<StemConfig>& configs);
     void rebuildRouterTagIndexFromConductor();
+    bool saveRoutingConfigToFile(const juce::File& file) const;
+    bool loadRoutingConfigFromFile(const juce::File& file);
 
     // Update getter method to return inherited device manager
     juce::AudioDeviceManager& getDeviceManager() { return deviceManager; }

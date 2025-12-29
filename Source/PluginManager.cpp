@@ -595,6 +595,90 @@ void PluginManager::rebuildRouterTagIndexFromConductor()
     audioRouter.rebuildTagIndex(mainComponent->getConductor().orchestra);
 }
 
+bool PluginManager::saveRoutingConfigToFile(const juce::File& file) const
+{
+    auto parentDir = file.getParentDirectory();
+    if (!parentDir.exists())
+        parentDir.createDirectory();
+
+    juce::XmlElement root("RoutingConfig");
+    root.setAttribute("version", 1);
+
+    for (const auto& stem : stemConfigs)
+    {
+        auto* stemElement = root.createNewChildElement("Stem");
+        stemElement->setAttribute("name", stem.name);
+
+        for (const auto& rule : stem.rules)
+        {
+            auto* ruleElement = stemElement->createNewChildElement("Rule");
+            ruleElement->setAttribute("label", rule.label);
+
+            for (const auto& tag : rule.tags)
+            {
+                auto* tagElement = ruleElement->createNewChildElement("Tag");
+                tagElement->setAttribute("value", tag);
+            }
+        }
+    }
+
+    return root.writeTo(file);
+}
+
+bool PluginManager::loadRoutingConfigFromFile(const juce::File& file)
+{
+    if (!file.existsAsFile())
+        return false;
+
+    juce::XmlDocument doc(file);
+    std::unique_ptr<juce::XmlElement> xml(doc.getDocumentElement());
+
+    if (xml == nullptr || !xml->hasTagName("RoutingConfig"))
+        return false;
+
+    std::vector<StemConfig> loaded;
+
+    for (auto* stemElement = xml->getFirstChildElement(); stemElement != nullptr; stemElement = stemElement->getNextElement())
+    {
+        if (!stemElement->hasTagName("Stem"))
+            continue;
+
+        auto stemName = stemElement->getStringAttribute("name").trim();
+        if (stemName.isEmpty())
+            continue;
+
+        StemConfig stem;
+        stem.name = stemName;
+
+        for (auto* ruleElement = stemElement->getFirstChildElement(); ruleElement != nullptr; ruleElement = ruleElement->getNextElement())
+        {
+            if (!ruleElement->hasTagName("Rule"))
+                continue;
+
+            StemRule rule;
+            rule.label = ruleElement->getStringAttribute("label");
+
+            for (auto* tagElement = ruleElement->getFirstChildElement(); tagElement != nullptr; tagElement = tagElement->getNextElement())
+            {
+                if (!tagElement->hasTagName("Tag"))
+                    continue;
+
+                auto value = tagElement->getStringAttribute("value").trim();
+                if (value.isNotEmpty())
+                    rule.tags.push_back(value);
+            }
+
+            if (!rule.tags.empty())
+                stem.rules.push_back(std::move(rule));
+        }
+
+        loaded.push_back(std::move(stem));
+    }
+
+    setStemConfigs(loaded);
+    return true;
+}
+
 void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)
 {
     juce::Uuid uuid;
