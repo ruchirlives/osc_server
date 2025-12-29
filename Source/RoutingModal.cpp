@@ -172,7 +172,7 @@ void RoutingModal::listBoxItemClicked(int row, const juce::MouseEvent& event)
     if (event.x < toggleAreaWidth)
     {
         stems[(size_t)row].renderEnabled = !stems[(size_t)row].renderEnabled;
-        stemsList.updateContent();
+        stemsList.repaintRow(row);
         return;
     }
 
