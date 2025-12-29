@@ -1175,6 +1175,34 @@ void PluginManager::prepareAllPlugins(double sampleRate, int blockSize)
     }
 }
 
+void PluginManager::setRenderProgressCallback(std::function<void(float)> callback)
+{
+    const juce::ScopedLock sl(renderCallbackLock);
+    renderProgressCallback = std::move(callback);
+}
+
+void PluginManager::clearRenderProgressCallback()
+{
+    const juce::ScopedLock sl(renderCallbackLock);
+    renderProgressCallback = {};
+}
+
+void PluginManager::notifyRenderProgress(float progress)
+{
+    std::function<void(float)> callback;
+    {
+        const juce::ScopedLock sl(renderCallbackLock);
+        callback = renderProgressCallback;
+    }
+    if (!callback)
+        return;
+
+    juce::MessageManager::callAsync([callback = std::move(callback), progress]()
+    {
+        callback(progress);
+    });
+}
+
 void PluginManager::invokeOnMessageThreadBlocking(std::function<void()> fn)
 {
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
@@ -1305,20 +1333,6 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
         return false;
     }
 
-    DBG("RenderMaster: events=" << (int)renderEvents.size()
-        << " endSample=" << endSample
-        << " duration=" << (endSample / sampleRate) << "s");
-    const size_t detailCount = juce::jmin<size_t>(renderEvents.size(), 32);
-    for (size_t i = 0; i < detailCount; ++i)
-    {
-        const auto& ev = renderEvents[i];
-        DBG("  [" << (int)i << "] plugin=" << ev.pluginId
-            << " samplePos=" << ev.samplePos
-            << " msg=" << ev.message.getDescription());
-    }
-    if (renderEvents.size() > detailCount)
-        DBG("  ... " << (int)(renderEvents.size() - detailCount) << " additional events");
-
     const juce::String fileName = sanitiseRenderName(projectName) + "_Master.wav";
     auto masterFile = targetFolder.getChildFile(fileName);
     if (masterFile.existsAsFile())
@@ -1400,11 +1414,14 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
         }
 
         writeBlock(numSamples);
-        renderProgress.store(static_cast<float>(blockStart) / static_cast<float>(endSample));
+        float progressValue = static_cast<float>(blockStart) / static_cast<float>(endSample);
+        renderProgress.store(progressValue);
+        notifyRenderProgress(progressValue);
     }
 
     writer.reset();
     renderProgress.store(1.0f);
+    notifyRenderProgress(1.0f);
     return true;
 }
 

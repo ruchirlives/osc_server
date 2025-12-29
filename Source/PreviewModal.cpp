@@ -4,6 +4,7 @@
 PreviewModal::PreviewModal(PluginManager& manager)
     : pluginManager(manager)
 {
+    setSize(560, 420);
     titleLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(titleLabel);
 
@@ -69,10 +70,10 @@ PreviewModal::PreviewModal(PluginManager& manager)
 
 void PreviewModal::resized()
 {
-    auto bounds = getLocalBounds().reduced(12);
-    titleLabel.setBounds(bounds.removeFromTop(30));
+    auto bounds = getLocalBounds().reduced(16);
+    titleLabel.setBounds(bounds.removeFromTop(34));
 
-    auto lineHeight = 24;
+    const int lineHeight = 26;
     totalEventsLabel.setBounds(bounds.removeFromTop(lineHeight));
     uniquePluginsLabel.setBounds(bounds.removeFromTop(lineHeight));
     durationLabel.setBounds(bounds.removeFromTop(lineHeight));
@@ -82,23 +83,28 @@ void PreviewModal::resized()
     otherLabel.setBounds(bounds.removeFromTop(lineHeight));
     transportLabel.setBounds(bounds.removeFromTop(lineHeight));
 
+    bounds.removeFromTop(12);
+    auto buttonRowOne = bounds.removeFromTop(40);
+    const int wideButton = 110;
+    playButton.setBounds(buttonRowOne.removeFromLeft(wideButton));
+    buttonRowOne.removeFromLeft(8);
+    pauseButton.setBounds(buttonRowOne.removeFromLeft(wideButton));
+    buttonRowOne.removeFromLeft(8);
+    stopButton.setBounds(buttonRowOne.removeFromLeft(wideButton));
+
     bounds.removeFromTop(10);
-    auto buttonRow = bounds.removeFromTop(30);
-    playButton.setBounds(buttonRow.removeFromLeft(80));
-    buttonRow.removeFromLeft(6);
-    pauseButton.setBounds(buttonRow.removeFromLeft(80));
-    buttonRow.removeFromLeft(6);
-    stopButton.setBounds(buttonRow.removeFromLeft(80));
-    buttonRow.removeFromLeft(6);
-    renderButton.setBounds(buttonRow.removeFromLeft(80));
-    buttonRow.removeFromLeft(6);
-    openFolderButton.setBounds(buttonRow.removeFromLeft(100));
+    auto buttonRowTwo = bounds.removeFromTop(40);
+    const int secondaryButton = 140;
+    renderButton.setBounds(buttonRowTwo.removeFromLeft(secondaryButton));
+    buttonRowTwo.removeFromLeft(8);
+    openFolderButton.setBounds(buttonRowTwo.removeFromLeft(secondaryButton));
 
-    bounds.removeFromTop(6);
-    closeButton.setBounds(bounds.removeFromTop(28).removeFromLeft(100));
+    bounds.removeFromTop(12);
+    auto closeRow = bounds.removeFromTop(36);
+    closeButton.setBounds(closeRow.withSizeKeepingCenter(140, 32));
 
-    bounds.removeFromTop(8);
-    renderInfoLabel.setBounds(bounds.removeFromTop(40));
+    bounds.removeFromTop(12);
+    renderInfoLabel.setBounds(bounds.removeFromTop(50));
 }
 
 void PreviewModal::timerCallback()
@@ -132,6 +138,7 @@ void PreviewModal::refreshSummaryAndState()
         const float progress = pluginManager.getRenderProgress();
         juce::String progressText = "Rendering... " + juce::String(progress * 100.0f, 1) + "%";
         renderInfoLabel.setText(progressText, juce::dontSendNotification);
+        DBG("PreviewModal render progress label update: " << progressText);
     }
 
     const bool hasEvents = summary.totalEvents > 0;
@@ -187,11 +194,20 @@ void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, doub
     renderInfoLabel.setText("Render starting...", juce::dontSendNotification);
 
     auto safeThis = juce::Component::SafePointer<PreviewModal>(this);
+    pm.setRenderProgressCallback([safeThis](float progress)
+    {
+        if (auto* self = safeThis.getComponent())
+        {
+            juce::String progressText = "Rendering... " + juce::String(progress * 100.0f, 1) + "%";
+            self->renderInfoLabel.setText(progressText, juce::dontSendNotification);
+        }
+    });
     pm.beginExclusiveRender(sampleRate, blockSize);
 
     std::thread([safeThis, &pm, folder, blockSize, tailSeconds, projectName]()
     {
         const bool ok = pm.renderMaster(folder, projectName, blockSize, tailSeconds);
+        pm.clearRenderProgressCallback();
         pm.endExclusiveRender();
         juce::MessageManager::callAsync([safeThis, ok, folder]()
         {
@@ -200,7 +216,7 @@ void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, doub
                 self->renderJobRunning.store(false);
                 self->lastRenderFolder = folder;
                 if (ok)
-                    self->renderInfoLabel.setText("Render complete. Master.wav saved to " + folder.getFullPathName(),
+                    self->renderInfoLabel.setText("Render complete. Wav files saved to " + folder.getFullPathName(),
                         juce::dontSendNotification);
                 else
                     self->renderInfoLabel.setText("Render failed. See logs for details.",

@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <atomic>
+#include <functional>
 
 #include "MidiManager.h"
 #include "PluginWindow.h"
@@ -162,6 +163,8 @@ public:
         const juce::String& projectName,
         int blockSize,
         double tailSeconds = 2.0);
+    void setRenderProgressCallback(std::function<void(float)> callback);
+    void clearRenderProgressCallback();
 
     void previewPlay();
     void previewPause();
@@ -232,12 +235,15 @@ private:
     int liveBlockSizeBackup = 0;
     std::atomic<bool> renderInProgress{ false };
     std::atomic<float> renderProgress{ 0.0f };
+    juce::CriticalSection renderCallbackLock;
+    std::function<void(float)> renderProgressCallback;
 
     void enqueueMasterForPreview(const std::vector<MyMidiMessage>& source,
         double offsetMs,
         double baseTimestamp);
     void prepareAllPlugins(double sampleRate, int blockSize);
     void invokeOnMessageThreadBlocking(std::function<void()> fn);
+    void notifyRenderProgress(float progress);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };
