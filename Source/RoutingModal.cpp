@@ -35,6 +35,8 @@ RoutingModal::RoutingModal(PluginManager& manager)
     addRuleButton.onClick = [this]() { addRule(); };
     removeRuleButton.onClick = [this]() { removeRule(); };
     saveButton.onClick = [this]() { saveAndApply(); };
+    saveXmlButton.onClick = [this]() { saveRoutingToFile(); };
+    loadXmlButton.onClick = [this]() { loadRoutingFromFile(); };
     closeButton.onClick = [this]()
     {
         if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
@@ -49,6 +51,8 @@ RoutingModal::RoutingModal(PluginManager& manager)
     addAndMakeVisible(addRuleButton);
     addAndMakeVisible(removeRuleButton);
     addAndMakeVisible(saveButton);
+    addAndMakeVisible(saveXmlButton);
+    addAndMakeVisible(loadXmlButton);
     addAndMakeVisible(closeButton);
     addAndMakeVisible(statusLabel);
 
@@ -156,6 +160,10 @@ void RoutingModal::resized()
     auto footer = bounds.removeFromTop(30);
     saveButton.setBounds(footer.removeFromLeft(100));
     footer.removeFromLeft(8);
+    saveXmlButton.setBounds(footer.removeFromLeft(100));
+    footer.removeFromLeft(8);
+    loadXmlButton.setBounds(footer.removeFromLeft(100));
+    footer.removeFromLeft(8);
     closeButton.setBounds(footer.removeFromLeft(100));
     statusLabel.setBounds(bounds);
 }
@@ -237,6 +245,39 @@ void RoutingModal::saveAndApply()
     stems = pluginManager.getStemConfigs(); // reload after sanitisation
     statusLabel.setText("Routing updated.", juce::dontSendNotification);
     refreshed();
+}
+
+void RoutingModal::saveRoutingToFile()
+{
+    juce::FileChooser chooser("Save Routing XML", juce::File(), "*.xml");
+    if (chooser.browseForFileToSave(true))
+    {
+        auto file = chooser.getResult().withFileExtension(".xml");
+        if (pluginManager.saveRoutingConfigToFile(file))
+            statusLabel.setText("Routing saved to " + file.getFileName(), juce::dontSendNotification);
+        else
+            statusLabel.setText("Failed to save routing XML.", juce::dontSendNotification);
+    }
+}
+
+void RoutingModal::loadRoutingFromFile()
+{
+    juce::FileChooser chooser("Load Routing XML", juce::File(), "*.xml");
+    if (chooser.browseForFileToOpen())
+    {
+        auto file = chooser.getResult();
+        if (pluginManager.loadRoutingConfigFromFile(file))
+        {
+            pluginManager.rebuildRouterTagIndexFromConductor();
+            stems = pluginManager.getStemConfigs();
+            statusLabel.setText("Routing loaded from " + file.getFileName(), juce::dontSendNotification);
+            refreshed();
+        }
+        else
+        {
+            statusLabel.setText("Failed to load routing XML.", juce::dontSendNotification);
+        }
+    }
 }
 
 std::vector<juce::String> RoutingModal::parseTags(const juce::String& text) const

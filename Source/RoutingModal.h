@@ -37,6 +37,8 @@ private:
     void addRule();
     void removeRule();
     void saveAndApply();
+    void saveRoutingToFile();
+    void loadRoutingFromFile();
 
     std::vector<juce::String> parseTags(const juce::String& text) const;
     int getSelectedRule() const;
@@ -63,5 +65,7 @@ private:
     juce::TextButton addRuleButton{ "Add Rule" };
     juce::TextButton removeRuleButton{ "Remove Rule" };
     juce::TextButton saveButton{ "Save" };
+    juce::TextButton saveXmlButton{ "Save XML" };
+    juce::TextButton loadXmlButton{ "Load XML" };
     juce::TextButton closeButton{ "Close" };
 };
