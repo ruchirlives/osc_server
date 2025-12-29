@@ -73,5 +73,6 @@ private:
     juce::TextButton recordCaptureButton{ "Record" };
     juce::TextButton stopCaptureButton{ "Stop" };
     juce::TextButton debugCaptureButton{ "Debug" };
+    juce::TextButton previewButton{ "Preview" };
     juce::Label captureStatusLabel{ "captureStatusLabel", "Recording: OFF" };
 };

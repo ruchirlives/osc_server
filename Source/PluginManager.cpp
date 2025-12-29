@@ -11,6 +11,7 @@
 #include "PluginManager.h"
 #include "MainComponent.h"
 #include <unordered_map>
+#include <unordered_set>
 #include "VST3Visitor.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>
@@ -375,7 +376,7 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         }
     }
 
-    logBusRmsIfNeeded(bufferToFill.numSamples);
+    //logBusRmsIfNeeded(bufferToFill.numSamples);
 
     // clear incoming MIDI and advance the host clock
     incomingMidi.clear();
@@ -1036,6 +1037,21 @@ void PluginManager::printMasterTaggedMidiBufferSummary()
         << (captureEnabled ? "ON" : "OFF"));
 }
 
+void PluginManager::debugPrintMasterTaggedMidiBuffer()
+{
+    const juce::ScopedLock sl(midiCriticalSection);
+    DBG("=== Master Tagged MIDI Buffer Dump (" << masterTaggedMidiBuffer.size() << " events) ===");
+    int index = 0;
+    for (const auto& entry : masterTaggedMidiBuffer)
+    {
+        DBG("#" << index++
+            << " plugin=" << entry.pluginId
+            << " ts(ms)=" << entry.timestamp
+            << " msg=" << entry.message.getDescription());
+    }
+    DBG("=== End of Master Tagged MIDI Buffer ===");
+}
+
 void PluginManager::startCapture(double startMs)
 {
     const juce::ScopedLock sl(midiCriticalSection);
@@ -1061,6 +1077,137 @@ std::vector<MyMidiMessage> PluginManager::snapshotMasterTaggedMidiBuffer()
 {
     const juce::ScopedLock sl(midiCriticalSection);
     return { masterTaggedMidiBuffer.begin(), masterTaggedMidiBuffer.end() };
+}
+
+PluginManager::MasterBufferSummary PluginManager::getMasterTaggedMidiSummary() const
+{
+    auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+    const juce::ScopedLock sl(lock);
+    MasterBufferSummary summary;
+    summary.totalEvents = masterTaggedMidiBuffer.size();
+
+    if (masterTaggedMidiBuffer.empty())
+        return summary;
+
+    const auto firstTimestamp = masterTaggedMidiBuffer.front().timestamp;
+    const auto lastTimestamp = masterTaggedMidiBuffer.back().timestamp;
+    summary.durationMs = juce::jmax<juce::int64>(0, lastTimestamp - firstTimestamp);
+
+    std::unordered_set<std::string> uniquePlugins;
+    uniquePlugins.reserve(masterTaggedMidiBuffer.size());
+
+    for (const auto& message : masterTaggedMidiBuffer)
+    {
+        uniquePlugins.insert(message.pluginId.toStdString());
+
+        if (message.message.isNoteOn())
+            ++summary.noteOnCount;
+        else if (message.message.isNoteOff())
+            ++summary.noteOffCount;
+        else if (message.message.isController())
+            ++summary.ccCount;
+        else
+            ++summary.otherCount;
+    }
+
+    summary.uniquePluginCount = static_cast<int>(uniquePlugins.size());
+    return summary;
+}
+
+void PluginManager::enqueueMasterForPreview(double offsetMs, double nowHostMs)
+{
+    const double playbackStartTimestamp = captureStartMs + offsetMs;
+    taggedMidiBuffer.clear();
+
+    for (const auto& message : masterTaggedMidiBuffer)
+    {
+        if (message.timestamp < playbackStartTimestamp)
+            continue;
+
+        MyMidiMessage scheduled = message;
+        scheduled.timestamp = static_cast<juce::int64>(nowHostMs + (static_cast<double>(message.timestamp) - playbackStartTimestamp));
+        insertSortedMidiMessage(taggedMidiBuffer, std::move(scheduled));
+    }
+}
+
+void PluginManager::previewPlay()
+{
+    const double nowMs = juce::Time::getMillisecondCounterHiRes();
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        if (masterTaggedMidiBuffer.empty())
+            return;
+    }
+
+    resetPlayback();
+
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        if (masterTaggedMidiBuffer.empty())
+            return;
+
+        if (!previewActive)
+        {
+            previewActive = true;
+            previewPaused = false;
+            previewOffsetMs = 0.0;
+        }
+        else if (previewPaused)
+        {
+            previewPaused = false;
+        }
+
+        previewStartHostMs = nowMs;
+        enqueueMasterForPreview(previewOffsetMs, nowMs);
+    }
+}
+
+void PluginManager::previewPause()
+{
+    const double nowMs = juce::Time::getMillisecondCounterHiRes();
+    bool shouldStop = false;
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+
+        if (!previewActive || previewPaused)
+            return;
+
+        previewOffsetMs += (nowMs - previewStartHostMs);
+        previewPauseHostMs = nowMs;
+        previewPaused = true;
+        taggedMidiBuffer.clear();
+        shouldStop = true;
+    }
+
+    if (shouldStop)
+        stopAllNotes();
+}
+
+void PluginManager::previewStop()
+{
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        previewActive = false;
+        previewPaused = false;
+        previewOffsetMs = 0.0;
+        taggedMidiBuffer.clear();
+    }
+    stopAllNotes();
+    resetPlayback();
+}
+
+bool PluginManager::isPreviewActive() const
+{
+    auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+    const juce::ScopedLock sl(lock);
+    return previewActive;
+}
+
+bool PluginManager::isPreviewPaused() const
+{
+    auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+    const juce::ScopedLock sl(lock);
+    return previewPaused;
 }
 
 void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce::String& pluginId, juce::int64& adjustedTimestamp)

@@ -11,6 +11,10 @@
       <FILE id="mx45n4" name="AudioRouter.cpp" compile="1" resource="0" file="Source/AudioRouter.cpp"/>
       <FILE id="VeJmQ4" name="RoutingModal.h" compile="0" resource="0" file="Source/RoutingModal.h"/>
       <FILE id="HUgucD" name="RoutingModal.cpp" compile="1" resource="0" file="Source/RoutingModal.cpp"/>
+      <FILE id="{6D0D3F49-9F4D-12B0-84F4-AB1BF0AC63C5}" name="PreviewModal.h" compile="0" resource="0"
+            file="Source/PreviewModal.h"/>
+      <FILE id="{21C7C6D0-F962-64E1-07DF-15B7B460DDD5}" name="PreviewModal.cpp" compile="1" resource="0"
+            file="Source/PreviewModal.cpp"/>
       <FILE id="GRNlv0" name="HostPlayHead.h" compile="0" resource="0" file="Source/HostPlayHead.h"/>
       <FILE id="FkV1NB" name="RenamePluginDialog.cpp" compile="1" resource="0"
             file="Source/RenamePluginDialog.cpp"/>

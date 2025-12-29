@@ -1,4 +1,5 @@
 #include "RoutingModal.h"
+#include "PreviewModal.h"
 
 RoutingModal::RoutingModal(PluginManager& manager)
     : pluginManager(manager), rulesList("rulesList", &rulesModel)
@@ -59,6 +60,27 @@ RoutingModal::RoutingModal(PluginManager& manager)
     debugCaptureButton.onClick = [this]()
     {
         pluginManager.printMasterTaggedMidiBufferSummary();
+        pluginManager.debugPrintMasterTaggedMidiBuffer();
+    };
+    previewButton.onClick = [this]()
+    {
+        auto summary = pluginManager.getMasterTaggedMidiSummary();
+        if (summary.totalEvents == 0)
+        {
+            statusLabel.setText("No capture data to preview.", juce::dontSendNotification);
+            return;
+        }
+
+        auto* content = new PreviewModal(pluginManager);
+        content->setSize(380, 260);
+        juce::DialogWindow::LaunchOptions options;
+        options.dialogTitle = "Capture Preview";
+        options.content.setOwned(content);
+        options.dialogBackgroundColour = juce::Colours::black;
+        options.escapeKeyTriggersCloseButton = true;
+        options.useNativeTitleBar = true;
+        options.resizable = false;
+        options.launchAsync();
     };
 
     addAndMakeVisible(addStemButton);
@@ -74,6 +96,7 @@ RoutingModal::RoutingModal(PluginManager& manager)
     addAndMakeVisible(recordCaptureButton);
     addAndMakeVisible(stopCaptureButton);
     addAndMakeVisible(debugCaptureButton);
+    addAndMakeVisible(previewButton);
     addAndMakeVisible(captureStatusLabel);
 
     stems = pluginManager.getStemConfigs();
@@ -189,6 +212,8 @@ void RoutingModal::resized()
     stopCaptureButton.setBounds(captureRow.removeFromLeft(80));
     captureRow.removeFromLeft(6);
     debugCaptureButton.setBounds(captureRow.removeFromLeft(80));
+    captureRow.removeFromLeft(6);
+    previewButton.setBounds(captureRow.removeFromLeft(80));
     captureRow.removeFromLeft(10);
     captureStatusLabel.setBounds(captureRow);
 
@@ -290,6 +315,9 @@ void RoutingModal::updateCaptureControls()
     stopCaptureButton.setEnabled(recording);
     captureStatusLabel.setText(recording ? "Recording: ON" : "Recording: OFF",
         juce::dontSendNotification);
+
+    const auto summary = pluginManager.getMasterTaggedMidiSummary();
+    previewButton.setEnabled(summary.totalEvents > 0);
 }
 
 void RoutingModal::saveRoutingToFile()

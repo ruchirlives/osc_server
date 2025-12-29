@@ -60,6 +60,16 @@ public:
         juce::String name;
         std::vector<StemRule> rules;
     };
+    struct MasterBufferSummary
+    {
+        std::size_t totalEvents = 0;
+        int uniquePluginCount = 0;
+        double durationMs = 0.0;
+        int noteOnCount = 0;
+        int noteOffCount = 0;
+        int ccCount = 0;
+        int otherCount = 0;
+    };
     // In PluginManager.h (or wherever you want to define it)
     struct PlayHeadImpl : public juce::AudioPlayHead
     {
@@ -129,11 +139,19 @@ public:
     void printTaggedMidiBuffer();
     void clearMasterTaggedMidiBuffer();
     void printMasterTaggedMidiBufferSummary();
+    void debugPrintMasterTaggedMidiBuffer();
 
     void startCapture(double startMs);
     void stopCapture();
     bool isCaptureEnabled() const;
     std::vector<MyMidiMessage> snapshotMasterTaggedMidiBuffer();
+    MasterBufferSummary getMasterTaggedMidiSummary() const;
+
+    void previewPlay();
+    void previewPause();
+    void previewStop();
+    bool isPreviewActive() const;
+    bool isPreviewPaused() const;
 
     juce::MemoryBlock getPluginState(const juce::String& pluginId);
     void restorePluginState(const juce::String& pluginId, const juce::MemoryBlock& state);
@@ -169,6 +187,11 @@ private:
     bool captureEnabled = false;
     double captureStartMs = 0.0;
     static constexpr std::size_t masterCaptureLimit = 500000;
+    bool previewActive = false;
+    bool previewPaused = false;
+    double previewStartHostMs = 0.0;
+    double previewPauseHostMs = 0.0;
+    double previewOffsetMs = 0.0;
 
     std::map<juce::String, std::map<int, std::vector<juce::String>>> channelTagsMap;
 
@@ -188,6 +211,8 @@ private:
     double currentSampleRate = 44100.0;
     juce::int64  totalSamplesProcessed{ 0 };
     MainComponent* mainComponent;
+
+    void enqueueMasterForPreview(double offsetMs, double nowHostMs);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };
