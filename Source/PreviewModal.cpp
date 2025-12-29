@@ -101,7 +101,7 @@ void PreviewModal::resized()
 
     bounds.removeFromTop(12);
     auto closeRow = bounds.removeFromTop(36);
-    closeButton.setBounds(closeRow.withSizeKeepingCenter(140, 32));
+    closeButton.setBounds(closeRow.withSizeKeepingCentre(140, 32));
 
     bounds.removeFromTop(12);
     renderInfoLabel.setBounds(bounds.removeFromTop(50));
