@@ -51,7 +51,13 @@ void AudioRouter::routeAudio(const juce::String& pluginInstanceId,
     const TagSet empty;
     const TagSet& tags = (it != tagsByPluginId.end()) ? it->second : empty;
 
-    const auto stem = chooseStemBusFor(tags);
+    const auto stem = chooseStemBusFor(pluginInstanceId, tags);
+    if (renderDebugEnabled)
+    {
+        const auto key = pluginInstanceId.toStdString();
+        if (renderDebugLoggedPlugins.insert(key).second)
+            logRenderMatch(pluginInstanceId, tags, stem.isNotEmpty() ? stem : "Master");
+    }
     if (stem.isNotEmpty() && stem != "Master")
         addToBus(stem, pluginAudio, numSamples);
 }
@@ -159,8 +165,11 @@ AudioRouter::TagSet AudioRouter::normaliseTags(const std::vector<juce::String>& 
     return out;
 }
 
-juce::String AudioRouter::chooseStemBusFor(const TagSet& tags) const
+juce::String AudioRouter::chooseStemBusFor(const juce::String& pluginInstanceId, const TagSet& tags) const
 {
+    auto normalizedId = pluginInstanceId.trim().toLowerCase();
+    const auto idStr = normalizedId.toStdString();
+
     for (const auto& stem : stemDefinitions)
     {
         for (const auto& rule : stem.rules)
@@ -168,14 +177,10 @@ juce::String AudioRouter::chooseStemBusFor(const TagSet& tags) const
             if (rule.empty())
                 continue;
 
-            const bool matches = std::all_of(rule.begin(), rule.end(),
-                [&tags](const auto& required)
+            const bool matches = std::any_of(rule.begin(), rule.end(),
+                [&idStr](const auto& required)
                 {
-                    return std::any_of(tags.begin(), tags.end(),
-                        [&required](const auto& tag)
-                        {
-                            return tag.find(required) != std::string::npos;
-                        });
+                    return !idStr.empty() && idStr.find(required) != std::string::npos;
                 });
 
             if (matches)
@@ -222,4 +227,27 @@ void AudioRouter::addToBus(const juce::String& busName,
     // If src is mono, duplicate into remaining channels (optional but handy)
     if (src.getNumChannels() == 1 && dst.getNumChannels() >= 2)
         dst.addFrom(1, 0, src, 0, 0, numSamples);
+}
+
+void AudioRouter::setRenderDebugEnabled(bool enabled)
+{
+    renderDebugEnabled = enabled;
+    if (renderDebugEnabled)
+        renderDebugLoggedPlugins.clear();
+}
+
+void AudioRouter::logRenderMatch(const juce::String& pluginInstanceId, const TagSet& tags, const juce::String& stemName)
+{
+    juce::String tagList;
+    bool first = true;
+    for (const auto& tag : tags)
+    {
+        if (!first)
+            tagList += ", ";
+        first = false;
+        tagList += juce::String(tag);
+    }
+
+    juce::String stemLabel = stemName.isNotEmpty() ? stemName : "Master";
+    DBG("Render Routing: " + pluginInstanceId + " -> " + stemLabel + " tags=[" + tagList + "]");
 }

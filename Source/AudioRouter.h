@@ -31,6 +31,7 @@ public:
     void routeAudio(const juce::String& pluginInstanceId,
                     const juce::AudioBuffer<float>& pluginAudio,
                     int numSamples);
+    void setRenderDebugEnabled(bool enabled);
 
     // Non-audio thread: rebuild tags lookup from orchestra data
     void rebuildTagIndex(const std::vector<InstrumentInfo>& orchestra);
@@ -51,7 +52,7 @@ private:
 
     // ===== Routing policy (temporary MVP) =====
     // Later we’ll replace this with match rules.
-    juce::String chooseStemBusFor(const TagSet& tags) const;
+    juce::String chooseStemBusFor(const juce::String& pluginInstanceId, const TagSet& tags) const;
 
     static TagSet normaliseTags(const std::vector<juce::String>& tags);
 
@@ -60,11 +61,15 @@ private:
     void addToBus(const juce::String& busName,
                   const juce::AudioBuffer<float>& src,
                   int numSamples);
+    void logRenderMatch(const juce::String& pluginInstanceId, const TagSet& tags, const juce::String& stemName);
 
 private:
     double sr = 0.0;
     int maxBlock = 0;
     int channels = 2;
+
+    bool renderDebugEnabled = false;
+    std::unordered_set<std::string> renderDebugLoggedPlugins;
 
     // Buses (audio thread writes into these each block)
     std::map<juce::String, juce::AudioBuffer<float>> buses;

@@ -154,7 +154,7 @@ void PreviewModal::refreshSummaryAndState()
         const float progress = pluginManager.getRenderProgress();
         juce::String progressText = "Rendering... " + juce::String(progress * 100.0f, 1) + "%";
         renderInfoLabel.setText(progressText, juce::dontSendNotification);
-        DBG("PreviewModal render progress label update: " << progressText);
+        //DBG("PreviewModal render progress label update: " << progressText);
     }
 
     const bool hasEvents = summary.totalEvents > 0;

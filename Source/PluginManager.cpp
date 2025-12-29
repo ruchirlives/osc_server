@@ -672,7 +672,7 @@ void PluginManager::rebuildRouterTagIndexFromConductor()
 
 namespace
 {
-std::vector<std::string> normaliseStringList(const std::vector<juce::String>& tags)
+std::vector<std::string> normaliseRuleTokens(const std::vector<juce::String>& tags)
 {
     std::vector<std::string> out;
     out.reserve(tags.size());
@@ -687,6 +687,15 @@ std::vector<std::string> normaliseStringList(const std::vector<juce::String>& ta
     }
 
     return out;
+}
+
+std::string normalisePluginId(const juce::String& pluginId)
+{
+    auto trimmed = pluginId.trim();
+    if (trimmed.isEmpty())
+        return {};
+
+    return trimmed.toLowerCase().toStdString();
 }
 }
 
@@ -706,7 +715,7 @@ std::vector<std::vector<int>> PluginManager::getStemRuleMatchCounts() const
         normalizedRules.reserve(stem.rules.size());
 
         for (const auto& rule : stem.rules)
-            normalizedRules.push_back(normaliseStringList(rule.tags));
+            normalizedRules.push_back(normaliseRuleTokens(rule.tags));
 
         if (normalizedRules.empty())
         {
@@ -716,8 +725,8 @@ std::vector<std::vector<int>> PluginManager::getStemRuleMatchCounts() const
 
         for (const auto& instrument : orchestra)
         {
-            const auto instrumentTags = normaliseStringList(instrument.tags);
-            if (instrumentTags.empty())
+            const auto instrumentId = normalisePluginId(instrument.pluginInstanceId);
+            if (instrumentId.empty())
                 continue;
 
             for (size_t r = 0; r < normalizedRules.size(); ++r)
@@ -726,14 +735,10 @@ std::vector<std::vector<int>> PluginManager::getStemRuleMatchCounts() const
                 if (required.empty())
                     continue;
 
-                const bool matches = std::all_of(required.begin(), required.end(),
-                    [&instrumentTags](const auto& requiredTag)
+                const bool matches = std::any_of(required.begin(), required.end(),
+                    [&instrumentId](const auto& requiredTag)
                     {
-                        return std::any_of(instrumentTags.begin(), instrumentTags.end(),
-                            [&requiredTag](const auto& tag)
-                            {
-                                return tag.find(requiredTag) != std::string::npos;
-                            });
+                        return instrumentId.find(requiredTag) != std::string::npos;
                     });
 
                 if (matches)
@@ -1477,6 +1482,7 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
 
     const juce::ScopedLock pluginLock(pluginInstanceLock);
     audioRouter.prepare(sampleRate, blockSize, 2);
+    audioRouter.setRenderDebugEnabled(true);
     for (int64 blockStart = 0; blockStart < endSample; blockStart += blockSize)
     {
         const int numSamples = (int)juce::jmin<int64>(blockSize, endSample - blockStart);
@@ -1548,6 +1554,7 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
     }
 
     writers.clear();
+    audioRouter.setRenderDebugEnabled(false);
     renderProgress.store(1.0f);
     notifyRenderProgress(1.0f);
     return true;
