@@ -333,6 +333,10 @@ void RoutingModal::updateCaptureControls()
     stopCaptureButton.setEnabled(recording);
     captureStatusLabel.setText(recording ? "Recording: ON" : "Recording: OFF",
         juce::dontSendNotification);
+    if (recordButtonDefaultColour == juce::Colour())
+        recordButtonDefaultColour = recordCaptureButton.findColour(juce::TextButton::buttonColourId);
+    const juce::Colour highlight = recording ? juce::Colours::crimson : recordButtonDefaultColour;
+    recordCaptureButton.setColour(juce::TextButton::buttonColourId, highlight);
 
     const auto summary = pluginManager.getMasterTaggedMidiSummary();
     previewButton.setEnabled(summary.totalEvents > 0);

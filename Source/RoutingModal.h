@@ -47,6 +47,7 @@ private:
     PluginManager& pluginManager;
     std::vector<PluginManager::StemConfig> stems;
     int selectedStem = -1;
+    juce::Colour recordButtonDefaultColour;
 
     juce::Label titleLabel{ "titleLabel", "Routing Setup" };
     juce::Label stemsLabel{ "stemsLabel", "Stems" };
