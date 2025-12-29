@@ -7,6 +7,10 @@
               companyEmail="@ruchirlives" companyWebsite="https://github.com/ruchirlives">
   <MAINGROUP id="pN3WCX" name="OSCDawServer">
     <GROUP id="{AA5004D7-8BC2-FCC1-C271-B3AAE1415B2A}" name="Source">
+      <FILE id="WjYzAf" name="AudioRouter.h" compile="0" resource="0" file="Source/AudioRouter.h"/>
+      <FILE id="mx45n4" name="AudioRouter.cpp" compile="1" resource="0" file="Source/AudioRouter.cpp"/>
+      <FILE id="VeJmQ4" name="RoutingModal.h" compile="0" resource="0" file="Source/RoutingModal.h"/>
+      <FILE id="HUgucD" name="RoutingModal.cpp" compile="1" resource="0" file="Source/RoutingModal.cpp"/>
       <FILE id="GRNlv0" name="HostPlayHead.h" compile="0" resource="0" file="Source/HostPlayHead.h"/>
       <FILE id="FkV1NB" name="RenamePluginDialog.cpp" compile="1" resource="0"
             file="Source/RenamePluginDialog.cpp"/>

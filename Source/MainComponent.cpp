@@ -1,6 +1,7 @@
 ﻿#include "MainComponent.h"
 #include "PluginScanModal.h"
 #include "PluginInstancesModal.h"
+#include "RoutingModal.h"
 
 #if JUCE_WINDOWS
 #include <windows.h>
@@ -121,6 +122,11 @@ MainComponent::MainComponent()
 	listPluginInstancesButton.onClick = [this]()
 	{ showPluginInstancesModal(); }; // Use lambda for button click handling
 	listPluginInstancesButton.setTooltip("Display every plugin instance and its ID.");
+
+	addAndMakeVisible(routingButton);
+	routingButton.onClick = [this]()
+	{ showRoutingModal(); };
+	routingButton.setTooltip("Configure stems and match rules for the audio router.");
 
 	// Initialize the "Send Test Note" button
 	addAndMakeVisible(sendTestNoteButton);
@@ -319,11 +325,15 @@ void MainComponent::resized()
 
 	// Row 1 (bottom row) - Scan, Select Plugin, Update, Open Plugin, List Plugin Instances
 	const int row1Y = buttonLayout.rowY[3];
-	ScanButton.setBounds(margin, row1Y, buttonWidth, buttonHeight);
-	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	openPluginButton.setBounds(pluginBox.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
-	aboutButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row1Y, buttonWidth, buttonHeight);
+	const int row1Buttons = 6;
+	const int row1ButtonWidth = juce::jmax(90, (windowWidth - 2 * margin - spacingX * (row1Buttons - 1)) / row1Buttons);
+
+	ScanButton.setBounds(margin, row1Y, row1ButtonWidth, buttonHeight);
+	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
+	openPluginButton.setBounds(pluginBox.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
+	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
+	aboutButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
+	routingButton.setBounds(aboutButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
 
 	// Row 2 - Instrument management and recording
 	const int row2Y = buttonLayout.rowY[2];
@@ -854,6 +864,22 @@ void MainComponent::showPluginInstancesModal()
 			updatePluginInstanceReferences(oldId, newId);
 		});
 	modalContent->setSize(420, 360);
+	options.content.setOwned(modalContent);
+	options.launchAsync();
+}
+
+void MainComponent::showRoutingModal()
+{
+	juce::DialogWindow::LaunchOptions options;
+	options.dialogTitle = "Routing";
+	options.dialogBackgroundColour = findColour(juce::ResizableWindow::backgroundColourId);
+	options.escapeKeyTriggersCloseButton = true;
+	options.useNativeTitleBar = true;
+	options.resizable = true;
+	options.componentToCentreAround = this;
+
+	auto* modalContent = new RoutingModal(pluginManager);
+	modalContent->setSize(640, 420);
 	options.content.setOwned(modalContent);
 	options.launchAsync();
 }

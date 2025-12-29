@@ -246,6 +246,7 @@ public:
 	void setSelectedAudioDriver(const juce::String& driverName);
 	void setSelectedAudioDevice(const juce::String& deviceName);
 	void initOrchestraTable();
+	void showRoutingModal();
 	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
 	void restoreProject(bool append = false);
 
@@ -332,6 +333,7 @@ private:
 	// Scan for plugins button
 	juce::TextButton ScanButton{ "Scan for plugins" }; // Button to Scan for plugins
 	juce::TextButton aboutButton{ "About" }; // Button to show app info
+	juce::TextButton routingButton{ "Routing" }; // Button to open routing modal
 
 	// Save and restore buttons
 	juce::TextButton saveButton{ "Save" }; // Button to save plugin states

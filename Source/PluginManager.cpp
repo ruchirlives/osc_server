@@ -19,6 +19,30 @@ namespace
 {
 constexpr std::size_t kMaxTaggedMidiEvents = 50000;
 constexpr juce::uint32 kMidiOverflowLogIntervalMs = 2000;
+
+std::vector<juce::String> sanitiseTags(const std::vector<juce::String>& tags)
+{
+    std::vector<juce::String> cleaned;
+    cleaned.reserve(tags.size());
+
+    for (const auto& tag : tags)
+    {
+        auto t = tag.trim();
+        if (t.isEmpty())
+            continue;
+
+        auto lowered = t.toLowerCase();
+        if (std::find_if(cleaned.begin(), cleaned.end(), [&lowered](const juce::String& existing)
+            {
+                return existing.compareIgnoreCase(lowered) == 0;
+            }) == cleaned.end())
+        {
+            cleaned.push_back(lowered);
+        }
+    }
+
+    return cleaned;
+}
 }
 
 HostPlayHead hostPlayHead;
@@ -75,6 +99,20 @@ PluginManager::~PluginManager()
 void PluginManager::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
     currentSampleRate = sampleRate;
+
+    int outputChannels = 2;
+    if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
+    {
+        auto activeOutputs = audioDevice->getActiveOutputChannels().countNumberOfSetBits();
+        if (activeOutputs > 0)
+            outputChannels = activeOutputs;
+    }
+
+    rmsDebugIntervalSamples = static_cast<juce::int64>(sampleRate);
+    rmsDebugSamplesAccumulated = 0;
+
+    audioRouter.prepare(sampleRate, samplesPerBlockExpected, outputChannels);
+
     const juce::ScopedLock pluginLock(pluginInstanceLock);
     for (auto& [pluginId, pluginInstance] : pluginInstances)
     {
@@ -134,6 +172,8 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     if (auto* audioDevice = deviceManager.getCurrentAudioDevice(); audioDevice != nullptr)
     {
         double sampleRate = audioDevice->getCurrentSampleRate();
+
+        audioRouter.beginBlock(bufferToFill.numSamples);
 
         // Purge MIDI messages for non-existent plugins
         taggedMidiBuffer.erase(
@@ -261,6 +301,8 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                     continue;
                 }
 
+                audioRouter.routeAudio(pluginId, tempBuffer, bufferToFill.numSamples);
+
                 // g) mix plugin output back into the host buffer
                 for (int ch = 0; ch < bufferToFill.buffer->getNumChannels(); ++ch)
                 {
@@ -313,6 +355,8 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             DBG("Unknown exception in audio tap callback");
         }
     }
+
+    logBusRmsIfNeeded(bufferToFill.numSamples);
 
     // clear incoming MIDI and advance the host clock
     incomingMidi.clear();
@@ -444,6 +488,103 @@ void PluginManager::openPluginWindow(juce::String pluginId)
 		DBG("Plugin window not found: " << pluginId);
 		listPluginInstances();
 	}
+}
+
+void PluginManager::logBusRmsIfNeeded(int numSamples)
+{
+    if (numSamples <= 0 || rmsDebugIntervalSamples <= 0)
+        return;
+
+    rmsDebugSamplesAccumulated += numSamples;
+    if (rmsDebugSamplesAccumulated < rmsDebugIntervalSamples)
+        return;
+
+    const auto rmsValues = audioRouter.calculateRmsPerBus(numSamples);
+    juce::String message("Bus RMS: ");
+    for (const auto& [name, rms] : rmsValues)
+    {
+        message << name << "=" << juce::String(rms, 4) << " ";
+    }
+
+    DBG(message.trimEnd());
+    rmsDebugSamplesAccumulated = 0;
+}
+
+std::vector<PluginManager::StemConfig> PluginManager::getStemConfigs() const
+{
+    return stemConfigs;
+}
+
+void PluginManager::setStemConfigs(const std::vector<StemConfig>& configs)
+{
+    auto parseRuleLabel = [](const juce::String& label) -> std::vector<juce::String>
+    {
+        juce::StringArray tokens;
+        tokens.addTokens(label, ",", "");
+        tokens.trim();
+        tokens.removeEmptyStrings();
+
+        std::vector<juce::String> result;
+        result.reserve(tokens.size());
+        for (const auto& t : tokens)
+            result.push_back(t);
+        return result;
+    };
+
+    std::vector<StemConfig> cleaned;
+    cleaned.reserve(configs.size());
+
+    for (const auto& cfg : configs)
+    {
+        auto stemName = cfg.name.trim();
+        if (stemName.isEmpty())
+            continue;
+
+        const bool alreadyExists = std::find_if(cleaned.begin(), cleaned.end(),
+            [&stemName](const StemConfig& other) { return other.name.compareIgnoreCase(stemName) == 0; }) != cleaned.end();
+        if (alreadyExists)
+            continue;
+
+        StemConfig dest;
+        dest.name = stemName;
+
+        for (const auto& rule : cfg.rules)
+        {
+            auto ruleLabel = rule.label.trim();
+            auto ruleTags = !rule.tags.empty() ? rule.tags : parseRuleLabel(ruleLabel);
+            auto normalised = sanitiseTags(ruleTags);
+            if (normalised.empty())
+                continue;
+
+            StemRule cleanedRule;
+            juce::StringArray labelTokens;
+            for (const auto& t : normalised)
+                labelTokens.add(t);
+
+            cleanedRule.label = ruleLabel.isNotEmpty() ? ruleLabel : labelTokens.joinIntoString(", ");
+            cleanedRule.tags = normalised;
+            dest.rules.push_back(std::move(cleanedRule));
+        }
+
+        cleaned.push_back(std::move(dest));
+    }
+
+    stemConfigs = cleaned;
+
+    std::vector<AudioRouter::StemRuleDefinition> definitions;
+    definitions.reserve(stemConfigs.size());
+
+    for (const auto& stem : stemConfigs)
+    {
+        AudioRouter::StemRuleDefinition def;
+        def.stemName = stem.name;
+        for (const auto& rule : stem.rules)
+            def.matchRules.push_back(rule.tags);
+
+        definitions.push_back(std::move(def));
+    }
+
+    audioRouter.setStemRules(definitions);
 }
 
 void PluginManager::instantiateSelectedPlugin(juce::PluginDescription* desc)

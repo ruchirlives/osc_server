@@ -916,6 +916,8 @@ void Conductor::syncOrchestraWithPluginManager()
 			pluginManager.resetPlugin(pluginId);
 		}
 	}
+
+	pluginManager.getAudioRouter().rebuildTagIndex(orchestra);
 }
 
 void Conductor::saveOrchestraData(const juce::String &dataFilePath, const std::vector<InstrumentInfo> &selectedInstruments = {})

@@ -8,6 +8,7 @@
 #include "MidiManager.h"
 #include "PluginWindow.h"
 #include "HostPlayHead.h"
+#include "AudioRouter.h"
 
 
 // Forward declaration
@@ -48,6 +49,16 @@ public:
     {
         juce::String pluginId;
         juce::String pluginName;
+    };
+    struct StemRule
+    {
+        juce::String label;
+        std::vector<juce::String> tags;
+    };
+    struct StemConfig
+    {
+        juce::String name;
+        std::vector<StemRule> rules;
     };
     // In PluginManager.h (or wherever you want to define it)
     struct PlayHeadImpl : public juce::AudioPlayHead
@@ -123,6 +134,12 @@ public:
     void saveAllPluginStates(const juce::String& dataFilePath, std::vector<juce::String> instances = {});
     void restoreAllPluginStates(const juce::String& dataFilePath);
 
+    AudioRouter& getAudioRouter() { return audioRouter; }
+    const AudioRouter& getAudioRouter() const { return audioRouter; }
+    void logBusRmsIfNeeded(int numSamples);
+    std::vector<StemConfig> getStemConfigs() const;
+    void setStemConfigs(const std::vector<StemConfig>& configs);
+
     // Update getter method to return inherited device manager
     juce::AudioDeviceManager& getDeviceManager() { return deviceManager; }
 
@@ -142,6 +159,10 @@ private:
 
     // juce::AudioDeviceManager deviceManager;  // Remove this line
     juce::AudioPluginFormatManager formatManager;
+    AudioRouter audioRouter;
+    juce::int64 rmsDebugSamplesAccumulated = 0;
+    juce::int64 rmsDebugIntervalSamples = 0;
+    std::vector<StemConfig> stemConfigs;
 
     juce::CriticalSection& midiCriticalSection;
     juce::MidiBuffer& incomingMidi;
