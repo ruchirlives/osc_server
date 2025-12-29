@@ -719,7 +719,6 @@ void MainComponent::restoreProject(bool append)
 		closeStatus();
 	}).detach();
 }
-}
 
 void MainComponent::refreshOrchestraTableUI()
 {
