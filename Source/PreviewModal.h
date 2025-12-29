@@ -2,12 +2,14 @@
 
 #include <JuceHeader.h>
 #include "PluginManager.h"
+#include <atomic>
 
 class PreviewModal : public juce::Component,
                      private juce::Timer
 {
 public:
     explicit PreviewModal(PluginManager& manager);
+    ~PreviewModal() override;
 
     void resized() override;
 
@@ -33,8 +35,11 @@ private:
     juce::TextButton stopButton{ "Stop" };
     juce::TextButton closeButton{ "Close" };
     juce::TextButton renderButton{ "Render" };
+    juce::TextButton openFolderButton{ "Open Folder" };
 
     juce::File lastRenderFolder;
+    std::atomic<bool> renderJobRunning{ false };
 
     void handleRenderRequest();
+    void launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds);
 };

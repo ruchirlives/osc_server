@@ -156,6 +156,7 @@ public:
     void beginExclusiveRender(double sampleRate, int blockSize);
     void endExclusiveRender();
     bool isRenderInProgress() const { return renderInProgress.load(); }
+    float getRenderProgress() const { return renderProgress.load(); }
     bool renderMaster(const juce::File& outFolder,
         const juce::String& projectName,
         int blockSize,
@@ -229,9 +230,13 @@ private:
     double liveSampleRateBackup = 0.0;
     int liveBlockSizeBackup = 0;
     std::atomic<bool> renderInProgress{ false };
+    std::atomic<float> renderProgress{ 0.0f };
 
-    void enqueueMasterForPreview(double offsetMs, double nowHostMs);
+    void enqueueMasterForPreview(const std::vector<MyMidiMessage>& source,
+        double offsetMs,
+        double baseTimestamp);
     void prepareAllPlugins(double sampleRate, int blockSize);
+    void invokeOnMessageThreadBlocking(std::function<void()> fn);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

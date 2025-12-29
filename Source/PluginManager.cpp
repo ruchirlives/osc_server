@@ -288,11 +288,11 @@ void PluginManager::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                         scheduledPluginMessages[taggedMessage.pluginId].addEvent(
                             taggedMessage.message,
                             juce::jlimit(0, bufferToFill.numSamples - 1, offset));
-                        DBG("Scheduling preview event plugin=" << taggedMessage.pluginId
-                            << " offset=" << offset
-                            << " blockSamples=" << bufferToFill.numSamples
-                            << " playbackPos=" << playbackSamplePosition
-                            << " msg=" << taggedMessage.message.getDescription());
+                        // DBG("Scheduling preview event plugin=" << taggedMessage.pluginId
+                        //     << " offset=" << offset
+                        //     << " blockSamples=" << bufferToFill.numSamples
+                        //     << " playbackPos=" << playbackSamplePosition
+                        //     << " msg=" << taggedMessage.message.getDescription());
                         consumeMessage = true;
                     }
                     else if (offset < 0)
@@ -1168,6 +1168,23 @@ void PluginManager::prepareAllPlugins(double sampleRate, int blockSize)
     }
 }
 
+void PluginManager::invokeOnMessageThreadBlocking(std::function<void()> fn)
+{
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+    {
+        fn();
+        return;
+    }
+
+    juce::WaitableEvent done;
+    juce::MessageManager::callAsync([fn = std::move(fn), &done]()
+        {
+            fn();
+            done.signal();
+        });
+    done.wait();
+}
+
 void PluginManager::beginExclusiveRender(double sampleRate, int blockSize)
 {
     jassert(sampleRate > 0.0);
@@ -1189,7 +1206,11 @@ void PluginManager::beginExclusiveRender(double sampleRate, int blockSize)
     currentSampleRate = sampleRate;
     currentBlockSize = blockSize;
 
-    prepareAllPlugins(sampleRate, blockSize);
+    invokeOnMessageThreadBlocking([this, sampleRate, blockSize]()
+        {
+            prepareAllPlugins(sampleRate, blockSize);
+        });
+    renderProgress.store(0.0f);
 }
 
 void PluginManager::endExclusiveRender()
@@ -1209,10 +1230,14 @@ void PluginManager::endExclusiveRender()
     {
         currentSampleRate = liveSampleRateBackup;
         currentBlockSize = liveBlockSizeBackup;
-        prepareAllPlugins(currentSampleRate, currentBlockSize);
+        invokeOnMessageThreadBlocking([this]()
+            {
+                prepareAllPlugins(currentSampleRate, currentBlockSize);
+            });
     }
 
     renderInProgress.store(false);
+    renderProgress.store(0.0f);
 }
 
 bool PluginManager::renderMaster(const juce::File& outFolder,
@@ -1224,7 +1249,10 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
     if (!targetFolder.exists())
         targetFolder.createDirectory();
     if (!targetFolder.isDirectory())
+    {
+        DBG("RenderMaster: target folder invalid: " << targetFolder.getFullPathName());
         return false;
+    }
 
     double sampleRate = currentSampleRate;
     if (sampleRate <= 0.0)
@@ -1233,23 +1261,35 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
             sampleRate = device->getCurrentSampleRate();
     }
     if (sampleRate <= 0.0)
+    {
+        DBG("RenderMaster: invalid sample rate");
         return false;
+    }
 
     if (blockSize <= 0)
         blockSize = currentBlockSize > 0 ? currentBlockSize : 512;
 
     auto snapshot = snapshotMasterTaggedMidiBuffer();
     if (snapshot.empty())
+    {
+        DBG("RenderMaster: master capture empty");
         return false;
+    }
 
     const double renderZeroMs = static_cast<double>(snapshot.front().timestamp);
     auto renderEvents = buildRenderTimelineFromSnapshot(snapshot, renderZeroMs, sampleRate);
     if (renderEvents.empty())
+    {
+        DBG("RenderMaster: render events empty after conversion");
         return false;
+    }
 
     const auto endSample = computeEndSampleWithTail(renderEvents, sampleRate, tailSeconds);
     if (endSample <= 0)
+    {
+        DBG("RenderMaster: computed endSample <= 0");
         return false;
+    }
 
     DBG("RenderMaster: events=" << (int)renderEvents.size()
         << " endSample=" << endSample
@@ -1269,7 +1309,10 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
     auto masterFile = targetFolder.getChildFile(fileName);
     auto writer = createMasterWriter(masterFile, sampleRate, 2);
     if (!writer)
+    {
+        DBG("RenderMaster: failed to create writer for " << masterFile.getFullPathName());
         return false;
+    }
 
     beginExclusiveRender(sampleRate, blockSize);
 
@@ -1343,9 +1386,11 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
         }
 
         writeBlock(numSamples);
+        renderProgress.store(static_cast<float>(blockStart) / static_cast<float>(endSample));
     }
 
     writer.reset();
+    renderProgress.store(1.0f);
     endExclusiveRender();
     return true;
 }
@@ -1385,17 +1430,17 @@ PluginManager::MasterBufferSummary PluginManager::getMasterTaggedMidiSummary() c
     return summary;
 }
 
-void PluginManager::enqueueMasterForPreview(double offsetMs, double nowHostMs)
+void PluginManager::enqueueMasterForPreview(const std::vector<MyMidiMessage>& source,
+    double offsetMs,
+    double baseTimestamp)
 {
-    double baseTimestamp = captureStartMs;
-    if (baseTimestamp < 0.0 && !masterTaggedMidiBuffer.empty())
-        baseTimestamp = static_cast<double>(masterTaggedMidiBuffer.front().timestamp);
-    const double playbackStartTimestamp = baseTimestamp + offsetMs;
-    taggedMidiBuffer.clear();
-    DBG("enqueueMasterForPreview: offsetMs=" << offsetMs << " captureStartMs=" << captureStartMs
-        << " playbackStart=" << playbackStartTimestamp << " events=" << (int)masterTaggedMidiBuffer.size());
+    double playbackStartTimestamp = baseTimestamp + offsetMs;
+    if (baseTimestamp < 0.0 && !source.empty())
+        playbackStartTimestamp = static_cast<double>(source.front().timestamp) + offsetMs;
 
-    for (const auto& message : masterTaggedMidiBuffer)
+    std::vector<MyMidiMessage> staged;
+    staged.reserve(source.size());
+    for (const auto& message : source)
     {
         if (message.timestamp < playbackStartTimestamp)
             continue;
@@ -1405,31 +1450,31 @@ void PluginManager::enqueueMasterForPreview(double offsetMs, double nowHostMs)
         if (relativeMs < 0)
             relativeMs = 0;
         scheduled.timestamp = relativeMs;
-        DBG(" preview enqueue plugin=" << scheduled.pluginId
-            << " relativeMs=" << relativeMs
-            << " originalTs=" << message.timestamp
-            << " msg=" << scheduled.message.getDescription());
-        insertSortedMidiMessage(taggedMidiBuffer, std::move(scheduled));
+        staged.push_back(std::move(scheduled));
     }
-    DBG(" enqueue complete: taggedMidiBuffer size=" << (int)taggedMidiBuffer.size());
+
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        taggedMidiBuffer.assign(staged.begin(), staged.end());
+    }
+    DBG("enqueueMasterForPreview complete, queued events: " << (int)taggedMidiBuffer.size());
 }
 
 void PluginManager::previewPlay()
 {
     const double nowMs = juce::Time::getMillisecondCounterHiRes();
-    {
-        const juce::ScopedLock sl(midiCriticalSection);
-        if (masterTaggedMidiBuffer.empty())
-            return;
-    }
+    auto snapshot = snapshotMasterTaggedMidiBuffer();
+    if (snapshot.empty())
+        return;
 
     resetPlayback();
 
+    double baseTimestamp = captureStartMs;
+    if (baseTimestamp < 0.0 && !snapshot.empty())
+        baseTimestamp = static_cast<double>(snapshot.front().timestamp);
+
     {
         const juce::ScopedLock sl(midiCriticalSection);
-        if (masterTaggedMidiBuffer.empty())
-            return;
-
         if (!previewActive)
         {
             previewActive = true;
@@ -1442,9 +1487,10 @@ void PluginManager::previewPlay()
         }
 
         previewStartHostMs = nowMs;
-        enqueueMasterForPreview(previewOffsetMs, nowMs);
         playbackSamplePosition = 0;
     }
+
+    enqueueMasterForPreview(snapshot, previewOffsetMs, baseTimestamp);
 }
 
 void PluginManager::previewPause()
@@ -1875,3 +1921,4 @@ void PluginManager::renamePluginInstance(const juce::String& oldId, const juce::
 // If you have any code that sets outputDeviceName to "No Device", remove or comment it out.
 
 // ...existing code...
+#include <functional>

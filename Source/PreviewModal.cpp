@@ -1,4 +1,5 @@
 #include "PreviewModal.h"
+#include <thread>
 
 PreviewModal::PreviewModal(PluginManager& manager)
     : pluginManager(manager)
@@ -47,12 +48,20 @@ PreviewModal::PreviewModal(PluginManager& manager)
     {
         handleRenderRequest();
     };
+    openFolderButton.onClick = [this]()
+    {
+        if (lastRenderFolder.exists())
+        {
+            lastRenderFolder.startAsProcess();
+        }
+    };
 
     addAndMakeVisible(playButton);
     addAndMakeVisible(pauseButton);
     addAndMakeVisible(stopButton);
     addAndMakeVisible(closeButton);
     addAndMakeVisible(renderButton);
+    addAndMakeVisible(openFolderButton);
 
     refreshSummaryAndState();
     startTimerHz(5);
@@ -83,7 +92,10 @@ void PreviewModal::resized()
     buttonRow.removeFromLeft(6);
     renderButton.setBounds(buttonRow.removeFromLeft(80));
     buttonRow.removeFromLeft(6);
-    closeButton.setBounds(buttonRow.removeFromLeft(80));
+    openFolderButton.setBounds(buttonRow.removeFromLeft(100));
+
+    bounds.removeFromTop(6);
+    closeButton.setBounds(bounds.removeFromTop(28).removeFromLeft(100));
 
     bounds.removeFromTop(8);
     renderInfoLabel.setBounds(bounds.removeFromTop(40));
@@ -115,11 +127,19 @@ void PreviewModal::refreshSummaryAndState()
         stateText = "State: Playing";
     transportLabel.setText(stateText, juce::dontSendNotification);
 
+    if (renderJobRunning.load())
+    {
+        const float progress = pluginManager.getRenderProgress();
+        juce::String progressText = "Rendering... " + juce::String(progress * 100.0f, 1) + "%";
+        renderInfoLabel.setText(progressText, juce::dontSendNotification);
+    }
+
     const bool hasEvents = summary.totalEvents > 0;
     playButton.setEnabled(hasEvents && (!active || paused));
     pauseButton.setEnabled(active && !paused);
     stopButton.setEnabled(active || paused);
-    renderButton.setEnabled(hasEvents);
+    renderButton.setEnabled(hasEvents && !renderJobRunning.load());
+    openFolderButton.setEnabled(lastRenderFolder.exists());
 }
 
 void PreviewModal::handleRenderRequest()
@@ -139,19 +159,37 @@ void PreviewModal::handleRenderRequest()
 
     const int blockSize = pluginManager.getCurrentBlockSize();
     constexpr double tailSeconds = 2.0;
-    const bool ok = pluginManager.renderMaster(lastRenderFolder,
-        "Capture",
-        blockSize > 0 ? blockSize : 512,
-        tailSeconds);
+    launchRenderJob(lastRenderFolder, blockSize > 0 ? blockSize : 512, tailSeconds);
+}
 
-    if (ok)
+void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds)
+{
+    if (renderJobRunning.load())
+        return;
+
+    renderJobRunning.store(true);
+    renderInfoLabel.setText("Render starting...", juce::dontSendNotification);
+
+    auto safeThis = juce::Component::SafePointer<PreviewModal>(this);
+    PluginManager& pm = pluginManager;
+
+    std::thread([safeThis, &pm, folder, blockSize, tailSeconds]()
     {
-        renderInfoLabel.setText("Render complete: Master.wav saved to " + lastRenderFolder.getFullPathName(),
-            juce::dontSendNotification);
-    }
-    else
-    {
-        renderInfoLabel.setText("Render failed. See logs for details.",
-            juce::dontSendNotification);
-    }
+        const bool ok = pm.renderMaster(folder, "Capture", blockSize, tailSeconds);
+        juce::MessageManager::callAsync([safeThis, ok, folder]()
+        {
+            if (auto* self = safeThis.getComponent())
+            {
+                self->renderJobRunning.store(false);
+                self->lastRenderFolder = folder;
+                if (ok)
+                    self->renderInfoLabel.setText("Render complete. Master.wav saved to " + folder.getFullPathName(),
+                        juce::dontSendNotification);
+                else
+                    self->renderInfoLabel.setText("Render failed. See logs for details.",
+                        juce::dontSendNotification);
+                self->openFolderButton.setEnabled(folder.exists());
+            }
+        });
+    }).detach();
 }

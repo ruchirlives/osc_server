@@ -1660,7 +1660,7 @@ void EditableTextCustomComponent::getTagsPresetList(std::function<void(const juc
 	presetTagsMenu.showAt(this);
 }
 
-void EditableTextCustomComponent::actionContextSelection(const juce::String &text, int columnId)
+void EditableTextCustomComponent::actionContextSelection(const juce::String &text, int columnIdIn)
 {
 	// Get the set of selected rows
 	juce::SparseSet<int> selectedRows = owner.table.getSelectedRows();
@@ -1674,7 +1674,7 @@ void EditableTextCustomComponent::actionContextSelection(const juce::String &tex
 			InstrumentInfo &instrument = owner.orchestraData[selectedRow];
 
 			// Update the field based on the columnId
-			switch (columnId)
+            switch (columnIdIn)
 			{
 			case 1: // Assuming column 1 is for Instrument Name
 				instrument.instrumentName = text;

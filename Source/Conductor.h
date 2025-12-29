@@ -149,7 +149,7 @@ public:
     void renameReferencesForSelectedRows();
     void iterate_pluginInstances();
     void showContextMenu_midiChannels();
-    void actionContextSelection(const juce::String& text, int columnId);
+    void actionContextSelection(const juce::String& text, int columnIdIn);
     void textWasEdited() override;
     void setRowAndColumn(int newRow, int newColumn);
 
