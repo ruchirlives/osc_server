@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <memory>
 #include "PluginManager.h"
 
 class RoutingModal : public juce::Component,
@@ -59,7 +60,7 @@ private:
 
     juce::Label titleLabel{ "titleLabel", "Routing Setup" };
     juce::Label stemsLabel{ "stemsLabel", "Stems" };
-    juce::Label rulesLabel{ "rulesLabel", "Match Rules (comma-separated strings to match with plugin instance Ids)" };
+    juce::Label rulesLabel{ "rulesLabel", "Match Rules" };
     juce::Label statusLabel;
 
     juce::ListBox stemsList{ "stemsList", this };
@@ -79,4 +80,5 @@ private:
     juce::TextButton debugCaptureButton{ "Debug" };
     juce::TextButton previewButton{ "Preview" };
     juce::Label captureStatusLabel{ "captureStatusLabel", "Recording: OFF" };
+    std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 };

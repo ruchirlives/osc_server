@@ -2,16 +2,20 @@
 #include "PreviewModal.h"
 #include <initializer_list>
 
-RoutingModal::RoutingModal(PluginManager& manager)
+    RoutingModal::RoutingModal(PluginManager& manager)
     : pluginManager(manager), rulesList("rulesList", &rulesModel)
 {
+    tooltipWindow = std::make_unique<juce::TooltipWindow>(this, 700);
+
     titleLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(titleLabel);
 
     stemsLabel.setJustificationType(juce::Justification::centredLeft);
+    stemsLabel.setTooltip("Toggle the green checkbox to disable a stem from rendering and routing.");
     addAndMakeVisible(stemsLabel);
 
     rulesLabel.setJustificationType(juce::Justification::centredLeft);
+    rulesLabel.setTooltip("Comma-separated strings to match with plugin instance IDs");
     addAndMakeVisible(rulesLabel);
 
     stemsList.setRowHeight(26);
@@ -94,15 +98,24 @@ RoutingModal::RoutingModal(PluginManager& manager)
     };
 
     addAndMakeVisible(addStemButton);
+    addStemButton.setTooltip("Create a new stem for grouping matched plugin instances.");
     addAndMakeVisible(saveButton);
+    saveButton.setTooltip("Save the current stem configuration and apply it.");
     addAndMakeVisible(saveXmlButton);
+    saveXmlButton.setTooltip("Export stem/rule configuration to an XML file.");
     addAndMakeVisible(loadXmlButton);
+    loadXmlButton.setTooltip("Load stem/rule configuration from XML.");
     addAndMakeVisible(closeButton);
+    closeButton.setTooltip("Close the routing modal.");
     addAndMakeVisible(statusLabel);
     addAndMakeVisible(recordCaptureButton);
+    recordCaptureButton.setTooltip("Start capturing OSC events for preview/render.");
     addAndMakeVisible(stopCaptureButton);
+    stopCaptureButton.setTooltip("Stop the current capture session.");
     addAndMakeVisible(debugCaptureButton);
+    debugCaptureButton.setTooltip("Dump capture buffer info to the log.");
     addAndMakeVisible(previewButton);
+    previewButton.setTooltip("Preview the last capture in the embedded player.");
     addAndMakeVisible(captureStatusLabel);
 
     stems = pluginManager.getStemConfigs();
