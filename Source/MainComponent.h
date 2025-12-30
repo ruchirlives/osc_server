@@ -107,6 +107,7 @@ public:
 
 	void drawTextEditorOutline(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override
 	{
+		juce::ignoreUnused(width, height);
 		auto outlineColour = textEditor.findColour(juce::TextEditor::outlineColourId);
 		g.setColour(outlineColour);
 		g.drawRoundedRectangle(textEditor.getLocalBounds().toFloat(), 6.0f, 1.5f);
@@ -130,7 +131,8 @@ public:
 
 	void drawButtonText(juce::Graphics& g, juce::TextButton& button, bool isMouseOverButton, bool isButtonDown) override
 	{
-		juce::Font font(14.0f, juce::Font::bold);
+		juce::ignoreUnused(isMouseOverButton, isButtonDown);
+		juce::Font font(14.0f, juce::Font::FontOptions().withStyleFlags(juce::Font::bold));
 		g.setFont(font);
 		g.setColour(button.findColour(juce::TextButton::textColourOffId));
 		g.drawFittedText(button.getButtonText(), button.getLocalBounds(), juce::Justification::centred, 1);
@@ -139,6 +141,7 @@ public:
 	void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button, bool shouldDrawButtonAsHighlighted,
 		bool shouldDrawButtonAsDown) override
 	{
+		juce::ignoreUnused(shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
 		auto bounds = button.getLocalBounds().toFloat().reduced(4);
 		g.setColour(button.getToggleState() ? accent : panel);
 		g.fillRoundedRectangle(bounds, 6.0f);
@@ -146,7 +149,7 @@ public:
 		g.setColour(juce::Colours::white.withAlpha(0.7f));
 		g.drawRoundedRectangle(bounds, 6.0f, 1.0f);
 
-		juce::Font font(12.0f, juce::Font::bold);
+		juce::Font font(12.0f, juce::Font::FontOptions().withStyleFlags(juce::Font::bold));
 		g.setFont(font);
 		g.setColour(juce::Colours::white);
 		g.drawFittedText(button.getButtonText(), button.getLocalBounds(), juce::Justification::centred, 1);
@@ -154,6 +157,7 @@ public:
 
 	void fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override
 	{
+		juce::ignoreUnused(width, height);
 		auto bg = textEditor.findColour(juce::TextEditor::backgroundColourId);
 		g.setColour(bg);
 		g.fillRoundedRectangle(textEditor.getLocalBounds().toFloat(), 6.0f);
@@ -161,10 +165,13 @@ public:
 
 	void drawPopupMenuBackground(juce::Graphics& g, int width, int height) override
 	{
+		juce::ignoreUnused(width, height);
+		const float w = static_cast<float>(width);
+		const float h = static_cast<float>(height);
 		g.setColour(findColour(juce::PopupMenu::backgroundColourId));
-		g.fillRoundedRectangle(0, 0, width, height, 6.0f);
+		g.fillRoundedRectangle(0.0f, 0.0f, w, h, 6.0f);
 		g.setColour(juce::Colours::white.withAlpha(0.15f));
-		g.drawRoundedRectangle(0, 0, width, height, 6.0f, 1.0f);
+		g.drawRoundedRectangle(0.0f, 0.0f, w, h, 6.0f, 1.0f);
 	}
 
 private:

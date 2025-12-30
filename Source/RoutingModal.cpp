@@ -251,8 +251,8 @@ void RoutingModal::showStemContextMenu(int row, const juce::MouseEvent& event)
     menu.addItem(3, "Add Rule");
 
     juce::PopupMenu::Options opts;
-    opts.withTargetComponent(&stemsList);
-    opts.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition(), { 1, 1 }));
+    (void)opts.withTargetComponent(&stemsList);
+    (void)opts.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition(), { 1, 1 }));
 
     const int result = menu.showMenu(opts);
     switch (result)
@@ -293,8 +293,8 @@ void RoutingModal::showRuleContextMenu(int row, const juce::MouseEvent& event)
     menu.addItem(2, "Remove Rule");
 
     juce::PopupMenu::Options opts;
-    opts.withTargetComponent(&rulesList);
-    opts.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition(), { 1, 1 }));
+    (void)opts.withTargetComponent(&rulesList);
+    (void)opts.withTargetScreenArea(juce::Rectangle<int>(event.getScreenPosition(), { 1, 1 }));
 
     const int result = menu.showMenu(opts);
     if (result == 1)
@@ -622,6 +622,7 @@ void RoutingModal::RulesListModel::listBoxItemClicked(int row, const juce::Mouse
 
 void RoutingModal::RulesListModel::listBoxItemDoubleClicked(int row, const juce::MouseEvent& event)
 {
+    juce::ignoreUnused(event);
     if (!juce::isPositiveAndBelow(row, getNumRows()))
         return;
 
