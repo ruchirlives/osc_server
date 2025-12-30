@@ -349,7 +349,13 @@ void RoutingModal::resized()
     auto listsArea = bounds.removeFromTop(bounds.getHeight() - 120);
 
     auto leftArea = listsArea.removeFromLeft(listsArea.getWidth() / 2);
-    stemsLabel.setBounds(leftArea.removeFromTop(22));
+    const int listHeaderHeight = 24;
+    const int addStemButtonWidth = 120;
+
+    auto stemsHeader = leftArea.removeFromTop(listHeaderHeight);
+    auto addStemButtonArea = stemsHeader.removeFromRight(addStemButtonWidth);
+    stemsLabel.setBounds(stemsHeader.reduced(0, 4));
+    addStemButton.setBounds(addStemButtonArea.reduced(0, 2));
     stemsList.setBounds(leftArea.reduced(0, 4));
 
     listsArea.removeFromLeft(10);
@@ -386,7 +392,7 @@ void RoutingModal::resized()
 
     buttonBlock.removeFromTop(6);
     auto row1 = buttonBlock.removeFromTop(actionRowHeight);
-    layoutButtonRow(row1, { &addStemButton, &recordCaptureButton, &stopCaptureButton,
+    layoutButtonRow(row1, { &recordCaptureButton, &stopCaptureButton,
                             &debugCaptureButton, &previewButton});
 
     buttonBlock.removeFromTop(buttonSpacing);
