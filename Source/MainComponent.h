@@ -132,7 +132,7 @@ public:
 	void drawButtonText(juce::Graphics& g, juce::TextButton& button, bool isMouseOverButton, bool isButtonDown) override
 	{
 		juce::ignoreUnused(isMouseOverButton, isButtonDown);
-		juce::Font font(14.0f, juce::Font::FontOptions().withStyleFlags(juce::Font::bold));
+		juce::Font font(juce::FontOptions{ 14.0f, juce::Font::bold });
 		g.setFont(font);
 		g.setColour(button.findColour(juce::TextButton::textColourOffId));
 		g.drawFittedText(button.getButtonText(), button.getLocalBounds(), juce::Justification::centred, 1);
@@ -149,7 +149,7 @@ public:
 		g.setColour(juce::Colours::white.withAlpha(0.7f));
 		g.drawRoundedRectangle(bounds, 6.0f, 1.0f);
 
-		juce::Font font(12.0f, juce::Font::FontOptions().withStyleFlags(juce::Font::bold));
+		juce::Font font(juce::FontOptions{ 12.0f, juce::Font::bold });
 		g.setFont(font);
 		g.setColour(juce::Colours::white);
 		g.drawFittedText(button.getButtonText(), button.getLocalBounds(), juce::Justification::centred, 1);
