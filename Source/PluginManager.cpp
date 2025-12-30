@@ -16,6 +16,7 @@
 #include "VST3Visitor.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>
+#include <limits>
 #include "RenderTimeline.h"
 
 namespace
@@ -456,15 +457,13 @@ void PluginManager::setBpm(double bpm)
 
 juce::PluginDescription PluginManager::getDescFromName(const juce::String& name)
 {
-    for (int i = 0; i < knownPluginList.getNumTypes(); ++i)
+    const auto types = knownPluginList.getTypes();
+    for (const auto& desc : types)
     {
-		juce::PluginDescription* desc = knownPluginList.getType(i);
-        if (desc->name == name)
-        {
-			return *desc;
-		}
-	}
-	return juce::PluginDescription();
+        if (desc.name == name)
+            return desc;
+    }
+    return juce::PluginDescription();
 }
 
 void PluginManager::instantiatePluginByName(const juce::String& name, const juce::String& pluginId)
@@ -1284,7 +1283,7 @@ bool PluginManager::loadMasterTaggedMidiBufferFromFile(const juce::File& file)
     std::vector<MyMidiMessage> loaded;
     loaded.reserve(xml->getNumChildElements());
 
-    forEachXmlChildElement(*xml, event)
+    for (auto* event = xml->getFirstChildElement(); event != nullptr; event = event->getNextElement())
     {
         if (!event->hasTagName("Event"))
             continue;
@@ -1911,7 +1910,8 @@ juce::int8 PluginManager::getNumInstances(std::vector<juce::String>& instances)
 
     if (instances.empty())
     {
-        numInstances = pluginInstances.size();
+        const auto safeSize = std::min(pluginInstances.size(), static_cast<size_t>(std::numeric_limits<juce::int8>::max()));
+        numInstances = static_cast<juce::int8>(safeSize);
         DBG("Number of total plugins if selection not used: " << juce::String(numInstances));
     }
     else

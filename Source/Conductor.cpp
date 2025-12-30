@@ -953,7 +953,7 @@ void Conductor::saveOrchestraData(const juce::String &dataFilePath, const std::v
 		}
 
 		// Write the XML to the output stream
-		rootElement.writeToStream(outputStream, "");
+		rootElement.writeTo(outputStream);
 		DBG("Orchestra data saved successfully to file: " + dataFilePath);
 	}
 	else
@@ -1050,11 +1050,12 @@ OrchestraTableModel::OrchestraTableModel(std::vector<InstrumentInfo> &data, juce
 
 int OrchestraTableModel::getNumRows()
 {
-	return orchestraData.size();
+	return static_cast<int>(orchestraData.size());
 }
 
 void OrchestraTableModel::paintRowBackground(juce::Graphics &g, int rowNumber, int width, int height, bool rowIsSelected)
 {
+	juce::ignoreUnused(rowNumber, width, height);
 	if (rowIsSelected)
 		g.fillAll(juce::Colours::lightblue);
 	else
@@ -1063,6 +1064,7 @@ void OrchestraTableModel::paintRowBackground(juce::Graphics &g, int rowNumber, i
 
 void OrchestraTableModel::paintCell(juce::Graphics &g, int rowNumber, int columnId, int width, int height, bool rowIsSelected)
 {
+	juce::ignoreUnused(rowIsSelected);
 	if (rowNumber < orchestraData.size())
 	{
 		auto &instrument = orchestraData[rowNumber];
@@ -1285,6 +1287,7 @@ void OrchestraTableModel::setText(int columnNumber, int rowNumber, const juce::S
 
 juce::Component *OrchestraTableModel::refreshComponentForCell(int rowNumber, int columnId, bool isRowSelected, juce::Component *existingComponentToUpdate)
 {
+	juce::ignoreUnused(isRowSelected);
 	auto *textLabel = dynamic_cast<EditableTextCustomComponent *>(existingComponentToUpdate);
 
 	if (textLabel == nullptr)

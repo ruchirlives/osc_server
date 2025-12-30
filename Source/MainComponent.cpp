@@ -16,7 +16,7 @@ public:
 	{
 		setSize(420, 64);
 		statusLabel.setJustificationType(juce::Justification::centred);
-		statusLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+		statusLabel.setFont(juce::Font(juce::FontOptions{ 14.0f, juce::Font::bold }));
 		statusLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 		addAndMakeVisible(statusLabel);
 	}
@@ -42,17 +42,6 @@ private:
 	juce::Label statusLabel{"restoreStatus", "Restoring project..."};
 };
 
-static bool isRunningInDebugger()
-{
-#if JUCE_WINDOWS
-	return ::IsDebuggerPresent();
-#elif JUCE_MAC || JUCE_LINUX
-	return juce::SystemStats::getEnvironmentVariable("JUCE_DEBUGGER", "").isNotEmpty();
-#else
-	return false;
-#endif
-}
-
 namespace
 {
 	class AboutContentComponent : public juce::Component
@@ -65,7 +54,7 @@ namespace
 				juce::String("Created by Ruchir Shah (c) 2024.\nBuilt on JUCE and released as open source AGPL\nOSCDawServer ") + juce::String(ProjectInfo::versionString),
 				juce::dontSendNotification);
 			infoLabel.setJustificationType(juce::Justification::centred);
-			infoLabel.setFont(juce::Font(15.0f));
+			infoLabel.setFont(juce::Font(juce::FontOptions{ 15.0f }));
 
 			addAndMakeVisible(infoLabel);
 			addAndMakeVisible(moreLink);
@@ -312,7 +301,20 @@ void MainComponent::resized()
 		nextX += width + spacingX;
 	};
 
-	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText()) + 200);
+	juce::GlyphArrangement projectNameGlyphs;
+	const float projectNameHeight = static_cast<float>(labelHeight);
+	projectNameGlyphs.addFittedText(projectNameLabel.getFont(),
+		projectNameLabel.getText(),
+		0.0f,
+		0.0f,
+		static_cast<float>(windowWidth),
+		projectNameHeight,
+		juce::Justification::centredLeft,
+		1,
+		1.0f);
+	const auto projectBoundingBox = projectNameGlyphs.getBoundingBox(0, projectNameGlyphs.getNumGlyphs(), true);
+	const int projectNameTextWidth = juce::jmax(0, juce::roundToInt(projectBoundingBox.getWidth()));
+	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameTextWidth + 200);
 	const int audioPortLabelWidth = 150;
 	const int audioPortFieldWidth = 100;
 	const int bpmLabelWidth = 38;
@@ -363,6 +365,7 @@ void MainComponent::resized()
 	// Row 1 (bottom row) - Scan, Select Plugin, Update, Open Plugin, List Plugin Instances
 	const int row1Y = buttonLayout.rowY[3];
 	const int row1Buttons = 5;
+	juce::ignoreUnused(row1Buttons);
 	const int row1ButtonWidth = buttonWidth;
 
 	int currentX = margin;
@@ -842,7 +845,7 @@ void MainComponent::addInstrument()
 
 			// Increment the MIDI channel
 			instrument.midiChannel++;
-			newRow = conductor.orchestra.size();
+			newRow = static_cast<int>(conductor.orchestra.size());
 			conductor.orchestra.push_back(instrument);
 
 			// Update and select the last row
@@ -854,7 +857,7 @@ void MainComponent::addInstrument()
 		// Set the default values for the new instrument
 		basicInstrument(instrument);
 		conductor.orchestra.push_back(instrument);
-		newRow = conductor.orchestra.size() - 1;
+		newRow = static_cast<int>(conductor.orchestra.size()) - 1;
 
 		// Update and select the last row
 		UpdateAndSelect(newRow);
@@ -890,7 +893,7 @@ void MainComponent::addNewInstrument()
 	// Set the default values for the new instrument
 	basicInstrument(instrument);
 	conductor.orchestra.push_back(instrument);
-	newRow = conductor.orchestra.size() - 1;
+	newRow = static_cast<int>(conductor.orchestra.size()) - 1;
 	// Update and select the last row
 	UpdateAndSelect(newRow);
 
@@ -1118,13 +1121,11 @@ void MainComponent::initPluginsList()
 	}
 	// Update the ListBox to display the plugins
 	pluginBox.clear();
-	for (int i = 0; i < pluginManager.knownPluginList.getNumTypes(); ++i)
+	const auto types = pluginManager.knownPluginList.getTypes();
+	const int totalTypes = static_cast<int>(types.size());
+	for (int i = 0; i < totalTypes; ++i)
 	{
-		juce::PluginDescription *desc = pluginManager.knownPluginList.getType(i);
-		if (desc != nullptr)
-		{
-			pluginBox.addItem(desc->name, i + 1);
-		}
+		pluginBox.addItem(types[i].name, i + 1);
 	}
 }
 
@@ -1345,48 +1346,46 @@ void MainComponent::comboBoxChanged(juce::ComboBox *comboBoxThatHasChanged)
 	if (comboBoxThatHasChanged == &pluginBox)
 	{
 		int index = pluginBox.getSelectedId() - 1;
-		if (index >= 0)
+		const auto types = pluginManager.knownPluginList.getTypes();
+		if (index >= 0 && index < static_cast<int>(types.size()))
 		{
-			juce::PluginDescription *desc = pluginManager.knownPluginList.getType(index);
-			if (desc != nullptr)
+			const auto& desc = types[index];
+
+			// Get selected row in the orchestra table
+			auto selectedRows = orchestraTable.getSelectedRows();
+			bool haveAdded = false;
+
+			for (int i = 0; i < selectedRows.size(); ++i)
 			{
-
-				// Get selected row in the orchestra table
-				auto selectedRows = orchestraTable.getSelectedRows();
-				bool haveAdded = false;
-
-				for (int i = 0; i < selectedRows.size(); ++i)
+				int row = selectedRows[i];
+				// Get the instrument from the orchestra
+				auto& instrument = conductor.orchestra[row];
+				// Check if the pluginInstanceId for this instrument is already in pluginInstances, and if so, ignore
+				if (pluginManager.hasPluginInstance(instrument.pluginInstanceId))
 				{
-					int row = selectedRows[i];
-					// Get the instrument from the orchestra
-					auto &instrument = conductor.orchestra[row];
-					// Check if the pluginInstanceId for this instrument is already in pluginInstances, and if so, ignore
-					if (pluginManager.hasPluginInstance(instrument.pluginInstanceId))
-					{
-						DBG("Plugin Instance ID already exists: " + instrument.pluginInstanceId);
-						continue;
-					}
-
-					// Set the plugin name and plugin instance ID
-					instrument.pluginName = desc->name;
-					// call plugin update
-					haveAdded = true;
-					orchestraTable.updateContent();
+					DBG("Plugin Instance ID already exists: " + instrument.pluginInstanceId);
+					continue;
 				}
-				// If no rows were selected or no valid rows, add a new instrument with the selected plugin
-				if (!haveAdded)
-				{
-					addNewInstrument();
-					auto &instrument = conductor.orchestra.back();
-					instrument.pluginName = desc->name;
-					orchestraTable.updateContent();
-				}
-				orchestraTable.repaint();
-				conductor.syncOrchestraWithPluginManager();
 
-				// Finally, deselect the pluginbox entry
-				pluginBox.setSelectedId(0, juce::dontSendNotification);
+				// Set the plugin name and plugin instance ID
+				instrument.pluginName = desc.name;
+				// call plugin update
+				haveAdded = true;
+				orchestraTable.updateContent();
 			}
+			// If no rows were selected or no valid rows, add a new instrument with the selected plugin
+			if (!haveAdded)
+			{
+				addNewInstrument();
+				auto& instrument = conductor.orchestra.back();
+				instrument.pluginName = desc.name;
+				orchestraTable.updateContent();
+			}
+			orchestraTable.repaint();
+			conductor.syncOrchestraWithPluginManager();
+
+			// Finally, deselect the pluginbox entry
+			pluginBox.setSelectedId(0, juce::dontSendNotification);
 		}
 	}
 	else if (comboBoxThatHasChanged == &midiInputList)
@@ -1589,6 +1588,7 @@ MainComponent::LayoutMetrics MainComponent::getLayoutMetrics() const
 
 juce::Rectangle<float> MainComponent::computeTablePanelBounds(const LayoutMetrics &metrics, const juce::Rectangle<int> &tableBounds) const
 {
+	juce::ignoreUnused(metrics);
 	const float panelInset = 6.0f;
 
 	if (tableBounds.getWidth() <= 0 || tableBounds.getHeight() <= 0)

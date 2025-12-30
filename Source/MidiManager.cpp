@@ -20,6 +20,7 @@
 
 void MidiManager::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
 {
+    juce::ignoreUnused(source);
 	// DBG("MIDI Message Received: " + message.getDescription() + " from " + source->getName());
 	// Forward the MIDI message to the buffee is their is a plugin instance
 
@@ -137,16 +138,12 @@ std::map<int, MidiManager::ChannelTrackInfo> MidiManager::buildChannelSequences(
 
         juce::int64 earliestTimestamp = std::numeric_limits<juce::int64>::max();
 
-        juce::MidiBuffer::Iterator iterator(bufferCopy);
-        juce::MidiMessage eventMessage;
-        int samplePosition = 0;
-
-        while (iterator.getNextEvent(eventMessage, samplePosition))
+        for (const auto metadata : bufferCopy)
         {
                 EventData data;
-                data.message = eventMessage;
+                data.message = metadata.getMessage();
                 data.channel = juce::jlimit(1, 16, data.message.getChannel());
-                data.timestamp = getTimestampFromEvent(data.message, samplePosition);
+                data.timestamp = getTimestampFromEvent(data.message, metadata.samplePosition);
 
                 if (data.timestamp < earliestTimestamp)
                         earliestTimestamp = data.timestamp;
@@ -344,13 +341,11 @@ void MidiManager::stripLeadingSilence()
                         return;
 
                 juce::int64 earliestTimestamp = std::numeric_limits<juce::int64>::max();
-                juce::MidiBuffer::Iterator it(recordBuffer);
-                juce::MidiMessage msg;
-                int samplePosition;
+                juce::MidiBuffer adjustedBuffer;
 
-                while (it.getNextEvent(msg, samplePosition))
+                for (const auto metadata : recordBuffer)
                 {
-                        auto ts = getTimestampFromEvent(msg, samplePosition);
+                        auto ts = getTimestampFromEvent(metadata.getMessage(), metadata.samplePosition);
                         if (ts < earliestTimestamp)
                                 earliestTimestamp = ts;
                 }
@@ -358,19 +353,15 @@ void MidiManager::stripLeadingSilence()
                 if (earliestTimestamp <= 0 || earliestTimestamp == std::numeric_limits<juce::int64>::max())
                         return;
 
-                juce::MidiBuffer adjustedBuffer;
-                juce::MidiBuffer::Iterator it2(recordBuffer);
-
-                while (it2.getNextEvent(msg, samplePosition))
+                for (const auto metadata : recordBuffer)
                 {
-                        auto ts = getTimestampFromEvent(msg, samplePosition);
-                        juce::MidiMessage adjusted = msg;
+                        auto ts = getTimestampFromEvent(metadata.getMessage(), metadata.samplePosition);
+                        juce::MidiMessage adjusted = metadata.getMessage();
 						auto shifted = ts - earliestTimestamp;
 						if (shifted < 0)
 							shifted = 0;
 						adjusted.setTimeStamp(static_cast<double>(shifted));
 						adjustedBuffer.addEvent(adjusted, static_cast<int>(shifted));
-
                 }
 
                 recordBuffer = adjustedBuffer;
@@ -459,20 +450,18 @@ void MidiManager::processRecordedMidi()
 	juce::int64 bigGapThreshold = static_cast<juce::int64>(5.0 * ticksPerSecond);
 
 	// --- First pass: find the start of the *last* note-group -------------
-	juce::int64 lastNoteOnTime = 0;
-	juce::int64 startTime = 0;
-	bool         foundBigGap = false;
+	double         lastNoteOnTime = 0.0;
+	double         startTime = 0.0;
+	bool           foundBigGap = false;
+	const double   gapThreshold = static_cast<double>(bigGapThreshold);
 
-	juce::MidiBuffer::Iterator it(recordBuffer);
-	juce::MidiMessage           msg;
-	int                         samplePosition;
-
-	while (it.getNextEvent(msg, samplePosition))
+	for (const auto metadata : recordBuffer)
 	{
+		auto msg = metadata.getMessage();
 		if (msg.isNoteOn())
 		{
-			juce::int64 ts = msg.getTimeStamp();
-			if (lastNoteOnTime != 0 && (ts - lastNoteOnTime) > bigGapThreshold)
+			const double ts = msg.getTimeStamp();
+			if (lastNoteOnTime != 0.0 && (ts - lastNoteOnTime) > gapThreshold)
 			{
 				startTime = ts;
 				foundBigGap = true;
@@ -483,13 +472,13 @@ void MidiManager::processRecordedMidi()
 
 	// If we never saw a big gap between Note-Ons, start from the very beginning
 	if (!foundBigGap)
-		startTime = 0;
+		startTime = 0.0;
 
 	// --- Second pass: copy everything from startTime onward -------------
-	juce::MidiBuffer::Iterator it2(recordBuffer);
-	while (it2.getNextEvent(msg, samplePosition))
+	for (const auto metadata : recordBuffer)
 	{
-		juce::int64 ts = msg.getTimeStamp();
+		auto msg = metadata.getMessage();
+		const double ts = msg.getTimeStamp();
 		if (ts >= startTime)
 		{
 			double timeDiff = (ts - startTime) * tickConversionFactor;
@@ -497,8 +486,9 @@ void MidiManager::processRecordedMidi()
 				timeDiff = 0.0;
 
 			DBG("Metadata Time: " + juce::String(ts));
-			msg.setTimeStamp(timeDiff);
-			recordedMidi.addEvent(msg);
+			auto adjustedMsg = msg;
+			adjustedMsg.setTimeStamp(timeDiff);
+			recordedMidi.addEvent(adjustedMsg);
 		}
 	}
 
@@ -876,14 +866,11 @@ void MidiManager::republishRecordedEvents(const juce::MidiBuffer& bufferCopy)
 
         pluginManager.resetPlayback();
 
-        juce::MidiBuffer::Iterator it(bufferCopy);
-        juce::MidiMessage msg;
-        int samplePosition;
         auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
 
-        while (it.getNextEvent(msg, samplePosition))
+        for (const auto metadata : bufferCopy)
         {
-                auto ticks = getTimestampFromEvent(msg, samplePosition);
+                auto ticks = getTimestampFromEvent(metadata.getMessage(), metadata.samplePosition);
                 if (ticks < 0)
                         ticks = 0;
 
@@ -891,7 +878,7 @@ void MidiManager::republishRecordedEvents(const juce::MidiBuffer& bufferCopy)
                 if (ticksPerSecond > 0)
                         timestampMs = static_cast<juce::int64>((static_cast<double>(ticks) * 1000.0) / static_cast<double>(ticksPerSecond));
 
-                juce::MidiMessage messageCopy = msg;
+                juce::MidiMessage messageCopy = metadata.getMessage();
                 pluginManager.addMidiMessage(messageCopy, pluginId, timestampMs);
         }
 
@@ -913,19 +900,16 @@ void MidiManager::removeMidiChannelFromOverdub(int midiChannel)
             return;
 
         juce::MidiBuffer filteredBuffer;
-        juce::MidiBuffer::Iterator it(recordBuffer);
-        juce::MidiMessage msg;
-        int samplePosition;
 
-        while (it.getNextEvent(msg, samplePosition))
+        for (const auto metadata : recordBuffer)
         {
-            if (msg.getChannel() == midiChannel)
+            if (metadata.getMessage().getChannel() == midiChannel)
             {
                 removedEvents = true;
                 continue;
             }
 
-            filteredBuffer.addEvent(msg, samplePosition);
+            filteredBuffer.addEvent(metadata.getMessage(), metadata.samplePosition);
         }
 
         if (!removedEvents)

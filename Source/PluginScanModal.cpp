@@ -46,7 +46,7 @@ void PluginScanModal::DragSelectHandler::mouseDrag(const juce::MouseEvent& event
 	if (listBox == nullptr || !isDragging || anchorRow < 0)
 		return;
 
-	const int totalRows = listBox->getModel() != nullptr ? listBox->getModel()->getNumRows() : 0;
+	const int totalRows = listBox->getListBoxModel() != nullptr ? listBox->getListBoxModel()->getNumRows() : 0;
 	if (totalRows <= 0)
 		return;
 
@@ -147,11 +147,11 @@ void PluginScanModal::refreshPluginList()
 {
 	pluginNames.clear();
 
-	const auto numTypes = pluginManager.knownPluginList.getNumTypes();
-	for (int i = 0; i < numTypes; ++i)
+	const auto types = pluginManager.knownPluginList.getTypes();
+	const int numTypes = static_cast<int>(types.size());
+	for (const auto& desc : types)
 	{
-		if (auto* desc = pluginManager.knownPluginList.getType(i))
-			pluginNames.add(desc->name);
+		pluginNames.add(desc.name);
 	}
 
 	if (pluginNames.isEmpty())

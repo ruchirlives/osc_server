@@ -204,7 +204,11 @@ public:
             {
                 if (auto* display = displays.getDisplayForRect(bounds))
                     return display->userArea;
-                return displays.getMainDisplay().userArea;
+                if (auto* primary = displays.getPrimaryDisplay())
+                    return primary->userArea;
+                if (!displays.displays.isEmpty())
+                    return displays.displays.getFirst().userArea;
+                return bounds;
             }();
 
             constexpr int margin = 20;
