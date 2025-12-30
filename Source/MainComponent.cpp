@@ -1151,7 +1151,7 @@ void MainComponent::initPlugins()
 {
 	addAndMakeVisible(pluginBox);
 	pluginBox.addListener(this);
-	pluginBox.setTextWhenNothingSelected("Select a Plugin");
+	pluginBox.setTextWhenNothingSelected("Instantiate Plugin");
 
 	initPluginsList();
 }
