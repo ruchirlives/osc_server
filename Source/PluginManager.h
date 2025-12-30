@@ -145,6 +145,8 @@ public:
     void debugPrintMasterTaggedMidiBuffer();
     bool hasMasterTaggedMidiData() const;
     double getMasterFirstEventMs() const;
+    bool saveMasterTaggedMidiBufferToFile(const juce::File& file);
+    bool loadMasterTaggedMidiBufferFromFile(const juce::File& file);
 
     void startCapture(double startMs);
     void stopCapture();
