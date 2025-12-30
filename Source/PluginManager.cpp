@@ -1258,7 +1258,7 @@ bool PluginManager::saveMasterTaggedMidiBufferToFile(const juce::File& file)
     {
         auto* xmlEvent = root.createNewChildElement("Event");
         xmlEvent->setAttribute("pluginId", event.pluginId);
-        xmlEvent->setAttribute("timestamp", static_cast<juce::int64>(event.timestamp));
+        xmlEvent->setAttribute("timestamp", juce::String(static_cast<juce::int64>(event.timestamp)));
 
         juce::MemoryBlock dataBlock(event.message.getRawData(),
             static_cast<size_t>(event.message.getRawDataSize()));
@@ -1297,7 +1297,10 @@ bool PluginManager::loadMasterTaggedMidiBufferFromFile(const juce::File& file)
         juce::MidiMessage midiMessage(dataBlock.getData(),
             static_cast<int>(dataBlock.getSize()));
         const juce::String pluginId = event->getStringAttribute("pluginId");
-        const juce::int64 timestamp = event->getInt64Attribute("timestamp");
+        const juce::String timestampString = event->getStringAttribute("timestamp");
+        if (timestampString.isEmpty())
+            continue;
+        const juce::int64 timestamp = timestampString.getLargeIntValue();
         loaded.emplace_back(midiMessage, pluginId, timestamp);
     }
 

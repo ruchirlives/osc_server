@@ -82,7 +82,6 @@
         if (summary.totalEvents == 0)
         {
             statusLabel.setText("No capture data to preview.", juce::dontSendNotification);
-            return;
         }
 
         auto* content = new PreviewModal(pluginManager);
