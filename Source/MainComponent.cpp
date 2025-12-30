@@ -226,6 +226,24 @@ MainComponent::MainComponent()
 	{ midiManager.bakeOverdubIntoMaster(); updateOverdubUI(); };
 	bakeOverdubButton.setTooltip("Merge the overdub buffer into the master capture.");
 
+	// Initialize the "Play Capture" button
+	addAndMakeVisible(playCaptureButton);
+	playCaptureButton.onClick = [this]()
+	{
+		pluginManager.previewPlay();
+		updateOverdubUI();
+	};
+	playCaptureButton.setTooltip("Play the captured master buffer.");
+
+	// Initialize the "Stop Capture" button
+	addAndMakeVisible(stopCaptureButton);
+	stopCaptureButton.onClick = [this]()
+	{
+		pluginManager.previewStop();
+		updateOverdubUI();
+	};
+	stopCaptureButton.setTooltip("Stop playback of the captured master buffer.");
+
 	// playOverdubOnTriggerButton
 	addAndMakeVisible(triggerOverdubButton);
 	triggerOverdubButton.onClick = [this]()
@@ -415,6 +433,9 @@ void MainComponent::resized()
 	stopOverdubButton.setBounds(playOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
 	bakeOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
 	undoOverdubButton.setBounds(bakeOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
+	const int captureButtonWidth = juce::jmax(1, (buttonWidth - spacingX) / 2);
+	playCaptureButton.setBounds(undoOverdubButton.getRight() + spacingX, row4Y, captureButtonWidth, buttonHeight);
+	stopCaptureButton.setBounds(playCaptureButton.getRight() + spacingX, row4Y, captureButtonWidth, buttonHeight);
 
 	// --- BPM Sync handler ---
 	bpmEditor.onTextChange = [this]()
@@ -464,6 +485,11 @@ void MainComponent::updateOverdubUI()
 		bakeOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::orange);
 	else
 		bakeOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
+	const bool captureHasEvents = pluginManager.hasMasterTaggedMidiData();
+	const bool previewActive = pluginManager.isPreviewActive();
+	const bool previewPaused = pluginManager.isPreviewPaused();
+	playCaptureButton.setEnabled(captureHasEvents && (!previewActive || previewPaused));
+	stopCaptureButton.setEnabled(previewActive || previewPaused);
 }
 void MainComponent::handleAudioPortChange()
 {
