@@ -29,7 +29,8 @@ The first string of every `/orchestra` message picks one of the supported comman
 - `add_instrument <instrumentName> <pluginInstanceId> <midiChannel> <tag>...`  
   Creates or updates an orchestra entry with the given name, plugin instance ID and 1-based MIDI channel (1-16), plus all supplied tags.
 - `get_recorded`  
-  Copies the recorded buffer to the MIDI manager (`MidiManager::getRecorded`).
+  `get_recorded`  
+  Exports the recorded MIDI buffer (from the last 5-second gap or beginning) to `recordedMIDI.mid` in the `Documents/OSCDawServer/` folder.
 - `select_by_tag <tag>`  
   Selects the first row in the orchestra table whose tag list contains `<tag>`.
 - `open_instrument <tag>`  
