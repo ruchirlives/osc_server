@@ -75,8 +75,8 @@ private:
     juce::TextButton saveXmlButton{ "Save XML" };
     juce::TextButton loadXmlButton{ "Load XML" };
     juce::TextButton closeButton{ "Close" };
-    juce::TextButton recordCaptureButton{ "Record" };
-    juce::TextButton stopCaptureButton{ "Stop" };
+    juce::TextButton recordCaptureButton{ "Capture OSC" };
+    juce::TextButton stopCaptureButton{ "Stop capture" };
     juce::TextButton debugCaptureButton{ "Debug" };
     juce::TextButton previewButton{ "Preview" };
     juce::Label captureStatusLabel{ "captureStatusLabel", "Recording: OFF" };

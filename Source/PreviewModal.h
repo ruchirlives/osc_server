@@ -30,9 +30,9 @@ private:
     juce::Label transportLabel{ "transportLabel", "State: Stopped" };
     juce::Label renderInfoLabel{ "renderInfoLabel", "" };
 
-    juce::TextButton playButton{ "Play" };
+    juce::TextButton playButton{ "Play capture" };
     juce::TextButton pauseButton{ "Pause" };
-    juce::TextButton stopButton{ "Stop" };
+    juce::TextButton stopButton{ "Stop capture" };
     juce::TextButton closeButton{ "Close" };
     juce::TextButton saveCaptureButton{ "Save Capture" };
     juce::TextButton loadCaptureButton{ "Load Capture" };

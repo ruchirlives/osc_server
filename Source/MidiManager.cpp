@@ -363,6 +363,7 @@ void MidiManager::addBufferToMasterCapture(const juce::MidiBuffer& bufferCopy)
 
 	auto& pluginManager = mainComponent->getPluginManager();
 	const auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+	const double anchorMs = pluginManager.getPreviewPlaybackTimestampMs();
 
 	for (const auto metadata : bufferCopy)
 	{
@@ -370,15 +371,13 @@ void MidiManager::addBufferToMasterCapture(const juce::MidiBuffer& bufferCopy)
 		if (ticks < 0)
 			continue;
 
-		juce::int64 timestampMs = 0;
+		double eventMs = 0.0;
 		if (ticksPerSecond > 0)
-		{
-			const auto timeMs = static_cast<double>(ticks) * 1000.0 / static_cast<double>(ticksPerSecond);
-			timestampMs = static_cast<juce::int64>(timeMs + 0.5);
-		}
+			eventMs = static_cast<double>(ticks) * 1000.0 / static_cast<double>(ticksPerSecond);
+		const auto timestampMs = static_cast<juce::int64>(anchorMs + eventMs + 0.5);
 
 		auto messageCopy = metadata.getMessage();
-		pluginManager.addMidiMessage(messageCopy, pluginId, timestampMs);
+		pluginManager.insertIntoMasterCapture(MyMidiMessage(messageCopy, pluginId, timestampMs));
 	}
 }
 

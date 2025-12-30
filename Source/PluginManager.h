@@ -147,6 +147,7 @@ public:
     double getMasterFirstEventMs() const;
     bool saveMasterTaggedMidiBufferToFile(const juce::File& file);
     bool loadMasterTaggedMidiBufferFromFile(const juce::File& file);
+    void insertIntoMasterCapture(MyMidiMessage message);
 
     void startCapture(double startMs);
     void stopCapture();
@@ -176,6 +177,7 @@ public:
     void previewStop();
     bool isPreviewActive() const;
     bool isPreviewPaused() const;
+    double getPreviewPlaybackTimestampMs() const;
 
     juce::MemoryBlock getPluginState(const juce::String& pluginId);
     void restorePluginState(const juce::String& pluginId, const juce::MemoryBlock& state);
@@ -254,6 +256,7 @@ private:
     void notifyRenderProgress(float progress);
 
     void notifyRestoreStatus(const juce::String& message);
+    void insertIntoMasterCaptureUnlocked(MyMidiMessage message);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

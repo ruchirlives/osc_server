@@ -41,7 +41,6 @@ PreviewModal::PreviewModal(PluginManager& manager)
     };
     closeButton.onClick = [this]()
     {
-        pluginManager.previewStop();
         if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
             dw->exitModalState(0);
     };
