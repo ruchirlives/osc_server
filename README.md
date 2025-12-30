@@ -19,14 +19,15 @@ The VST3 Server and plugin use PORTS 8000 and 9000 to communicate using OSC prot
 
 OSCDawServer listens for OSC messages on UDP port 8000 and, by default, sends any replies toward `239.255.0.1:9000`. Payloads are routed by instrument tags whenever possible, so every tag you configure in the UI can be used to target one or more instruments from OSC.
 
-### `/orchestra/set_tempo`
-
-- Payload: single numeric argument (int, float or string) that represents the target BPM.
-- Updates the host and UI tempo via `PluginManager::setBpm` and `MainComponent::setBpm`.
-
-### `/orchestra`
+### `/orchestra/`
 
 The first string of every `/orchestra` message picks one of the supported commands, and the arguments that follow are interpreted as described below. Any trailing string arguments are treated as instrument tags and are used to resolve the matching `InstrumentInfo` entries.
+
+- `set_tempo <bpm>`  
+  Expects a single numeric argument (int, float, or string) representing the target BPM and immediately updates both `PluginManager` and `MainComponent` via `setBpm`. The OSC address `/orchestra/set_tempo` is handled before the rest of the dispatcher so tempo changes can short-circuit the generic command parsing.
+
+- `add_instrument <instrumentName> <pluginInstanceId> <midiChannel> <tag>...`  
+  Creates or updates an orchestra entry with the given name, plugin instance ID and 1ƒ?'based MIDI channel, plus all supplied tags.
 
 - `add_instrument <instrumentName> <pluginInstanceId> <midiChannel> <tag>...`  
   Creates or updates an orchestra entry with the given name, plugin instance ID and 1‑based MIDI channel, plus all supplied tags.
