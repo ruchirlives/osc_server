@@ -491,6 +491,10 @@ void MainComponent::updateOverdubUI()
 	const bool previewPaused = pluginManager.isPreviewPaused();
 	const bool shouldEnablePlayCapture = captureHasEvents && (!previewActive || previewPaused);
 	playCaptureButton.setEnabled(shouldEnablePlayCapture);
+	if (previewActive && !previewPaused)
+		playCaptureButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
+	else
+		playCaptureButton.setColour(juce::TextButton::buttonColourId, shouldEnablePlayCapture ? juce::Colours::orange : juce::Colours::lightgrey);
 	DBG("Play Capture button enabled=" << (shouldEnablePlayCapture ? "true" : "false")
 		<< " captureHasEvents=" << (captureHasEvents ? "true" : "false")
 		<< " previewActive=" << (previewActive ? "true" : "false")
