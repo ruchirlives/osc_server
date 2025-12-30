@@ -230,6 +230,7 @@ MainComponent::MainComponent()
 	addAndMakeVisible(playCaptureButton);
 	playCaptureButton.onClick = [this]()
 	{
+		DBG("Starting preview playback of captured master buffer");
 		pluginManager.previewPlay();
 		updateOverdubUI();
 	};
@@ -488,7 +489,12 @@ void MainComponent::updateOverdubUI()
 	const bool captureHasEvents = pluginManager.hasMasterTaggedMidiData();
 	const bool previewActive = pluginManager.isPreviewActive();
 	const bool previewPaused = pluginManager.isPreviewPaused();
-	playCaptureButton.setEnabled(captureHasEvents && (!previewActive || previewPaused));
+	const bool shouldEnablePlayCapture = captureHasEvents && (!previewActive || previewPaused);
+	playCaptureButton.setEnabled(shouldEnablePlayCapture);
+	DBG("Play Capture button enabled=" << (shouldEnablePlayCapture ? "true" : "false")
+		<< " captureHasEvents=" << (captureHasEvents ? "true" : "false")
+		<< " previewActive=" << (previewActive ? "true" : "false")
+		<< " previewPaused=" << (previewPaused ? "true" : "false"));
 	stopCaptureButton.setEnabled(previewActive || previewPaused);
 }
 void MainComponent::handleAudioPortChange()
@@ -759,6 +765,7 @@ void MainComponent::restoreProject(bool append)
 				DBG("Project Restored: " + projectName);
 				updateProjectNameLabel(projectName);
 				repaint();
+				updateOverdubUI();
 			});
 
 			restoreSucceeded = true;

@@ -1720,7 +1720,10 @@ void PluginManager::previewPlay()
     const double nowMs = juce::Time::getMillisecondCounterHiRes();
     auto snapshot = snapshotMasterTaggedMidiBuffer();
     if (snapshot.empty())
+    {
+        DBG("previewPlay: master capture empty, cannot start preview");
         return;
+    }
 
     resetPlayback();
 
