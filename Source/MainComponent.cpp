@@ -324,10 +324,13 @@ void MainComponent::resized()
 	placeTopControl(audioStreamingPortLabel, audioPortLabelWidth);
 	placeTopControl(audioStreamingPortEditor, audioPortFieldWidth);
 
-	const int bpmEditorRight = windowWidth - margin;
+	const int bpmEditorRight = windowWidth - margin - 110;
 	const int bpmEditorX = bpmEditorRight - bpmFieldWidth;
 	bpmEditor.setBounds(bpmEditorX, topRowY, bpmFieldWidth, labelHeight);
 	bpmLabel.setBounds(bpmEditorX - bpmSpacing - bpmLabelWidth, topRowY, bpmLabelWidth, labelHeight);
+
+	const int aboutButtonWidth = 110;
+	aboutButton.setBounds(windowWidth - margin - aboutButtonWidth, topRowY, aboutButtonWidth, labelHeight);
 
 	const int driverRowY = projectNameLabel.getBottom() + spacingY / 2;
 	audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
@@ -360,15 +363,14 @@ void MainComponent::resized()
 
 	// Row 1 (bottom row) - Scan, Select Plugin, Update, Open Plugin, List Plugin Instances
 	const int row1Y = buttonLayout.rowY[3];
-	const int row1Buttons = 6;
+	const int row1Buttons = 5;
 	const int row1ButtonWidth = juce::jmax(90, (windowWidth - 2 * margin - spacingX * (row1Buttons - 1)) / row1Buttons);
 
 	ScanButton.setBounds(margin, row1Y, row1ButtonWidth, buttonHeight);
 	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
 	openPluginButton.setBounds(pluginBox.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
 	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
-	aboutButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
-	routingButton.setBounds(aboutButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
+	routingButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
 
 	// Row 2 - Instrument management and recording
 	const int row2Y = buttonLayout.rowY[2];
