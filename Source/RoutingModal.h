@@ -59,7 +59,7 @@ private:
 
     juce::Label titleLabel{ "titleLabel", "Routing Setup" };
     juce::Label stemsLabel{ "stemsLabel", "Stems" };
-    juce::Label rulesLabel{ "rulesLabel", "Match Rules (comma-separated tags)" };
+    juce::Label rulesLabel{ "rulesLabel", "Match Rules (comma-separated strings to match with plugin instance Ids)" };
     juce::Label statusLabel;
 
     juce::ListBox stemsList{ "stemsList", this };
