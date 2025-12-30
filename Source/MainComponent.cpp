@@ -364,13 +364,20 @@ void MainComponent::resized()
 	// Row 1 (bottom row) - Scan, Select Plugin, Update, Open Plugin, List Plugin Instances
 	const int row1Y = buttonLayout.rowY[3];
 	const int row1Buttons = 5;
-	const int row1ButtonWidth = juce::jmax(90, (windowWidth - 2 * margin - spacingX * (row1Buttons - 1)) / row1Buttons);
+	const int row1ButtonWidth = buttonWidth;
 
-	ScanButton.setBounds(margin, row1Y, row1ButtonWidth, buttonHeight);
-	pluginBox.setBounds(ScanButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
-	openPluginButton.setBounds(pluginBox.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
-	listPluginInstancesButton.setBounds(openPluginButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
-	routingButton.setBounds(listPluginInstancesButton.getRight() + spacingX, row1Y, row1ButtonWidth, buttonHeight);
+	int currentX = margin;
+	auto placeRowButton = [&](juce::Component& button)
+	{
+		button.setBounds(currentX, row1Y, row1ButtonWidth, buttonHeight);
+		currentX += row1ButtonWidth + spacingX;
+	};
+
+	placeRowButton(ScanButton);
+	placeRowButton(pluginBox);
+	placeRowButton(openPluginButton);
+	placeRowButton(listPluginInstancesButton);
+	placeRowButton(routingButton);
 
 	// Row 2 - Instrument management and recording
 	const int row2Y = buttonLayout.rowY[2];
@@ -1057,7 +1064,7 @@ void MainComponent::showPluginScanModal()
 		[this]()
 		{ initPluginsList(); });
 
-	modalContent->setSize(420, 360);
+	modalContent->setSize(450, 360);
 	options.content.setOwned(modalContent);
 	options.launchAsync();
 }
