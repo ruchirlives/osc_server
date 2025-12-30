@@ -32,7 +32,7 @@ private:
 
     juce::TextButton playButton{ "Play capture" };
     juce::TextButton pauseButton{ "Pause" };
-    juce::TextButton stopButton{ "Stop capture" };
+    juce::TextButton stopButton{ "Stop" };
     juce::TextButton closeButton{ "Close" };
     juce::TextButton saveCaptureButton{ "Save Capture" };
     juce::TextButton loadCaptureButton{ "Load Capture" };

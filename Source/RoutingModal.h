@@ -72,10 +72,10 @@ private:
 
     juce::TextButton addStemButton{ "Add Stem" };
     juce::TextButton saveButton{ "Save" };
-    juce::TextButton saveXmlButton{ "Save XML" };
-    juce::TextButton loadXmlButton{ "Load XML" };
+    juce::TextButton saveXmlButton{ "Save routing" };
+    juce::TextButton loadXmlButton{ "Load routing" };
     juce::TextButton closeButton{ "Close" };
-    juce::TextButton recordCaptureButton{ "Capture OSC" };
+    juce::TextButton recordCaptureButton{ "Start capture" };
     juce::TextButton stopCaptureButton{ "Stop capture" };
     juce::TextButton debugCaptureButton{ "Debug" };
     juce::TextButton previewButton{ "Preview" };
