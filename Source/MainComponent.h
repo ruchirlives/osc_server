@@ -285,8 +285,9 @@ public:
         void removeMidiChannelFromOverdub(int midiChannel);
 
         // Refresh the orchestra table and layout after data changes
-        void refreshOrchestraTableUI();
-
+	void refreshOrchestraTableUI();
+	void replacePluginForRow(int row, juce::Component* anchor);
+	void applyPluginReplacement(int row, const juce::String& pluginName);
 
 private:
     juce::File pluginFolder; // Use a juce::File object instead of a pointer

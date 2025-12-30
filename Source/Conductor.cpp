@@ -1506,6 +1506,12 @@ void EditableTextCustomComponent::showContextMenu_pluginInstances()
 				owner.mainComponent->getPluginManager().resetPlugin(owner.getSelectedPluginId());
 				owner.table.updateContent();
 			} });
+	contextMenu.addItem("Replace Plugin", [this]()
+						{
+			if (row != -1)
+			{
+				owner.mainComponent->replacePluginForRow(row, this);
+			} });
 	// Show the menu at the current mouse position
 	contextMenu.showAt(this);
 }

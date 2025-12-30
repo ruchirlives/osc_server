@@ -1127,6 +1127,55 @@ void MainComponent::showPluginScanModal()
 	options.launchAsync();
 }
 
+void MainComponent::replacePluginForRow(int row, juce::Component* anchor)
+{
+	if (row < 0 || row >= static_cast<int>(conductor.orchestra.size()))
+		return;
+
+	const auto types = pluginManager.knownPluginList.getTypes();
+	if (types.isEmpty())
+	{
+		juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+			"Replace Plugin", "No plugins are available to replace with.");
+		return;
+	}
+
+	juce::PopupMenu replaceMenu;
+	for (const auto& desc : types)
+	{
+		const juce::String pluginName = desc.name;
+		replaceMenu.addItem(pluginName, [this, row, pluginName]()
+			{
+				juce::MessageManager::callAsync([this, row, pluginName]()
+					{
+						applyPluginReplacement(row, pluginName);
+					});
+			});
+	}
+
+	replaceMenu.showAt(anchor);
+}
+
+void MainComponent::applyPluginReplacement(int row, const juce::String& pluginName)
+{
+	if (row < 0 || row >= static_cast<int>(conductor.orchestra.size()) || pluginName.isEmpty())
+		return;
+
+	auto pluginId = conductor.orchestra[row].pluginInstanceId;
+
+	pluginManager.resetPlugin(pluginId);
+	pluginManager.instantiatePluginByName(pluginName, pluginId);
+
+	for (auto& inst : conductor.orchestra)
+	{
+		if (inst.pluginInstanceId == pluginId)
+			inst.pluginName = pluginName;
+	}
+
+	orchestraTable.updateContent();
+	conductor.syncOrchestraWithPluginManager();
+}
+
 void MainComponent::scanForPlugins(PluginScanMode mode)
 {
 	if (!getFolder())
