@@ -81,7 +81,8 @@
         auto summary = pluginManager.getMasterTaggedMidiSummary();
         if (summary.totalEvents == 0)
         {
-            statusLabel.setText("No capture data to preview.", juce::dontSendNotification);
+            statusLabel.setText("No capture data to preview. Opening preview window so you can load one.", juce::dontSendNotification);
+
         }
 
         auto* content = new PreviewModal(pluginManager);
@@ -386,7 +387,7 @@ void RoutingModal::resized()
     buttonBlock.removeFromTop(6);
     auto row1 = buttonBlock.removeFromTop(actionRowHeight);
     layoutButtonRow(row1, { &addStemButton, &recordCaptureButton, &stopCaptureButton,
-                            &debugCaptureButton, &previewButton });
+                            &debugCaptureButton, &previewButton});
 
     buttonBlock.removeFromTop(buttonSpacing);
     auto row2 = buttonBlock.removeFromTop(actionRowHeight);
@@ -503,7 +504,7 @@ void RoutingModal::updateCaptureControls()
     recordCaptureButton.setColour(juce::TextButton::buttonColourId, highlight);
 
     const auto summary = pluginManager.getMasterTaggedMidiSummary();
-    previewButton.setEnabled(summary.totalEvents > 0);
+    previewButton.setEnabled(true);
 }
 
 void RoutingModal::saveRoutingToFile()

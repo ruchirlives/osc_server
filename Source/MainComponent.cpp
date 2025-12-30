@@ -21,7 +21,7 @@ public:
 		addAndMakeVisible(statusLabel);
 	}
 
-	void paint(juce::Graphics& g) override
+	void paint(juce::Graphics &g) override
 	{
 		g.fillAll(juce::Colours::darkslategrey.darker(0.15f));
 		g.setColour(juce::Colours::white.withAlpha(0.12f));
@@ -33,13 +33,13 @@ public:
 		statusLabel.setBounds(getLocalBounds().reduced(12, 8));
 	}
 
-	void setMessage(const juce::String& message)
+	void setMessage(const juce::String &message)
 	{
 		statusLabel.setText(message, juce::dontSendNotification);
 	}
 
 private:
-	juce::Label statusLabel{ "restoreStatus", "Restoring project..." };
+	juce::Label statusLabel{"restoreStatus", "Restoring project..."};
 };
 
 static bool isRunningInDebugger()
@@ -276,8 +276,7 @@ MainComponent::MainComponent()
 										{
 											if (self->onInitialised)
 												self->onInitialised();
-										}
-									});
+										} });
 }
 
 MainComponent::~MainComponent()
@@ -313,7 +312,7 @@ void MainComponent::resized()
 		nextX += width + spacingX;
 	};
 
-	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText())+200);
+	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameLabel.getFont().getStringWidth(projectNameLabel.getText()) + 200);
 	const int audioPortLabelWidth = 150;
 	const int audioPortFieldWidth = 100;
 	const int bpmLabelWidth = 38;
@@ -367,7 +366,7 @@ void MainComponent::resized()
 	const int row1ButtonWidth = buttonWidth;
 
 	int currentX = margin;
-	auto placeRowButton = [&](juce::Component& button)
+	auto placeRowButton = [&](juce::Component &button)
 	{
 		button.setBounds(currentX, row1Y, row1ButtonWidth, buttonHeight);
 		currentX += row1ButtonWidth + spacingX;
@@ -509,7 +508,6 @@ juce::String MainComponent::getCurrentProjectName() const
 	return currentProjectName.isNotEmpty() ? currentProjectName : "Capture";
 }
 
-
 void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments)
 {
 	// Create OSCDawServer subfolder in user's documents directory
@@ -518,10 +516,12 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 		dawServerDir.createDirectory();
 
 	// Get the full file paths in OSCDawServer subfolder
+
 	juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
 	juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 	juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
 	juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+	juce::File captureBufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
 	const bool includeRoutingData = selectedInstruments.empty();
 	if (includeRoutingData)
 	{
@@ -531,9 +531,11 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 
 	// Save the project state files
 	conductor.saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName(), selectedInstruments);
+	const bool captureBufferSaved = includeRoutingData && pluginManager.hasMasterTaggedMidiData() && pluginManager.saveMasterTaggedMidiBufferToFile(captureBufferFile);
 
 	// Open a file chooser dialog for the custom project file
 	juce::FileChooser fileChooser("Save Project", juce::File(), "*.oscdaw"); // Custom suffix here
+
 	if (fileChooser.browseForFileToSave(true))
 	{
 		// Get the selected file, ensuring it has the correct suffix
@@ -555,6 +557,8 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 			zipBuilder.addFile(metaFile, 1, "projectMeta.xml");
 			if (includeRoutingData && routingFile.existsAsFile())
 				zipBuilder.addFile(routingFile, 1, "projectRouting.xml");
+			if (captureBufferSaved && captureBufferFile.existsAsFile())
+				zipBuilder.addFile(captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
 
 			// Write the compressed data to the file
 			zipBuilder.writeToStream(outputStream, nullptr);
@@ -572,7 +576,7 @@ void MainComponent::restoreProject(bool append)
 	if (!fileChooser.browseForFileToOpen())
 		return;
 
-	auto* statusComponent = new ProjectRestoreModal();
+	auto *statusComponent = new ProjectRestoreModal();
 	statusComponent->setSize(420, 64);
 	juce::DialogWindow::LaunchOptions opts;
 	opts.content.setOwned(statusComponent);
@@ -584,11 +588,11 @@ void MainComponent::restoreProject(bool append)
 	opts.launchAsync();
 
 	auto safeStatus = juce::Component::SafePointer<ProjectRestoreModal>(statusComponent);
-	auto updateStatus = [safeStatus](const juce::String& message)
+	auto updateStatus = [safeStatus](const juce::String &message)
 	{
 		auto deliver = [safeStatus, message]() mutable
 		{
-			if (auto* comp = safeStatus.getComponent())
+			if (auto *comp = safeStatus.getComponent())
 				comp->setMessage(message);
 		};
 
@@ -601,13 +605,12 @@ void MainComponent::restoreProject(bool append)
 	auto closeStatus = [safeStatus]()
 	{
 		juce::MessageManager::callAsync([safeStatus]()
-		{
+										{
 			if (auto* comp = safeStatus.getComponent())
 			{
 				if (auto* dialog = comp->findParentComponentOfClass<juce::DialogWindow>())
 					dialog->exitModalState(0);
-			}
-		});
+			} });
 	};
 
 	auto runOnMessageThreadBlocking = [](std::function<void()> fn)
@@ -619,10 +622,9 @@ void MainComponent::restoreProject(bool append)
 		}
 		juce::WaitableEvent done;
 		juce::MessageManager::callAsync([fn = std::move(fn), &done]() mutable
-		{
+										{
 			fn();
-			done.signal();
-		});
+			done.signal(); });
 		done.wait();
 	};
 
@@ -630,13 +632,11 @@ void MainComponent::restoreProject(bool append)
 	updateStatus("Selected Project: " + zipFile.getFileName());
 	DBG("Selected Project: " + zipFile.getFullPathName());
 
-	pluginManager.setRestoreStatusCallback([updateStatus](const juce::String& message)
-	{
-		updateStatus(message);
-	});
+	pluginManager.setRestoreStatusCallback([updateStatus](const juce::String &message)
+										   { updateStatus(message); });
 
 	std::thread([this, zipFile, updateStatus, closeStatus, runOnMessageThreadBlocking, append]()
-	{
+				{
 		bool restoreSucceeded = false;
 		juce::FileInputStream inputStream(zipFile);
 		if (inputStream.openedOk())
@@ -655,6 +655,7 @@ void MainComponent::restoreProject(bool append)
 			juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
 			juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
 			juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+			juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
 
 			updateStatus("Unzipping Project...");
 			auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
@@ -682,23 +683,32 @@ void MainComponent::restoreProject(bool append)
 			extractFile("projectPlugins.dat", pluginsFile);
 			extractFile("projectMeta.xml", metaFile);
 			const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
+			const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
 			updateStatus("Project Unzipped.");
 			DBG("Project Unzipped.");
 
-			runOnMessageThreadBlocking([this, &dataFile, &pluginsFile, &metaFile, routingExtracted, &routingFile, append]()
+			runOnMessageThreadBlocking([this, &dataFile, &pluginsFile, &metaFile, routingExtracted, &routingFile, bufferExtracted, &bufferFile, append]()
 			{
 				if (!append)
 				{
 					conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
 					if (routingExtracted)
 						pluginManager.loadRoutingConfigFromFile(routingFile);
-					pluginManager.rebuildRouterTagIndexFromConductor();
+					if (bufferExtracted)
+					{
+						if (!pluginManager.loadMasterTaggedMidiBufferFromFile(bufferFile))
+							pluginManager.clearMasterTaggedMidiBuffer();
+					}
+					else
+					{
+						pluginManager.clearMasterTaggedMidiBuffer();
+					}
 				}
 				else
 				{
 					conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-					pluginManager.rebuildRouterTagIndexFromConductor();
 				}
+				pluginManager.rebuildRouterTagIndexFromConductor();
 			});
 
 			runOnMessageThreadBlocking([this, &zipFile]()
@@ -734,8 +744,8 @@ void MainComponent::restoreProject(bool append)
 		}
 
 		pluginManager.clearRestoreStatusCallback();
-		closeStatus();
-	}).detach();
+		closeStatus(); })
+		.detach();
 }
 
 void MainComponent::refreshOrchestraTableUI()
@@ -1014,7 +1024,7 @@ void MainComponent::showRoutingModal()
 	options.resizable = true;
 	options.componentToCentreAround = this;
 
-	auto* modalContent = new RoutingModal(pluginManager);
+	auto *modalContent = new RoutingModal(pluginManager);
 	modalContent->setSize(640, 420);
 	options.content.setOwned(modalContent);
 	options.launchAsync();

@@ -1371,6 +1371,7 @@ void EditableTextCustomComponent::save_selection()
 
 	// Save the selected instruments
 	owner.mainComponent->saveProject(selectedInstruments);
+
 }
 
 std::vector<juce::String> presetTags = {
