@@ -27,7 +27,7 @@ The first string of every `/orchestra` message picks one of the supported comman
   Expects a single numeric argument (int, float, or string) representing the target BPM and immediately updates both `PluginManager` and `MainComponent` via `setBpm`. The OSC address `/orchestra/set_tempo` is handled before the rest of the dispatcher so tempo changes can short-circuit the generic command parsing.
 
 - `add_instrument <instrumentName> <pluginInstanceId> <midiChannel> <tag>...`  
-  Creates or updates an orchestra entry with the given name, plugin instance ID and 1ƒ?'based MIDI channel, plus all supplied tags.
+  Creates or updates an orchestra entry with the given name, plugin instance ID and 1-based MIDI channel (1-16), plus all supplied tags.
 - `get_recorded`  
   Copies the recorded buffer to the MIDI manager (`MidiManager::getRecorded`).
 - `select_by_tag <tag>`  
