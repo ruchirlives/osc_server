@@ -361,11 +361,12 @@ private:
 
         // Buttons for overdub control
     juce::TextButton startOverdubButton { "Start" };
-    juce::TextButton stopOverdubButton { "Stop Overdub" };
+    juce::TextButton stopOverdubButton { "Stop" };
 	juce::TextButton playOverdubButton{ "Play" };
 	juce::TextButton triggerOverdubButton{ "Trig" };
+	juce::TextButton bakeOverdubButton{ "Bake" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
-    juce::TextButton undoOverdubButton { "Undo Overdub" };
+    juce::TextButton undoOverdubButton { "Undo" };
     juce::TextButton importMidiButton { "Import dub" };
 	juce::TextButton exportMidiButton { "Export dub" };
 

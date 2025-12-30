@@ -35,6 +35,7 @@ public:
 	void undoLastOverdub();
 	void getRecorded();
 	void sendTestNote();
+	void bakeOverdubIntoMaster();
 
         void exportRecordBufferToMidiFile();
         void importMidiFileToRecordBuffer();
@@ -91,6 +92,7 @@ private:
         void writeMidiFile(const juce::File& file, const std::map<int, ChannelTrackInfo>& channelSequences) const;
         static int extractChannelFromTrack(const juce::MidiMessageSequence& sequence);
         bool ensurePluginChannelEntry(const juce::String& pluginId, int channel, const juce::String& trackName);
+        void addBufferToMasterCapture(const juce::MidiBuffer& bufferCopy);
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiManager)
 };

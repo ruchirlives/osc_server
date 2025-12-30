@@ -220,6 +220,12 @@ MainComponent::MainComponent()
 	{ midiManager.playOverdub(); updateOverdubUI(); };
 	playOverdubButton.setTooltip("Play back the captured overdub buffer.");
 
+	// Initialize the "Bake Overdub" button
+	addAndMakeVisible(bakeOverdubButton);
+	bakeOverdubButton.onClick = [this]()
+	{ midiManager.bakeOverdubIntoMaster(); updateOverdubUI(); };
+	bakeOverdubButton.setTooltip("Merge the overdub buffer into the master capture.");
+
 	// playOverdubOnTriggerButton
 	addAndMakeVisible(triggerOverdubButton);
 	triggerOverdubButton.onClick = [this]()
@@ -406,8 +412,9 @@ void MainComponent::resized()
 	startOverdubButton.setBounds(restoreButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
 	triggerOverdubButton.setBounds(startOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
 	playOverdubButton.setBounds(triggerOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
-	stopOverdubButton.setBounds(playOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
-	undoOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, buttonWidth, buttonHeight);
+	stopOverdubButton.setBounds(playOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
+	bakeOverdubButton.setBounds(stopOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
+	undoOverdubButton.setBounds(bakeOverdubButton.getRight() + spacingX, row4Y, miniButtonWidth, buttonHeight);
 
 	// --- BPM Sync handler ---
 	bpmEditor.onTextChange = [this]()
@@ -452,6 +459,11 @@ void MainComponent::updateOverdubUI()
 
 	stripLeadingSilenceButton.setEnabled(!midiManager.isOverdubbing && midiManager.hasRecordedEvents());
 	undoOverdubButton.setEnabled(!midiManager.isOverdubbing && midiManager.canUndoOverdub());
+	bakeOverdubButton.setEnabled(!midiManager.isOverdubbing && midiManager.hasRecordedEvents());
+	if (!midiManager.isOverdubbing && midiManager.hasRecordedEvents())
+		bakeOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::orange);
+	else
+		bakeOverdubButton.setColour(juce::TextButton::buttonColourId, juce::Colours::lightgrey);
 }
 void MainComponent::handleAudioPortChange()
 {

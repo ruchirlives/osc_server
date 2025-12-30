@@ -331,6 +331,57 @@ void MidiManager::playOverdub()
     republishRecordedEvents(bufferCopy);
 }
 
+void MidiManager::bakeOverdubIntoMaster()
+{
+	juce::MidiBuffer bufferCopy;
+	{
+		const juce::ScopedLock sl(midiCriticalSection);
+		if (recordBuffer.getNumEvents() == 0)
+			return;
+		bufferCopy = recordBuffer;
+	}
+
+	addBufferToMasterCapture(bufferCopy);
+	DBG("bakeOverdubIntoMaster: recordBuffer contains " << bufferCopy.getNumEvents() << " events");
+	for (const auto metadata : bufferCopy)
+	{
+		const auto ts = getTimestampFromEvent(metadata.getMessage(), metadata.samplePosition);
+		DBG("  event ts=" << ts << " msg=" << metadata.getMessage().getDescription());
+	}
+
+	republishRecordedEvents(bufferCopy);
+}
+
+void MidiManager::addBufferToMasterCapture(const juce::MidiBuffer& bufferCopy)
+{
+	if (mainComponent == nullptr)
+		return;
+
+	juce::String pluginId = mainComponent->getOrchestraTableModel().getSelectedPluginId();
+	if (pluginId.isEmpty())
+		return;
+
+	auto& pluginManager = mainComponent->getPluginManager();
+	const auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
+
+	for (const auto metadata : bufferCopy)
+	{
+		auto ticks = getTimestampFromEvent(metadata.getMessage(), metadata.samplePosition);
+		if (ticks < 0)
+			continue;
+
+		juce::int64 timestampMs = 0;
+		if (ticksPerSecond > 0)
+		{
+			const auto timeMs = static_cast<double>(ticks) * 1000.0 / static_cast<double>(ticksPerSecond);
+			timestampMs = static_cast<juce::int64>(timeMs + 0.5);
+		}
+
+		auto messageCopy = metadata.getMessage();
+		pluginManager.addMidiMessage(messageCopy, pluginId, timestampMs);
+	}
+}
+
 void MidiManager::stripLeadingSilence()
 {
         juce::MidiBuffer bufferCopy;
