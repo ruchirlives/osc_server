@@ -1238,6 +1238,94 @@ double PluginManager::getMasterFirstEventMs() const
     return static_cast<double>(masterTaggedMidiBuffer.front().timestamp);
 }
 
+bool PluginManager::saveMasterTaggedMidiBufferToFile(const juce::File& file)
+{
+    auto snapshot = snapshotMasterTaggedMidiBuffer();
+    double startMs;
+    {
+        auto& lock = const_cast<juce::CriticalSection&>(midiCriticalSection);
+        const juce::ScopedLock sl(lock);
+        startMs = captureStartMs;
+    }
+
+    if (snapshot.empty())
+        return false;
+
+    juce::XmlElement root("MasterTaggedMidiBuffer");
+    root.setAttribute("captureStartMs", startMs);
+
+    for (const auto& event : snapshot)
+    {
+        auto* xmlEvent = root.createNewChildElement("Event");
+        xmlEvent->setAttribute("pluginId", event.pluginId);
+        xmlEvent->setAttribute("timestamp", static_cast<juce::int64>(event.timestamp));
+
+        juce::MemoryBlock dataBlock(event.message.getRawData(),
+            static_cast<size_t>(event.message.getRawDataSize()));
+        xmlEvent->setAttribute("data", dataBlock.toBase64Encoding());
+    }
+
+    if (auto parent = file.getParentDirectory(); !parent.exists())
+        parent.createDirectory();
+
+    return root.writeTo(file);
+}
+
+bool PluginManager::loadMasterTaggedMidiBufferFromFile(const juce::File& file)
+{
+    if (!file.existsAsFile())
+        return false;
+
+    juce::XmlDocument doc(file);
+    std::unique_ptr<juce::XmlElement> xml(doc.getDocumentElement());
+    if (xml == nullptr || !xml->hasTagName("MasterTaggedMidiBuffer"))
+        return false;
+
+    std::vector<MyMidiMessage> loaded;
+    loaded.reserve(xml->getNumChildElements());
+
+    forEachXmlChildElement(*xml, event)
+    {
+        if (!event->hasTagName("Event"))
+            continue;
+
+        const juce::String dataString = event->getStringAttribute("data");
+        juce::MemoryBlock dataBlock;
+        if (!dataBlock.fromBase64Encoding(dataString) || dataBlock.getSize() == 0)
+            continue;
+
+        juce::MidiMessage midiMessage(dataBlock.getData(),
+            static_cast<int>(dataBlock.getSize()));
+        const juce::String pluginId = event->getStringAttribute("pluginId");
+        const juce::int64 timestamp = event->getInt64Attribute("timestamp");
+        loaded.emplace_back(midiMessage, pluginId, timestamp);
+    }
+
+    if (loaded.empty())
+        return false;
+
+    double loadedCaptureStart = xml->getDoubleAttribute("captureStartMs", -1.0);
+    if (loadedCaptureStart < 0.0 && !loaded.empty())
+        loadedCaptureStart = static_cast<double>(loaded.front().timestamp);
+
+    {
+        const juce::ScopedLock sl(midiCriticalSection);
+        masterTaggedMidiBuffer.clear();
+        taggedMidiBuffer.clear();
+        previewActive = false;
+        previewPaused = false;
+        previewOffsetMs = 0.0;
+        captureStartMs = loadedCaptureStart;
+
+        for (auto& message : loaded)
+            insertSortedMidiMessage(masterTaggedMidiBuffer, std::move(message));
+    }
+
+    resetPlayback();
+    stopAllNotes();
+    return true;
+}
+
 juce::String PluginManager::getRenderProjectName() const
 {
     if (mainComponent != nullptr)

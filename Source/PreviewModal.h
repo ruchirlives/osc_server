@@ -34,10 +34,13 @@ private:
     juce::TextButton pauseButton{ "Pause" };
     juce::TextButton stopButton{ "Stop" };
     juce::TextButton closeButton{ "Close" };
+    juce::TextButton saveCaptureButton{ "Save Capture" };
+    juce::TextButton loadCaptureButton{ "Load Capture" };
     juce::TextButton renderButton{ "Render" };
     juce::TextButton openFolderButton{ "Open Folder" };
 
     juce::File lastRenderFolder;
+    juce::File lastCaptureFile;
     std::atomic<bool> renderJobRunning{ false };
 
     void handleRenderRequest();

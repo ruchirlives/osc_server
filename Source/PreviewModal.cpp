@@ -49,6 +49,53 @@ PreviewModal::PreviewModal(PluginManager& manager)
     {
         handleRenderRequest();
     };
+    saveCaptureButton.onClick = [this]()
+    {
+        if (!pluginManager.hasMasterTaggedMidiData())
+            return;
+
+        juce::File defaultDir = lastCaptureFile.exists() ? lastCaptureFile.getParentDirectory()
+            : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+        juce::FileChooser chooser("Save Capture", defaultDir, "*.xml", true);
+        if (!chooser.browseForFileToSave(true))
+            return;
+
+        auto target = chooser.getResult();
+        if (!target.hasFileExtension(".xml"))
+            target = target.withFileExtension(".xml");
+
+        const bool ok = pluginManager.saveMasterTaggedMidiBufferToFile(target);
+        if (ok)
+        {
+            lastCaptureFile = target;
+            renderInfoLabel.setText("Capture saved to " + target.getFullPathName(), juce::dontSendNotification);
+        }
+        else
+        {
+            renderInfoLabel.setText("Failed to save capture.", juce::dontSendNotification);
+        }
+    };
+    loadCaptureButton.onClick = [this]()
+    {
+        juce::File defaultDir = lastCaptureFile.exists() ? lastCaptureFile.getParentDirectory()
+            : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+        juce::FileChooser chooser("Load Capture", defaultDir, "*.xml", true);
+        if (!chooser.browseForFileToOpen())
+            return;
+
+        const juce::File file = chooser.getResult();
+        const bool ok = pluginManager.loadMasterTaggedMidiBufferFromFile(file);
+        if (ok)
+        {
+            lastCaptureFile = file;
+            refreshSummaryAndState();
+            renderInfoLabel.setText("Capture loaded from " + file.getFullPathName(), juce::dontSendNotification);
+        }
+        else
+        {
+            renderInfoLabel.setText("Failed to load capture.", juce::dontSendNotification);
+        }
+    };
     openFolderButton.onClick = [this]()
     {
         if (lastRenderFolder.exists())
@@ -61,6 +108,8 @@ PreviewModal::PreviewModal(PluginManager& manager)
     addAndMakeVisible(pauseButton);
     addAndMakeVisible(stopButton);
     addAndMakeVisible(closeButton);
+    addAndMakeVisible(saveCaptureButton);
+    addAndMakeVisible(loadCaptureButton);
     addAndMakeVisible(renderButton);
     addAndMakeVisible(openFolderButton);
 
@@ -96,7 +145,7 @@ void PreviewModal::resized()
     infoGrid.performLayout(infoArea);
 
     bounds.removeFromTop(24);
-    auto buttonArea = bounds.removeFromTop(110);
+    auto buttonArea = bounds.removeFromTop(170);
     juce::Grid buttonGrid;
     buttonGrid.templateColumns = {
         juce::Grid::TrackInfo(juce::Grid::Fr(1)),
@@ -104,6 +153,7 @@ void PreviewModal::resized()
         juce::Grid::TrackInfo(juce::Grid::Fr(1))
     };
     buttonGrid.templateRows = {
+        juce::Grid::TrackInfo(juce::Grid::Px(40)),
         juce::Grid::TrackInfo(juce::Grid::Px(40)),
         juce::Grid::TrackInfo(juce::Grid::Px(40))
     };
@@ -113,6 +163,8 @@ void PreviewModal::resized()
         juce::GridItem(playButton),
         juce::GridItem(pauseButton),
         juce::GridItem(stopButton),
+        juce::GridItem(saveCaptureButton),
+        juce::GridItem(loadCaptureButton),
         juce::GridItem(renderButton),
         juce::GridItem(openFolderButton),
         juce::GridItem(closeButton)
@@ -162,6 +214,8 @@ void PreviewModal::refreshSummaryAndState()
     pauseButton.setEnabled(active && !paused);
     stopButton.setEnabled(active || paused);
     renderButton.setEnabled(hasEvents && !renderJobRunning.load());
+    saveCaptureButton.setEnabled(hasEvents);
+    loadCaptureButton.setEnabled(true);
     openFolderButton.setEnabled(lastRenderFolder.exists());
 }
 
