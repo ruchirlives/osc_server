@@ -70,7 +70,7 @@ The `/midi/message` listener reads a command name as the first string followed b
 ### Responses
 
 - `/selected/tags <tag>...`  
-  Sent in reply to `request_tags`; contains the last tag list that was dispatched to the client.
+  Sent in reply to `request_tags`; contains the last tag list that was dispatched to the client provided as a sequence of separate string arguments.
 - `/dawServerData <tag> <midiChannel> <pluginInstanceId> <pluginName> <instrumentName> <uniqueId>`  
   Emitted when `/midi/message` receives `request_dawServerData` so that an OSC client can learn the details of a tagged instrument.
 
