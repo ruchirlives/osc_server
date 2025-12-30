@@ -28,9 +28,6 @@ The first string of every `/orchestra` message picks one of the supported comman
 
 - `add_instrument <instrumentName> <pluginInstanceId> <midiChannel> <tag>...`  
   Creates or updates an orchestra entry with the given name, plugin instance ID and 1ƒ?'based MIDI channel, plus all supplied tags.
-
-- `add_instrument <instrumentName> <pluginInstanceId> <midiChannel> <tag>...`  
-  Creates or updates an orchestra entry with the given name, plugin instance ID and 1‑based MIDI channel, plus all supplied tags.
 - `get_recorded`  
   Copies the recorded buffer to the MIDI manager (`MidiManager::getRecorded`).
 - `select_by_tag <tag>`  
