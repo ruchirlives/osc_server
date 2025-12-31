@@ -11,6 +11,11 @@ struct LayoutMetrics
 	int spacingY = 10;
 	int labelHeight = 20;
 	int numButtonRows = 4;
+	int numButtonColumns = 5;
+	bool windowResizable = true;
+	int windowWidth = numButtonColumns * (buttonWidth + spacingX) + margin * 2 - spacingX;
+	juce::Rectangle<int> initialWindowBounds{ 50, 50, windowWidth, 380 };
+	bool positionWindowBottomRight = true;
 };
 
 class RoundedTableWrapper : public juce::Component

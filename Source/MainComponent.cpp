@@ -350,13 +350,14 @@ void MainComponent::resized()
 	placeTopControl(audioStreamingPortLabel, audioPortLabelWidth);
 	placeTopControl(audioStreamingPortEditor, audioPortFieldWidth);
 
-	const int bpmEditorRight = windowWidth - margin - 110;
+	const int aboutButtonWidth = 110;
+	aboutButton.setBounds(windowWidth - margin - aboutButtonWidth, topRowY, aboutButtonWidth, labelHeight);
+
+	const int bpmEditorRight = windowWidth - margin - aboutButtonWidth - spacingX;
 	const int bpmEditorX = bpmEditorRight - bpmFieldWidth;
 	bpmEditor.setBounds(bpmEditorX, topRowY, bpmFieldWidth, labelHeight);
 	bpmLabel.setBounds(bpmEditorX - bpmSpacing - bpmLabelWidth, topRowY, bpmLabelWidth, labelHeight);
 
-	const int aboutButtonWidth = 110;
-	aboutButton.setBounds(windowWidth - margin - aboutButtonWidth, topRowY, aboutButtonWidth, labelHeight);
 
 	const int driverRowY = projectNameLabel.getBottom() + spacingY / 2;
 	audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);

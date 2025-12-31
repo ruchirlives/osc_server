@@ -171,9 +171,11 @@ public:
            #if JUCE_IOS || JUCE_ANDROID
             setFullScreen (true);
            #else
-            setResizable (true, true);
-            setBounds(50, 50, 750, 460);
-            positionBottomRight();
+            LayoutMetrics layoutMetrics;
+            setResizable (layoutMetrics.windowResizable, layoutMetrics.windowResizable);
+            setBounds(layoutMetrics.initialWindowBounds);
+            if (layoutMetrics.positionWindowBottomRight)
+                positionBottomRight();
            #endif
 
             setVisible (true);
