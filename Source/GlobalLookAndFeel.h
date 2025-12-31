@@ -51,6 +51,8 @@ private:
 class GlobalLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
+	juce::Colour getBaseColour() const { return base; }
+
 	GlobalLookAndFeel()
 		: base(juce::Colour::fromRGB(50, 50, 50)),
 		  panel(base.brighter(0.1f)),
