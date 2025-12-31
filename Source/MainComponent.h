@@ -59,9 +59,22 @@ public:
 	void setSelectedAudioDevice(const juce::String& deviceName);
 	void initOrchestraTable();
 	void showRoutingModal();
-	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
-	void restoreProject(bool append = false);
+	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {}, const juce::File& customFile = {});
+	void restoreProject(bool append = false, const juce::File& customFile = {});
 	RestoreModalController openRestoreModal();
+
+	struct ProjectSaveFiles
+	{
+		juce::File dataFile;
+		juce::File pluginDescriptionsFile;
+		juce::File orchestraFile;
+		juce::File routingFile;
+		juce::File captureBufferFile;
+	};
+
+	ProjectSaveFiles getDefaultProjectFiles() const;
+	juce::File getDefaultProjectArchiveFile() const;
+	bool saveSharedProjectFiles(const ProjectSaveFiles& files, bool includeRoutingData, const std::vector<InstrumentInfo>& selectedInstruments);
 	bool restoreProjectFromFiles(const juce::File& dataFile,
 	                             const juce::File& pluginDescFile,
 	                             const juce::File& orchestraFile,
@@ -107,6 +120,8 @@ private:
     juce::File pluginFolder; // Use a juce::File object instead of a pointer
 
     LayoutMetrics getLayoutMetrics() const;
+
+    juce::File getDefaultDawServerDir() const;
 
     struct ButtonPanelLayout
     {
@@ -176,7 +191,7 @@ private:
     juce::TextButton importMidiButton { "Import dub" };
 	juce::TextButton exportMidiButton { "Export dub" };
 
-	juce::TooltipWindow tooltipWindow;
+    juce::TooltipWindow tooltipWindow;
 
 	PluginManager pluginManager { this, midiCriticalSection, midiBuffer }; // Create an instance of the PluginManager class
 	Conductor conductor{ pluginManager, midiManager, this }; // Create an instance of the Conductor class

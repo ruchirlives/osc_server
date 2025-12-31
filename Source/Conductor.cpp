@@ -73,13 +73,6 @@ namespace
 		return 0.0;
 	}
 
-	juce::File getDefaultDawServerDir()
-	{
-		auto dir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-		if (!dir.exists())
-			dir.createDirectory();
-		return dir;
-	}
 }
 
 // Constructor: takes a reference to PluginManager and passes it
@@ -262,29 +255,24 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
 			else if (messageType == "save_project")
 			{
-				auto files = getDefaultProjectFiles();
-				const bool captureBufferSaved = saveSharedProjectFiles(files, true, {});
-				DBG("OSC save_project saved project (capture buffer saved: " + juce::String(captureBufferSaved ? "yes" : "no") + ").");
+				if (mainComponent != nullptr)
+				{
+					auto archive = mainComponent->getDefaultProjectArchiveFile();
+					mainComponent->saveProject({}, archive);
+					DBG("OSC save_project wrote archive " + archive.getFullPathName());
+				}
+				else
+				{
+					DBG("OSC save_project: mainComponent is null.");
+				}
 			}
-                        else if (messageType == "restore_project")
-                        {
-                                auto files = getDefaultProjectFiles();
-                                const bool routingExists = files.routingFile.existsAsFile();
-                                const bool bufferExists = files.captureBufferFile.existsAsFile();
-                                const bool restored = mainComponent != nullptr
-                                    ? mainComponent->restoreProjectFromFiles(
-                                        files.dataFile,
-                                        files.pluginDescriptionsFile,
-                                        files.orchestraFile,
-                                        files.routingFile,
-                                        routingExists,
-                                        files.captureBufferFile,
-                                        bufferExists,
-                                        false,
-                                        juce::String())
-                                    : false;
-
-                        }
+			else if (messageType == "restore_project")
+			{
+				if (mainComponent != nullptr)
+				{
+					mainComponent->restoreProject(false, mainComponent->getDefaultProjectArchiveFile());
+				}
+			}
 			else if (messageType == "restore_from_file")
 			{
 				DBG("Received restore from file request for file: ");
@@ -1024,37 +1012,6 @@ void Conductor::saveAllData(const juce::String &dataFilePath, const juce::String
 	pluginManager.savePluginDescriptionsToFile(pluginDescFilePath, selectedInstances);
 	pluginManager.saveAllPluginStates(dataFilePath, selectedInstances);
 	saveOrchestraData(orchestraFilePath, selectedInstruments);
-}
-
-Conductor::ProjectSaveFiles Conductor::getDefaultProjectFiles() const
-{
-	auto dir = getDefaultDawServerDir();
-	return {
-		dir.getChildFile("projectData.dat"),
-		dir.getChildFile("projectPlugins.dat"),
-		dir.getChildFile("projectMeta.xml"),
-		dir.getChildFile("projectRouting.xml"),
-		dir.getChildFile("projectTaggedMidiBuffer.xml")};
-}
-
-bool Conductor::saveSharedProjectFiles(const ProjectSaveFiles &files, bool includeRoutingData, const std::vector<InstrumentInfo> &selectedInstruments)
-{
-	if (includeRoutingData)
-	{
-		if (!pluginManager.saveRoutingConfigToFile(files.routingFile))
-			DBG("Warning: Failed to save routing configuration to " + files.routingFile.getFullPathName());
-	}
-
-	saveAllData(files.dataFile.getFullPathName(), files.pluginDescriptionsFile.getFullPathName(), files.orchestraFile.getFullPathName(), selectedInstruments);
-
-	if (!includeRoutingData || !pluginManager.hasMasterTaggedMidiData())
-		return false;
-
-	const bool captureBufferSaved = pluginManager.saveMasterTaggedMidiBufferToFile(files.captureBufferFile);
-	if (!captureBufferSaved)
-		DBG("Warning: Failed to save master tagged MIDI buffer to " + files.captureBufferFile.getFullPathName());
-
-	return captureBufferSaved;
 }
 
 void Conductor::upsertAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath)

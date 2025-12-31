@@ -559,57 +559,112 @@ juce::String MainComponent::getCurrentProjectName() const
 	return currentProjectName.isNotEmpty() ? currentProjectName : "Capture";
 }
 
-void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments)
+void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments, const juce::File &customFile)
 {
-	const auto projectFiles = conductor.getDefaultProjectFiles();
+	const auto projectFiles = getDefaultProjectFiles();
 	const bool includeRoutingData = selectedInstruments.empty();
-	const bool captureBufferSaved = conductor.saveSharedProjectFiles(projectFiles, includeRoutingData, selectedInstruments);
+	const bool captureBufferSaved = saveSharedProjectFiles(projectFiles, includeRoutingData, selectedInstruments);
 
-	// Open a file chooser dialog for the custom project file
-	juce::FileChooser fileChooser("Save Project", juce::File(), "*.oscdaw"); // Custom suffix here
-
-	if (fileChooser.browseForFileToSave(true))
+	juce::File targetFile = customFile;
+	if (targetFile == juce::File()) // No custom file provided as it's just a default juce::File()
 	{
-		// Get the selected file, ensuring it has the correct suffix
-		juce::File customFile = fileChooser.getResult().withFileExtension(".oscdaw");
-
-		// Delete file if it already exists
-		if (customFile.exists())
-		{
-			customFile.deleteFile();
-		}
-
-		juce::FileOutputStream outputStream(customFile);
-
-		if (outputStream.openedOk())
-		{
-			juce::ZipFile::Builder zipBuilder;
-			zipBuilder.addFile(projectFiles.dataFile, 5, "projectData.dat"); // Using moderate compression
-			zipBuilder.addFile(projectFiles.pluginDescriptionsFile, 5, "projectPlugins.dat");
-			zipBuilder.addFile(projectFiles.orchestraFile, 1, "projectMeta.xml");
-			if (includeRoutingData && projectFiles.routingFile.existsAsFile())
-				zipBuilder.addFile(projectFiles.routingFile, 1, "projectRouting.xml");
-			if (captureBufferSaved && projectFiles.captureBufferFile.existsAsFile())
-				zipBuilder.addFile(projectFiles.captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
-
-			// Write the compressed data to the file
-			zipBuilder.writeToStream(outputStream, nullptr);
-		}
+		juce::FileChooser fileChooser("Save Project", juce::File(), "*.oscdaw");
+		if (!fileChooser.browseForFileToSave(true))
+			return;
+		targetFile = fileChooser.getResult().withFileExtension(".oscdaw");
 	}
-	// Get the saved file name
-	juce::String projectName = fileChooser.getResult().getFileNameWithoutExtension();
+	else
+	{
+		targetFile = targetFile.withFileExtension(".oscdaw");
+	}
+
+	const juce::String projectName = targetFile.getFileNameWithoutExtension();
 	DBG("Project Saved: " + projectName);
+
+	if (targetFile.exists())
+		targetFile.deleteFile();
+
+	juce::FileOutputStream outputStream(targetFile);
+	if (!outputStream.openedOk())
+		return;
+
+	juce::ZipFile::Builder zipBuilder;
+	zipBuilder.addFile(projectFiles.dataFile, 5, "projectData.dat"); // Using moderate compression
+	zipBuilder.addFile(projectFiles.pluginDescriptionsFile, 5, "projectPlugins.dat");
+	zipBuilder.addFile(projectFiles.orchestraFile, 1, "projectMeta.xml");
+	if (includeRoutingData && projectFiles.routingFile.existsAsFile())
+		zipBuilder.addFile(projectFiles.routingFile, 1, "projectRouting.xml");
+	if (captureBufferSaved && projectFiles.captureBufferFile.existsAsFile())
+		zipBuilder.addFile(projectFiles.captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
+
+	zipBuilder.writeToStream(outputStream, nullptr);
 	updateProjectNameLabel(projectName);
 }
 
-void MainComponent::restoreProject(bool append)
+juce::File MainComponent::getDefaultDawServerDir() const
 {
-	juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
-	if (!fileChooser.browseForFileToOpen())
-		return;
+	auto dir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+	if (!dir.exists())
+		dir.createDirectory();
+	return dir;
+}
 
-	const juce::File zipFile = fileChooser.getResult();
+MainComponent::ProjectSaveFiles MainComponent::getDefaultProjectFiles() const
+{
+	auto dir = getDefaultDawServerDir();
+	return
+	{
+		dir.getChildFile("projectData.dat"),
+		dir.getChildFile("projectPlugins.dat"),
+		dir.getChildFile("projectMeta.xml"),
+		dir.getChildFile("projectRouting.xml"),
+		dir.getChildFile("projectTaggedMidiBuffer.xml")
+	};
+}
+
+juce::File MainComponent::getDefaultProjectArchiveFile() const
+{
+	return getDefaultDawServerDir().getChildFile("project.oscdaw");
+}
+
+bool MainComponent::saveSharedProjectFiles(const ProjectSaveFiles& files, bool includeRoutingData, const std::vector<InstrumentInfo>& selectedInstruments)
+{
+	if (includeRoutingData)
+	{
+		if (!pluginManager.saveRoutingConfigToFile(files.routingFile))
+			DBG("Warning: Failed to save routing configuration to " + files.routingFile.getFullPathName());
+	}
+
+	conductor.saveAllData(files.dataFile.getFullPathName(), files.pluginDescriptionsFile.getFullPathName(), files.orchestraFile.getFullPathName(), selectedInstruments);
+
+	if (!includeRoutingData || !pluginManager.hasMasterTaggedMidiData())
+		return false;
+
+	const bool captureBufferSaved = pluginManager.saveMasterTaggedMidiBufferToFile(files.captureBufferFile);
+	if (!captureBufferSaved)
+		DBG("Warning: Failed to save master tagged MIDI buffer to " + files.captureBufferFile.getFullPathName());
+
+	return captureBufferSaved;
+}
+
+void MainComponent::restoreProject(bool append, const juce::File &customFile)
+{
+	juce::File zipFile = customFile;
+	if (zipFile == juce::File())
+	{
+		juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
+		if (!fileChooser.browseForFileToOpen())
+			return;
+		zipFile = fileChooser.getResult();
+	}
+
 	DBG("Selected Project: " + zipFile.getFullPathName());
+
+	if (!zipFile.existsAsFile())
+	{
+		DBG("Restore project file missing: " + zipFile.getFullPathName());
+		return;
+	}
 
 	bool restoreSucceeded = false;
 	juce::FileInputStream inputStream(zipFile);
