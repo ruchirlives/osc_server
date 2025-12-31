@@ -265,9 +265,7 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			{
 				auto files = getDefaultProjectFiles();
 				const bool captureBufferSaved = saveSharedProjectFiles(files, true, {});
-				auto archive = writeProjectArchive(files, true, captureBufferSaved);
-				DBG("OSC save_project saved project (capture buffer saved: " + juce::String(captureBufferSaved ? "yes" : "no") +
-					", archive: " + (archive.existsAsFile() ? archive.getFileName() : "<failed>") + ").");
+				DBG("OSC save_project saved project (capture buffer saved: " + juce::String(captureBufferSaved ? "yes" : "no") + ").");
 			}
                         else if (messageType == "restore_project")
                         {
@@ -1063,36 +1061,6 @@ bool Conductor::saveSharedProjectFiles(const ProjectSaveFiles& files, bool inclu
 	return captureBufferSaved;
 }
 
-juce::File Conductor::getDefaultProjectArchiveFile() const
-{
-	return getDefaultDawServerDir().getChildFile("project.oscdaw");
-}
-
-juce::File Conductor::writeProjectArchive(const ProjectSaveFiles& files, bool includeRoutingData, bool captureBufferSaved) const
-{
-	auto archiveFile = getDefaultProjectArchiveFile();
-	if (archiveFile.existsAsFile())
-		archiveFile.deleteFile();
-
-	juce::FileOutputStream outputStream(archiveFile);
-	if (!outputStream.openedOk())
-	{
-		DBG("Failed to open archive file for writing: " + archiveFile.getFullPathName());
-		return {};
-	}
-
-	juce::ZipFile::Builder zipBuilder;
-	zipBuilder.addFile(files.dataFile, 5, "projectData.dat");
-	zipBuilder.addFile(files.pluginDescriptionsFile, 5, "projectPlugins.dat");
-	zipBuilder.addFile(files.orchestraFile, 1, "projectMeta.xml");
-	if (includeRoutingData && files.routingFile.existsAsFile())
-		zipBuilder.addFile(files.routingFile, 1, "projectRouting.xml");
-	if (captureBufferSaved && files.captureBufferFile.existsAsFile())
-		zipBuilder.addFile(files.captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
-
-	zipBuilder.writeToStream(outputStream, nullptr);
-	return archiveFile;
-}
 
 void Conductor::upsertAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath)
 {

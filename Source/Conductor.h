@@ -106,9 +106,6 @@ private:
     void handleIncomingPolyAftertouch(int channel, int note, int value, const juce::String& pluginId, juce::int64& timestamp);
     MainComponent* mainComponent;  // Reference to the MainComponent object
 
-    juce::File getDefaultProjectArchiveFile() const;
-    juce::File writeProjectArchive(const ProjectSaveFiles& files, bool includeRoutingData, bool captureBufferSaved) const;
-
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Conductor)
 };
