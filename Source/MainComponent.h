@@ -156,7 +156,7 @@ private:
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
     juce::TextButton undoOverdubButton { "Undo" };
     juce::TextButton playCaptureButton{ "Play Capture" };
-    juce::TextButton stopCaptureButton{ "Stop Capture" };
+    juce::TextButton stopCaptureButton{ "Stop" };
     juce::TextButton importMidiButton { "Import dub" };
 	juce::TextButton exportMidiButton { "Export dub" };
 
