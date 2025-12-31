@@ -16,7 +16,7 @@ public:
 	{
 		setSize(420, 64);
 		statusLabel.setJustificationType(juce::Justification::centred);
-		statusLabel.setFont(juce::Font(juce::FontOptions{ 14.0f, juce::Font::bold }));
+		statusLabel.setFont(juce::Font(juce::FontOptions{14.0f, juce::Font::bold}));
 		statusLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 		addAndMakeVisible(statusLabel);
 	}
@@ -54,7 +54,7 @@ namespace
 				juce::String("Created by Ruchir Shah (c) 2024.\nBuilt on JUCE and released as open source AGPL\nOSCDawServer ") + juce::String(ProjectInfo::versionString),
 				juce::dontSendNotification);
 			infoLabel.setJustificationType(juce::Justification::centred);
-			infoLabel.setFont(juce::Font(juce::FontOptions{ 15.0f }));
+			infoLabel.setFont(juce::Font(juce::FontOptions{15.0f}));
 
 			addAndMakeVisible(infoLabel);
 			addAndMakeVisible(moreLink);
@@ -329,14 +329,14 @@ void MainComponent::resized()
 	juce::GlyphArrangement projectNameGlyphs;
 	const float projectNameHeight = static_cast<float>(labelHeight);
 	projectNameGlyphs.addFittedText(projectNameLabel.getFont(),
-		projectNameLabel.getText(),
-		0.0f,
-		0.0f,
-		static_cast<float>(windowWidth),
-		projectNameHeight,
-		juce::Justification::centredLeft,
-		1,
-		1.0f);
+									projectNameLabel.getText(),
+									0.0f,
+									0.0f,
+									static_cast<float>(windowWidth),
+									projectNameHeight,
+									juce::Justification::centredLeft,
+									1,
+									1.0f);
 	const auto projectBoundingBox = projectNameGlyphs.getBoundingBox(0, projectNameGlyphs.getNumGlyphs(), true);
 	const int projectNameTextWidth = juce::jmax(0, juce::roundToInt(projectBoundingBox.getWidth()));
 	const int projectNameWidth = juce::jlimit(buttonWidth, windowWidth / 2, projectNameTextWidth + 200);
@@ -357,7 +357,6 @@ void MainComponent::resized()
 	const int bpmEditorX = bpmEditorRight - bpmFieldWidth;
 	bpmEditor.setBounds(bpmEditorX, topRowY, bpmFieldWidth, labelHeight);
 	bpmLabel.setBounds(bpmEditorX - bpmSpacing - bpmLabelWidth, topRowY, bpmLabelWidth, labelHeight);
-
 
 	const int driverRowY = projectNameLabel.getBottom() + spacingY / 2;
 	audioDriverLabel.setBounds(margin, driverRowY, 150, labelHeight);
@@ -497,9 +496,9 @@ void MainComponent::updateOverdubUI()
 	else
 		playCaptureButton.setColour(juce::TextButton::buttonColourId, shouldEnablePlayCapture ? juce::Colours::orange : juce::Colours::lightgrey);
 	DBG("Play Capture button enabled=" << (shouldEnablePlayCapture ? "true" : "false")
-		<< " captureHasEvents=" << (captureHasEvents ? "true" : "false")
-		<< " previewActive=" << (previewActive ? "true" : "false")
-		<< " previewPaused=" << (previewPaused ? "true" : "false"));
+									   << " captureHasEvents=" << (captureHasEvents ? "true" : "false")
+									   << " previewActive=" << (previewActive ? "true" : "false")
+									   << " previewPaused=" << (previewPaused ? "true" : "false"));
 	stopCaptureButton.setEnabled(previewActive || previewPaused);
 }
 void MainComponent::handleAudioPortChange()
@@ -605,104 +604,96 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 
 void MainComponent::restoreProject(bool append)
 {
-    juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
-    if (!fileChooser.browseForFileToOpen())
-        return;
+	juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
+	if (!fileChooser.browseForFileToOpen())
+		return;
 
-    const juce::File zipFile = fileChooser.getResult();
-    DBG("Selected Project: " + zipFile.getFullPathName());
+	const juce::File zipFile = fileChooser.getResult();
+	DBG("Selected Project: " + zipFile.getFullPathName());
 
-    bool restoreSucceeded = false;
-    juce::FileInputStream inputStream(zipFile);
-    if (inputStream.openedOk())
-    {
-        DBG("Reading Project...");
-        juce::ZipFile zip(inputStream);
-        DBG("Project Read.");
+	bool restoreSucceeded = false;
+	juce::FileInputStream inputStream(zipFile);
+	if (inputStream.openedOk())
+	{
+		DBG("Reading Project...");
+		juce::ZipFile zip(inputStream);
+		DBG("Project Read.");
 
-        juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-        if (!dawServerDir.exists())
-            dawServerDir.createDirectory();
+		juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+		if (!dawServerDir.exists())
+			dawServerDir.createDirectory();
 
-        juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-        juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-        juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-        juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
-        juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
+		juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+		juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+		juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+		juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+		juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
 
-        DBG("Unzipping Project...");
-        auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
-        {
-            auto index = zip.getIndexOfFileName(fileName);
-            if (index >= 0)
-            {
-                auto* fileStream = zip.createStreamForEntry(index);
-                if (fileStream != nullptr)
-                {
-                    if (destination.exists())
-                        destination.deleteFile();
-                    juce::FileOutputStream outStream(destination);
-                    if (outStream.openedOk())
-                        outStream.writeFromInputStream(*fileStream, -1);
-                    delete fileStream;
-                    return true;
-                }
-            }
-            return false;
-        };
+		DBG("Unzipping Project...");
+		auto extractFile = [&](const juce::String &fileName, const juce::File &destination)
+		{
+			auto index = zip.getIndexOfFileName(fileName);
+			if (index >= 0)
+			{
+				auto *fileStream = zip.createStreamForEntry(index);
+				if (fileStream != nullptr)
+				{
+					if (destination.exists())
+						destination.deleteFile();
+					juce::FileOutputStream outStream(destination);
+					if (outStream.openedOk())
+						outStream.writeFromInputStream(*fileStream, -1);
+					delete fileStream;
+					return true;
+				}
+			}
+			return false;
+		};
 
-        extractFile("projectData.dat", dataFile);
-        extractFile("projectPlugins.dat", pluginsFile);
-        extractFile("projectMeta.xml", metaFile);
-        const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
-        const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
-        DBG("Project Unzipped.");
+		extractFile("projectData.dat", dataFile);
+		extractFile("projectPlugins.dat", pluginsFile);
+		extractFile("projectMeta.xml", metaFile);
+		const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
+		const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
+		DBG("Project Unzipped.");
 
-        restoreSucceeded = restoreProjectFromFiles(
-            dataFile,
-            pluginsFile,
-            metaFile,
-            routingFile,
-            routingExtracted,
-            bufferFile,
-            bufferExtracted,
-            append);
+		restoreSucceeded = restoreProjectFromFiles(
+			dataFile,
+			pluginsFile,
+			metaFile,
+			routingFile,
+			routingExtracted,
+			bufferFile,
+			bufferExtracted,
+			append,
+			zipFile.getFileNameWithoutExtension());
+	}
+	else
+	{
+		DBG("Failed to open file for restoring project states.");
+	}
 
-        if (restoreSucceeded)
-        {
-            refreshOrchestraTableUI();
-            const juce::String projectName = zipFile.getFileNameWithoutExtension();
-            DBG("Project Restored: " + projectName);
-            updateProjectNameLabel(projectName);
-            repaint();
-            updateOverdubUI();
-        }
-    }
-    else
-    {
-        DBG("Failed to open file for restoring project states.");
-    }
-
-    if (!restoreSucceeded)
-    {
-        repaint();
-        if (auto* top = getTopLevelComponent())
-        {
-            auto w = top->getWidth();
-            auto h = top->getHeight();
-            top->setSize(w + 1, h);
-            top->setSize(w, h);
-        }
-    }
+	if (!restoreSucceeded)
+	{
+		repaint();
+		if (auto *top = getTopLevelComponent())
+		{
+			auto w = top->getWidth();
+			auto h = top->getHeight();
+			top->setSize(w + 1, h);
+			top->setSize(w, h);
+		}
+	}
 }
-bool MainComponent::restoreProjectFromFiles(const juce::File& dataFile,
-                                            const juce::File& pluginDescFile,
-                                            const juce::File& orchestraFile,
-                                            const juce::File& routingFile,
-                                            bool routingExtracted,
-                                            const juce::File& bufferFile,
-                                            bool bufferExtracted,
-                                            bool append)
+bool MainComponent::restoreProjectFromFiles(const juce::File &dataFile,
+											const juce::File &pluginDescFile,
+											const juce::File &orchestraFile,
+											const juce::File &routingFile,
+											bool routingExtracted,
+											const juce::File &bufferFile,
+											bool bufferExtracted,
+											bool append,
+											const juce::String &projectName)
 {
 	if (!dataFile.existsAsFile() || !pluginDescFile.existsAsFile() || !orchestraFile.existsAsFile())
 		return false;
@@ -711,11 +702,10 @@ bool MainComponent::restoreProjectFromFiles(const juce::File& dataFile,
 	auto updateStatus = modal.updateStatus;
 	auto closeStatus = modal.close;
 
-	pluginManager.setRestoreStatusCallback([updateStatus](const juce::String& message)
+	pluginManager.setRestoreStatusCallback([updateStatus](const juce::String &message)
 										   {
 											   if (updateStatus)
-												   updateStatus(message);
-										   });
+												   updateStatus(message); });
 
 	if (!append)
 	{
@@ -735,6 +725,20 @@ bool MainComponent::restoreProjectFromFiles(const juce::File& dataFile,
 	}
 
 	pluginManager.rebuildRouterTagIndexFromConductor();
+
+	refreshOrchestraTableUI();
+	if (projectName.isNotEmpty())
+	{
+		DBG("Project Restored: " + projectName);
+		updateProjectNameLabel(projectName);
+	}
+	else
+	{
+		DBG("Project Restored (name unavailable).");
+	}
+	repaint();
+	updateOverdubUI();
+
 	pluginManager.clearRestoreStatusCallback();
 	if (closeStatus)
 		closeStatus();
@@ -780,7 +784,7 @@ MainComponent::RestoreModalController MainComponent::openRestoreModal()
 			} });
 	};
 
-	return { std::move(updateStatus), std::move(closeStatus) };
+	return {std::move(updateStatus), std::move(closeStatus)};
 }
 
 void MainComponent::refreshOrchestraTableUI()
@@ -1059,7 +1063,8 @@ void MainComponent::showRoutingModal()
 	options.resizable = true;
 	options.componentToCentreAround = this;
 
-	auto *modalContent = new RoutingModal(pluginManager, [this]() { updateOverdubUI(); });
+	auto *modalContent = new RoutingModal(pluginManager, [this]()
+										  { updateOverdubUI(); });
 	modalContent->setSize(640, 420);
 	options.content.setOwned(modalContent);
 	options.launchAsync();
@@ -1114,7 +1119,7 @@ void MainComponent::showPluginScanModal()
 	options.launchAsync();
 }
 
-void MainComponent::replacePluginForRow(int row, juce::Component* anchor)
+void MainComponent::replacePluginForRow(int row, juce::Component *anchor)
 {
 	if (row < 0 || row >= static_cast<int>(conductor.orchestra.size()))
 		return;
@@ -1123,27 +1128,23 @@ void MainComponent::replacePluginForRow(int row, juce::Component* anchor)
 	if (types.isEmpty())
 	{
 		juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-			"Replace Plugin", "No plugins are available to replace with.");
+											   "Replace Plugin", "No plugins are available to replace with.");
 		return;
 	}
 
 	juce::PopupMenu replaceMenu;
-	for (const auto& desc : types)
+	for (const auto &desc : types)
 	{
 		const juce::String pluginName = desc.name;
 		replaceMenu.addItem(pluginName, [this, row, pluginName]()
-			{
-				juce::MessageManager::callAsync([this, row, pluginName]()
-					{
-						applyPluginReplacement(row, pluginName);
-					});
-			});
+							{ juce::MessageManager::callAsync([this, row, pluginName]()
+															  { applyPluginReplacement(row, pluginName); }); });
 	}
 
 	replaceMenu.showAt(anchor);
 }
 
-void MainComponent::applyPluginReplacement(int row, const juce::String& pluginName)
+void MainComponent::applyPluginReplacement(int row, const juce::String &pluginName)
 {
 	if (row < 0 || row >= static_cast<int>(conductor.orchestra.size()) || pluginName.isEmpty())
 		return;
@@ -1153,7 +1154,7 @@ void MainComponent::applyPluginReplacement(int row, const juce::String& pluginNa
 	pluginManager.resetPlugin(pluginId);
 	pluginManager.instantiatePluginByName(pluginName, pluginId);
 
-	for (auto& inst : conductor.orchestra)
+	for (auto &inst : conductor.orchestra)
 	{
 		if (inst.pluginInstanceId == pluginId)
 			inst.pluginName = pluginName;
@@ -1430,7 +1431,7 @@ void MainComponent::comboBoxChanged(juce::ComboBox *comboBoxThatHasChanged)
 		const auto types = pluginManager.knownPluginList.getTypes();
 		if (index >= 0 && index < static_cast<int>(types.size()))
 		{
-			const auto& desc = types[index];
+			const auto &desc = types[index];
 
 			// Get selected row in the orchestra table
 			auto selectedRows = orchestraTable.getSelectedRows();
@@ -1440,7 +1441,7 @@ void MainComponent::comboBoxChanged(juce::ComboBox *comboBoxThatHasChanged)
 			{
 				int row = selectedRows[i];
 				// Get the instrument from the orchestra
-				auto& instrument = conductor.orchestra[row];
+				auto &instrument = conductor.orchestra[row];
 				// Check if the pluginInstanceId for this instrument is already in pluginInstances, and if so, ignore
 				if (pluginManager.hasPluginInstance(instrument.pluginInstanceId))
 				{
@@ -1458,7 +1459,7 @@ void MainComponent::comboBoxChanged(juce::ComboBox *comboBoxThatHasChanged)
 			if (!haveAdded)
 			{
 				addNewInstrument();
-				auto& instrument = conductor.orchestra.back();
+				auto &instrument = conductor.orchestra.back();
 				instrument.pluginName = desc.name;
 				orchestraTable.updateContent();
 			}

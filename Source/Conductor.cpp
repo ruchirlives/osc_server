@@ -280,15 +280,10 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
                                         routingExists,
                                         files.captureBufferFile,
                                         bufferExists,
-                                        false)
+                                        false,
+                                        juce::String())
                                     : false;
 
-                                if (restored && mainComponent != nullptr)
-                                {
-                                        mainComponent->refreshOrchestraTableUI();
-                                        mainComponent->repaint();
-                                        mainComponent->updateOverdubUI();
-                                }
                         }
 			else if (messageType == "restore_from_file")
 			{

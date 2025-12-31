@@ -69,7 +69,8 @@ public:
 	                             bool routingExtracted,
 	                             const juce::File& bufferFile,
 	                             bool bufferExtracted,
-	                             bool append);
+	                             bool append,
+	                             const juce::String& projectName = {});
 
 	// Add methods for add and remove instrument buttons
 	void addInstrument();
