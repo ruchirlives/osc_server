@@ -649,157 +649,132 @@ bool MainComponent::saveSharedProjectFiles(const ProjectSaveFiles& files, bool i
 
 void MainComponent::restoreProject(bool append, const juce::File &customFile)
 {
-	juce::File zipFile = customFile;
-	if (zipFile == juce::File())
-	{
-		juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
-		if (!fileChooser.browseForFileToOpen())
-			return;
-		zipFile = fileChooser.getResult();
-	}
+    juce::File zipFile = customFile;
+    if (zipFile == juce::File())
+    {
+        juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
+        if (!fileChooser.browseForFileToOpen())
+            return;
+        zipFile = fileChooser.getResult();
+    }
 
-	DBG("Selected Project: " + zipFile.getFullPathName());
+    DBG("Selected Project: " + zipFile.getFullPathName());
 
-	if (!zipFile.existsAsFile())
-	{
-		DBG("Restore project file missing: " + zipFile.getFullPathName());
-		return;
-	}
+    if (!zipFile.existsAsFile())
+    {
+        DBG("Restore project file missing: " + zipFile.getFullPathName());
+        return;
+    }
 
-	bool restoreSucceeded = false;
-	juce::FileInputStream inputStream(zipFile);
-	if (inputStream.openedOk())
-	{
-		DBG("Reading Project...");
-		juce::ZipFile zip(inputStream);
-		DBG("Project Read.");
+    auto modal = openRestoreModal();
+    auto updateStatus = modal.updateStatus;
+    auto closeStatus = modal.close;
 
-		juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-		if (!dawServerDir.exists())
-			dawServerDir.createDirectory();
+    pluginManager.setRestoreStatusCallback([updateStatus](const juce::String &message)
+                                           {
+                                               if (updateStatus)
+                                                   updateStatus(message);
+                                           });
 
-		juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-		juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-		juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-		juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
-		juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
+    bool restoreSucceeded = false;
+    juce::FileInputStream inputStream(zipFile);
+    if (inputStream.openedOk())
+    {
+        DBG("Reading Project...");
+        juce::ZipFile zip(inputStream);
+        DBG("Project Read.");
 
-		DBG("Unzipping Project...");
-		auto extractFile = [&](const juce::String &fileName, const juce::File &destination)
-		{
-			auto index = zip.getIndexOfFileName(fileName);
-			if (index >= 0)
-			{
-				auto *fileStream = zip.createStreamForEntry(index);
-				if (fileStream != nullptr)
-				{
-					if (destination.exists())
-						destination.deleteFile();
-					juce::FileOutputStream outStream(destination);
-					if (outStream.openedOk())
-						outStream.writeFromInputStream(*fileStream, -1);
-					delete fileStream;
-					return true;
-				}
-			}
-			return false;
-		};
+        juce::File dawServerDir = getDefaultDawServerDir();
 
-		extractFile("projectData.dat", dataFile);
-		extractFile("projectPlugins.dat", pluginsFile);
-		extractFile("projectMeta.xml", metaFile);
-		const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
-		const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
-		DBG("Project Unzipped.");
+        juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+        juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+        juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+        juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+        juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
 
-		restoreSucceeded = restoreProjectFromFiles(
-			dataFile,
-			pluginsFile,
-			metaFile,
-			routingFile,
-			routingExtracted,
-			bufferFile,
-			bufferExtracted,
-			append,
-			zipFile.getFileNameWithoutExtension());
-	}
-	else
-	{
-		DBG("Failed to open file for restoring project states.");
-	}
+        DBG("Unzipping Project...");
+        auto extractFile = [&](const juce::String &fileName, const juce::File &destination)
+        {
+            auto index = zip.getIndexOfFileName(fileName);
+            if (index >= 0)
+            {
+                auto *fileStream = zip.createStreamForEntry(index);
+                if (fileStream != nullptr)
+                {
+                    if (destination.exists())
+                        destination.deleteFile();
+                    juce::FileOutputStream outStream(destination);
+                    if (outStream.openedOk())
+                        outStream.writeFromInputStream(*fileStream, -1);
+                    delete fileStream;
+                    return true;
+                }
+            }
+            return false;
+        };
 
-	if (!restoreSucceeded)
-	{
-		repaint();
-		if (auto *top = getTopLevelComponent())
-		{
-			auto w = top->getWidth();
-			auto h = top->getHeight();
-			top->setSize(w + 1, h);
-			top->setSize(w, h);
-		}
-	}
+        extractFile("projectData.dat", dataFile);
+        extractFile("projectPlugins.dat", pluginsFile);
+        extractFile("projectMeta.xml", metaFile);
+        const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
+        const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
+        DBG("Project Unzipped.");
+
+        if (!append)
+        {
+            conductor.restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+            if (routingExtracted && routingFile.existsAsFile())
+                pluginManager.loadRoutingConfigFromFile(routingFile);
+
+            if (bufferExtracted && bufferFile.existsAsFile())
+            {
+                if (!pluginManager.loadMasterTaggedMidiBufferFromFile(bufferFile))
+                    DBG("Warning: failed to load master tagged MIDI buffer during restore.");
+            }
+        }
+        else
+        {
+            conductor.upsertAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+        }
+
+        pluginManager.rebuildRouterTagIndexFromConductor();
+        pluginManager.clearRestoreStatusCallback();
+        if (closeStatus)
+            closeStatus();
+
+        refreshOrchestraTableUI();
+        const juce::String projectName = zipFile.getFileNameWithoutExtension();
+        if (projectName.isNotEmpty())
+        {
+            DBG("Project Restored: " + projectName);
+            updateProjectNameLabel(projectName);
+        }
+        else
+        {
+            DBG("Project Restored (name unavailable).");
+        }
+        repaint();
+        updateOverdubUI();
+
+        restoreSucceeded = true;
+    }
+    else
+    {
+        DBG("Failed to open file for restoring project states.");
+    }
+
+    if (!restoreSucceeded)
+    {
+        repaint();
+        if (auto *top = getTopLevelComponent())
+        {
+            auto w = top->getWidth();
+            auto h = top->getHeight();
+            top->setSize(w + 1, h);
+            top->setSize(w, h);
+        }
+    }
 }
-bool MainComponent::restoreProjectFromFiles(const juce::File &dataFile,
-											const juce::File &pluginDescFile,
-											const juce::File &orchestraFile,
-											const juce::File &routingFile,
-											bool routingExtracted,
-											const juce::File &bufferFile,
-											bool bufferExtracted,
-											bool append,
-											const juce::String &projectName)
-{
-	if (!dataFile.existsAsFile() || !pluginDescFile.existsAsFile() || !orchestraFile.existsAsFile())
-		return false;
-
-	auto modal = openRestoreModal();
-	auto updateStatus = modal.updateStatus;
-	auto closeStatus = modal.close;
-
-	pluginManager.setRestoreStatusCallback([updateStatus](const juce::String &message)
-										   {
-											   if (updateStatus)
-												   updateStatus(message); });
-
-	if (!append)
-	{
-		conductor.restoreAllData(dataFile.getFullPathName(), pluginDescFile.getFullPathName(), orchestraFile.getFullPathName());
-		if (routingExtracted && routingFile.existsAsFile())
-			pluginManager.loadRoutingConfigFromFile(routingFile);
-
-		if (bufferExtracted && bufferFile.existsAsFile())
-		{
-			if (!pluginManager.loadMasterTaggedMidiBufferFromFile(bufferFile))
-				DBG("Warning: failed to load master tagged MIDI buffer during restore.");
-		}
-	}
-	else
-	{
-		conductor.upsertAllData(dataFile.getFullPathName(), pluginDescFile.getFullPathName(), orchestraFile.getFullPathName());
-	}
-
-	pluginManager.rebuildRouterTagIndexFromConductor();
-
-	refreshOrchestraTableUI();
-	if (projectName.isNotEmpty())
-	{
-		DBG("Project Restored: " + projectName);
-		updateProjectNameLabel(projectName);
-	}
-	else
-	{
-		DBG("Project Restored (name unavailable).");
-	}
-	repaint();
-	updateOverdubUI();
-
-	pluginManager.clearRestoreStatusCallback();
-	if (closeStatus)
-		closeStatus();
-	return true;
-}
-
 MainComponent::RestoreModalController MainComponent::openRestoreModal()
 {
 	auto *statusComponent = new ProjectRestoreModal();

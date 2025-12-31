@@ -75,15 +75,6 @@ public:
 	ProjectSaveFiles getDefaultProjectFiles() const;
 	juce::File getDefaultProjectArchiveFile() const;
 	bool saveSharedProjectFiles(const ProjectSaveFiles& files, bool includeRoutingData, const std::vector<InstrumentInfo>& selectedInstruments);
-	bool restoreProjectFromFiles(const juce::File& dataFile,
-	                             const juce::File& pluginDescFile,
-	                             const juce::File& orchestraFile,
-	                             const juce::File& routingFile,
-	                             bool routingExtracted,
-	                             const juce::File& bufferFile,
-	                             bool bufferExtracted,
-	                             bool append,
-	                             const juce::String& projectName = {});
 
 	// Add methods for add and remove instrument buttons
 	void addInstrument();
