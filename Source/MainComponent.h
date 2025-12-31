@@ -13,6 +13,12 @@ class MainComponent :   public juce::Component,
                         public juce::ComboBox::Listener
 {
 public:
+    struct RestoreModalController
+    {
+        std::function<void(const juce::String&)> updateStatus;
+        std::function<void()> close;
+    };
+
     MainComponent();
     ~MainComponent() override;
 
@@ -55,6 +61,15 @@ public:
 	void showRoutingModal();
 	void saveProject(const std::vector<InstrumentInfo>& selectedInstruments = {});
 	void restoreProject(bool append = false);
+	RestoreModalController openRestoreModal();
+	bool restoreProjectFromFiles(const juce::File& dataFile,
+	                             const juce::File& pluginDescFile,
+	                             const juce::File& orchestraFile,
+	                             const juce::File& routingFile,
+	                             bool routingExtracted,
+	                             const juce::File& bufferFile,
+	                             bool bufferExtracted,
+	                             bool append);
 
 	// Add methods for add and remove instrument buttons
 	void addInstrument();

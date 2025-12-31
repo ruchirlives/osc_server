@@ -9,12 +9,12 @@ namespace
 	{
 		if (message.size() < minSize)
 		{
-	#if JUCE_DEBUG
+#if JUCE_DEBUG
 			char buffer[256];
 			std::snprintf(buffer, sizeof(buffer), "OSC %s requires at least %d args but got %d",
-				context, minSize, static_cast<int>(message.size()));
+						  context, minSize, static_cast<int>(message.size()));
 			std::fprintf(stderr, "%s\n", buffer);
-	#endif
+#endif
 			return false;
 		}
 		return true;
@@ -25,11 +25,11 @@ namespace
 		if (index >= 0 && index < message.size() && message[index].isInt32())
 			return true;
 
-	#if JUCE_DEBUG
+#if JUCE_DEBUG
 		char buffer[256];
 		std::snprintf(buffer, sizeof(buffer), "OSC %s argument %d expected Int32", context, index);
 		std::fprintf(stderr, "%s\n", buffer);
-	#endif
+#endif
 		return false;
 	}
 
@@ -38,11 +38,11 @@ namespace
 		if (index >= 0 && index < message.size() && message[index].isString())
 			return true;
 
-	#if JUCE_DEBUG
+#if JUCE_DEBUG
 		char buffer[256];
 		std::snprintf(buffer, sizeof(buffer), "OSC %s argument %d expected String", context, index);
 		std::fprintf(stderr, "%s\n", buffer);
-	#endif
+#endif
 		return false;
 	}
 
@@ -54,11 +54,11 @@ namespace
 				return true;
 		}
 
-	#if JUCE_DEBUG
+#if JUCE_DEBUG
 		char buffer[256];
 		std::snprintf(buffer, sizeof(buffer), "OSC %s argument %d expected Timestamp", context, index);
 		std::fprintf(stderr, "%s\n", buffer);
-	#endif
+#endif
 		return false;
 	}
 
@@ -201,12 +201,11 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 		if (mainComponent != nullptr)
 		{
 			juce::MessageManager::callAsync([this, bpm]()
-											 {
+											{
 				if (mainComponent != nullptr)
 				{
 					mainComponent->setBpm(bpm);
-				}
-				});
+				} });
 		}
 		return;
 	}
@@ -269,26 +268,32 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
                         else if (messageType == "restore_project")
                         {
-                                // Create OSCDawServer subfolder in user's documents directory
-                                juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-                                if (!dawServerDir.exists())
-                                        dawServerDir.createDirectory();
+                                auto files = getDefaultProjectFiles();
+                                const bool routingExists = files.routingFile.existsAsFile();
+                                const bool bufferExists = files.captureBufferFile.existsAsFile();
+                                const bool restored = mainComponent != nullptr
+                                    ? mainComponent->restoreProjectFromFiles(
+                                        files.dataFile,
+                                        files.pluginDescriptionsFile,
+                                        files.orchestraFile,
+                                        files.routingFile,
+                                        routingExists,
+                                        files.captureBufferFile,
+                                        bufferExists,
+                                        false)
+                                    : false;
 
-				// Define the extraction locations in OSCDawServer subfolder
-				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-                                juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-                                juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-
-                                restoreAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
-                                if (mainComponent != nullptr)
+                                if (restored && mainComponent != nullptr)
                                 {
                                         mainComponent->refreshOrchestraTableUI();
+                                        mainComponent->repaint();
+                                        mainComponent->updateOverdubUI();
                                 }
                         }
-                        else if (messageType == "restore_from_file")
-                        {
-                                DBG("Received restore from file request for file: ");
-                                mainComponent->restoreProject(false); // false means do not append, just restore
+			else if (messageType == "restore_from_file")
+			{
+				DBG("Received restore from file request for file: ");
+				mainComponent->restoreProject(false); // false means do not append, just restore
 			}
 			else if (messageType == "request_tags")
 			{
@@ -760,9 +765,7 @@ bool Conductor::openInstrumentByTag(const juce::String &tag)
 		{
 			juce::String pluginInstanceId = instrument.pluginInstanceId;
 			juce::MessageManager::callAsync([this, pluginInstanceId]()
-											{
-				pluginManager.openPluginWindow(pluginInstanceId);
-			});
+											{ pluginManager.openPluginWindow(pluginInstanceId); });
 			return true;
 		}
 	}
@@ -1031,17 +1034,15 @@ void Conductor::saveAllData(const juce::String &dataFilePath, const juce::String
 Conductor::ProjectSaveFiles Conductor::getDefaultProjectFiles() const
 {
 	auto dir = getDefaultDawServerDir();
-	return
-	{
+	return {
 		dir.getChildFile("projectData.dat"),
 		dir.getChildFile("projectPlugins.dat"),
 		dir.getChildFile("projectMeta.xml"),
 		dir.getChildFile("projectRouting.xml"),
-		dir.getChildFile("projectTaggedMidiBuffer.xml")
-	};
+		dir.getChildFile("projectTaggedMidiBuffer.xml")};
 }
 
-bool Conductor::saveSharedProjectFiles(const ProjectSaveFiles& files, bool includeRoutingData, const std::vector<InstrumentInfo>& selectedInstruments)
+bool Conductor::saveSharedProjectFiles(const ProjectSaveFiles &files, bool includeRoutingData, const std::vector<InstrumentInfo> &selectedInstruments)
 {
 	if (includeRoutingData)
 	{
@@ -1060,7 +1061,6 @@ bool Conductor::saveSharedProjectFiles(const ProjectSaveFiles& files, bool inclu
 
 	return captureBufferSaved;
 }
-
 
 void Conductor::upsertAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath)
 {
@@ -1407,7 +1407,6 @@ void EditableTextCustomComponent::save_selection()
 
 	// Save the selected instruments
 	owner.mainComponent->saveProject(selectedInstruments);
-
 }
 
 std::vector<juce::String> presetTags = {
@@ -1717,7 +1716,7 @@ void EditableTextCustomComponent::actionContextSelection(const juce::String &tex
 			InstrumentInfo &instrument = owner.orchestraData[selectedRow];
 
 			// Update the field based on the columnId
-            switch (columnIdIn)
+			switch (columnIdIn)
 			{
 			case 1: // Assuming column 1 is for Instrument Name
 				instrument.instrumentName = text;
