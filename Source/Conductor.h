@@ -60,6 +60,18 @@ public:
     void saveAllData(const juce::String& dataFilePath, const juce::String& pluginDescFilePath, const juce::String& orchestraFilePath, const std::vector<InstrumentInfo>& selectedInstruments = {});
     void restoreAllData(const juce::String& dataFilePath, const juce::String& pluginDescFilePath, const juce::String& orchestraFilePath);
 
+    struct ProjectSaveFiles
+    {
+        juce::File dataFile;
+        juce::File pluginDescriptionsFile;
+        juce::File orchestraFile;
+        juce::File routingFile;
+        juce::File captureBufferFile;
+    };
+
+    ProjectSaveFiles getDefaultProjectFiles() const;
+    bool saveSharedProjectFiles(const ProjectSaveFiles& files, bool includeRoutingData, const std::vector<InstrumentInfo>& selectedInstruments);
+
     // Vector to hold instrument information
     std::vector<InstrumentInfo> orchestra;
 
@@ -93,6 +105,9 @@ private:
     void handleIncomingChannelAftertouch(int channel, int value, const juce::String& pluginId, juce::int64& timestamp);
     void handleIncomingPolyAftertouch(int channel, int note, int value, const juce::String& pluginId, juce::int64& timestamp);
     MainComponent* mainComponent;  // Reference to the MainComponent object
+
+    juce::File getDefaultProjectArchiveFile() const;
+    juce::File writeProjectArchive(const ProjectSaveFiles& files, bool includeRoutingData, bool captureBufferSaved) const;
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Conductor)

@@ -72,6 +72,14 @@ namespace
 			return argument.getString().getDoubleValue();
 		return 0.0;
 	}
+
+	juce::File getDefaultDawServerDir()
+	{
+		auto dir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+		if (!dir.exists())
+			dir.createDirectory();
+		return dir;
+	}
 }
 
 // Constructor: takes a reference to PluginManager and passes it
@@ -255,18 +263,11 @@ void Conductor::oscMessageReceived(const juce::OSCMessage &message)
 			}
 			else if (messageType == "save_project")
 			{
-					// Create OSCDawServer subfolder in user's documents directory
-					juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-				if (!dawServerDir.exists())
-					dawServerDir.createDirectory();
-
-					// Get the full file paths in OSCDawServer subfolder
-				juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-				juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-				juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-
-				// Save the project state files
-				saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName());
+				auto files = getDefaultProjectFiles();
+				const bool captureBufferSaved = saveSharedProjectFiles(files, true, {});
+				auto archive = writeProjectArchive(files, true, captureBufferSaved);
+				DBG("OSC save_project saved project (capture buffer saved: " + juce::String(captureBufferSaved ? "yes" : "no") +
+					", archive: " + (archive.existsAsFile() ? archive.getFileName() : "<failed>") + ").");
 			}
                         else if (messageType == "restore_project")
                         {
@@ -1027,6 +1028,70 @@ void Conductor::saveAllData(const juce::String &dataFilePath, const juce::String
 	pluginManager.savePluginDescriptionsToFile(pluginDescFilePath, selectedInstances);
 	pluginManager.saveAllPluginStates(dataFilePath, selectedInstances);
 	saveOrchestraData(orchestraFilePath, selectedInstruments);
+}
+
+Conductor::ProjectSaveFiles Conductor::getDefaultProjectFiles() const
+{
+	auto dir = getDefaultDawServerDir();
+	return
+	{
+		dir.getChildFile("projectData.dat"),
+		dir.getChildFile("projectPlugins.dat"),
+		dir.getChildFile("projectMeta.xml"),
+		dir.getChildFile("projectRouting.xml"),
+		dir.getChildFile("projectTaggedMidiBuffer.xml")
+	};
+}
+
+bool Conductor::saveSharedProjectFiles(const ProjectSaveFiles& files, bool includeRoutingData, const std::vector<InstrumentInfo>& selectedInstruments)
+{
+	if (includeRoutingData)
+	{
+		if (!pluginManager.saveRoutingConfigToFile(files.routingFile))
+			DBG("Warning: Failed to save routing configuration to " + files.routingFile.getFullPathName());
+	}
+
+	saveAllData(files.dataFile.getFullPathName(), files.pluginDescriptionsFile.getFullPathName(), files.orchestraFile.getFullPathName(), selectedInstruments);
+
+	if (!includeRoutingData || !pluginManager.hasMasterTaggedMidiData())
+		return false;
+
+	const bool captureBufferSaved = pluginManager.saveMasterTaggedMidiBufferToFile(files.captureBufferFile);
+	if (!captureBufferSaved)
+		DBG("Warning: Failed to save master tagged MIDI buffer to " + files.captureBufferFile.getFullPathName());
+
+	return captureBufferSaved;
+}
+
+juce::File Conductor::getDefaultProjectArchiveFile() const
+{
+	return getDefaultDawServerDir().getChildFile("project.oscdaw");
+}
+
+juce::File Conductor::writeProjectArchive(const ProjectSaveFiles& files, bool includeRoutingData, bool captureBufferSaved) const
+{
+	auto archiveFile = getDefaultProjectArchiveFile();
+	if (archiveFile.existsAsFile())
+		archiveFile.deleteFile();
+
+	juce::FileOutputStream outputStream(archiveFile);
+	if (!outputStream.openedOk())
+	{
+		DBG("Failed to open archive file for writing: " + archiveFile.getFullPathName());
+		return {};
+	}
+
+	juce::ZipFile::Builder zipBuilder;
+	zipBuilder.addFile(files.dataFile, 5, "projectData.dat");
+	zipBuilder.addFile(files.pluginDescriptionsFile, 5, "projectPlugins.dat");
+	zipBuilder.addFile(files.orchestraFile, 1, "projectMeta.xml");
+	if (includeRoutingData && files.routingFile.existsAsFile())
+		zipBuilder.addFile(files.routingFile, 1, "projectRouting.xml");
+	if (captureBufferSaved && files.captureBufferFile.existsAsFile())
+		zipBuilder.addFile(files.captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
+
+	zipBuilder.writeToStream(outputStream, nullptr);
+	return archiveFile;
 }
 
 void Conductor::upsertAllData(const juce::String &dataFilePath, const juce::String &pluginDescFilePath, const juce::String &orchestraFilePath)

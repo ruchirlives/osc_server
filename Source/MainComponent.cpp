@@ -562,28 +562,9 @@ juce::String MainComponent::getCurrentProjectName() const
 
 void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstruments)
 {
-	// Create OSCDawServer subfolder in user's documents directory
-	juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-	if (!dawServerDir.exists())
-		dawServerDir.createDirectory();
-
-	// Get the full file paths in OSCDawServer subfolder
-
-	juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-	juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-	juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-	juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
-	juce::File captureBufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
+	const auto projectFiles = conductor.getDefaultProjectFiles();
 	const bool includeRoutingData = selectedInstruments.empty();
-	if (includeRoutingData)
-	{
-		if (!pluginManager.saveRoutingConfigToFile(routingFile))
-			DBG("Warning: Failed to write routing configuration file.");
-	}
-
-	// Save the project state files
-	conductor.saveAllData(dataFile.getFullPathName(), pluginsFile.getFullPathName(), metaFile.getFullPathName(), selectedInstruments);
-	const bool captureBufferSaved = includeRoutingData && pluginManager.hasMasterTaggedMidiData() && pluginManager.saveMasterTaggedMidiBufferToFile(captureBufferFile);
+	const bool captureBufferSaved = conductor.saveSharedProjectFiles(projectFiles, includeRoutingData, selectedInstruments);
 
 	// Open a file chooser dialog for the custom project file
 	juce::FileChooser fileChooser("Save Project", juce::File(), "*.oscdaw"); // Custom suffix here
@@ -604,13 +585,13 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 		if (outputStream.openedOk())
 		{
 			juce::ZipFile::Builder zipBuilder;
-			zipBuilder.addFile(dataFile, 5, "projectData.dat"); // Using moderate compression
-			zipBuilder.addFile(pluginsFile, 5, "projectPlugins.dat");
-			zipBuilder.addFile(metaFile, 1, "projectMeta.xml");
-			if (includeRoutingData && routingFile.existsAsFile())
-				zipBuilder.addFile(routingFile, 1, "projectRouting.xml");
-			if (captureBufferSaved && captureBufferFile.existsAsFile())
-				zipBuilder.addFile(captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
+			zipBuilder.addFile(projectFiles.dataFile, 5, "projectData.dat"); // Using moderate compression
+			zipBuilder.addFile(projectFiles.pluginDescriptionsFile, 5, "projectPlugins.dat");
+			zipBuilder.addFile(projectFiles.orchestraFile, 1, "projectMeta.xml");
+			if (includeRoutingData && projectFiles.routingFile.existsAsFile())
+				zipBuilder.addFile(projectFiles.routingFile, 1, "projectRouting.xml");
+			if (captureBufferSaved && projectFiles.captureBufferFile.existsAsFile())
+				zipBuilder.addFile(projectFiles.captureBufferFile, 1, "projectTaggedMidiBuffer.xml");
 
 			// Write the compressed data to the file
 			zipBuilder.writeToStream(outputStream, nullptr);
