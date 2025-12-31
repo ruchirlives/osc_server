@@ -1679,7 +1679,7 @@ void MainComponent::removeMidiChannelFromOverdub(int midiChannel)
 	updateOverdubUI();
 }
 
-MainComponent::LayoutMetrics MainComponent::getLayoutMetrics() const
+LayoutMetrics MainComponent::getLayoutMetrics() const
 {
 	return LayoutMetrics{};
 }
