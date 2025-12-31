@@ -52,7 +52,7 @@ class GlobalLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
 	GlobalLookAndFeel()
-		: base(juce::Colours::darkslategrey.darker(0.25f)),
+		: base(juce::Colour::fromRGB(50, 50, 50)),
 		  panel(base.brighter(0.1f)),
 		  accent(juce::Colour::fromRGB(90, 224, 255)),
 		  shadowColour(juce::Colours::black.withAlpha(0.35f))

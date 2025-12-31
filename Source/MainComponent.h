@@ -150,7 +150,7 @@ private:
         // Buttons for overdub control
     juce::TextButton startOverdubButton { "Start" };
     juce::TextButton stopOverdubButton { "Stop" };
-	juce::TextButton playOverdubButton{ "Play" };
+	juce::TextButton playOverdubButton{ "Preview" };
 	juce::TextButton triggerOverdubButton{ "Trig" };
 	juce::TextButton bakeOverdubButton{ "Bake" };
     juce::TextButton stripLeadingSilenceButton { "Strip Silence" };
