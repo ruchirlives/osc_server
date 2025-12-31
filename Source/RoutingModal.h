@@ -2,13 +2,14 @@
 
 #include <JuceHeader.h>
 #include <memory>
+#include <functional>
 #include "PluginManager.h"
 
 class RoutingModal : public juce::Component,
                      private juce::ListBoxModel
 {
 public:
-    explicit RoutingModal(PluginManager& manager);
+    RoutingModal(PluginManager& manager, std::function<void()> updateOverdubUICallback);
     ~RoutingModal() override;
 
 private:
@@ -52,6 +53,7 @@ private:
     void updateRuleMatchCounts();
 
     PluginManager& pluginManager;
+    std::function<void()> updateOverdubUICallback;
     std::vector<PluginManager::StemConfig> stems;
     int selectedStem = -1;
     int editingRuleIndex = -1;

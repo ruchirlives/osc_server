@@ -2,8 +2,10 @@
 #include "PreviewModal.h"
 #include <initializer_list>
 
-    RoutingModal::RoutingModal(PluginManager& manager)
-    : pluginManager(manager), rulesList("rulesList", &rulesModel)
+    RoutingModal::RoutingModal(PluginManager& manager, std::function<void()> updateOverdubUICallbackIn)
+    : pluginManager(manager),
+      updateOverdubUICallback(updateOverdubUICallbackIn),
+      rulesList("rulesList", &rulesModel)
 {
     tooltipWindow = std::make_unique<juce::TooltipWindow>(this, 700);
 
@@ -58,6 +60,8 @@
             dw->exitModalState(0);
         else
             setVisible(false);
+        if (updateOverdubUICallback)
+            updateOverdubUICallback();
     };
     recordCaptureButton.onClick = [this]()
     {

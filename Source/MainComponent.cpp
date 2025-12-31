@@ -1077,7 +1077,7 @@ void MainComponent::showRoutingModal()
 	options.resizable = true;
 	options.componentToCentreAround = this;
 
-	auto *modalContent = new RoutingModal(pluginManager);
+	auto *modalContent = new RoutingModal(pluginManager, [this]() { updateOverdubUI(); });
 	modalContent->setSize(640, 420);
 	options.content.setOwned(modalContent);
 	options.launchAsync();
