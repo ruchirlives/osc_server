@@ -5,7 +5,7 @@
               bundleIdentifier="com.ruchirlives.OSCDawServer" binaryDataNamespace="BinaryData"
               headerPath="F:\asiosdk_2.3.3_2019-06-14\common" companyCopyright="Ruchir Shah (c) 2024"
               companyEmail="@ruchirlives" companyWebsite="https://github.com/ruchirlives"
-              version="1.8.0">
+              version="1.8.5">
   <MAINGROUP id="pN3WCX" name="OSCDawServer">
     <GROUP id="{AA5004D7-8BC2-FCC1-C271-B3AAE1415B2A}" name="Source">
       <FILE id="WjYzAf" name="AudioRouter.h" compile="0" resource="0" file="Source/AudioRouter.h"/>
@@ -39,8 +39,10 @@
       <FILE id="dS1Dt1" name="PluginWindow.cpp" compile="1" resource="0"
             file="Source/PluginWindow.cpp"/>
       <FILE id="OGH4VA" name="PluginWindow.h" compile="0" resource="0" file="Source/PluginWindow.h"/>
-      <FILE id="t5L0Qd" name="GlobalLookAndFeel.h" compile="0" resource="0" file="Source/GlobalLookAndFeel.h"/>
-      <FILE id="J0cUQW" name="AudioUdpStreamer.h" compile="0" resource="0" file="Source/AudioUdpStreamer.h"/>
+      <FILE id="t5L0Qd" name="GlobalLookAndFeel.h" compile="0" resource="0"
+            file="Source/GlobalLookAndFeel.h"/>
+      <FILE id="J0cUQW" name="AudioUdpStreamer.h" compile="0" resource="0"
+            file="Source/AudioUdpStreamer.h"/>
       <FILE id="vCHErj" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="CqDNgS" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
