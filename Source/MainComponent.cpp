@@ -605,125 +605,96 @@ void MainComponent::saveProject(const std::vector<InstrumentInfo> &selectedInstr
 
 void MainComponent::restoreProject(bool append)
 {
-	juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
-	if (!fileChooser.browseForFileToOpen())
-		return;
+    juce::FileChooser fileChooser("Open Project", juce::File(), "*.oscdaw");
+    if (!fileChooser.browseForFileToOpen())
+        return;
 
-	auto runOnMessageThreadBlocking = [](std::function<void()> fn)
-	{
-		if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-		{
-			fn();
-			return;
-		}
-		juce::WaitableEvent done;
-		juce::MessageManager::callAsync([fn = std::move(fn), &done]() mutable
-										{
-			fn();
-			done.signal(); });
-		done.wait();
-	};
+    const juce::File zipFile = fileChooser.getResult();
+    DBG("Selected Project: " + zipFile.getFullPathName());
 
-	const juce::File zipFile = fileChooser.getResult();
-	DBG("Selected Project: " + zipFile.getFullPathName());
+    bool restoreSucceeded = false;
+    juce::FileInputStream inputStream(zipFile);
+    if (inputStream.openedOk())
+    {
+        DBG("Reading Project...");
+        juce::ZipFile zip(inputStream);
+        DBG("Project Read.");
 
-	std::thread([this, zipFile, runOnMessageThreadBlocking, append]()
-				{
-		bool restoreSucceeded = false;
-		juce::FileInputStream inputStream(zipFile);
-		if (inputStream.openedOk())
-		{
-			DBG("Reading Project...");
-			juce::ZipFile zip(inputStream);
-			DBG("Project Read.");
+        juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
+        if (!dawServerDir.exists())
+            dawServerDir.createDirectory();
 
-			juce::File dawServerDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("OSCDawServer");
-			if (!dawServerDir.exists())
-				dawServerDir.createDirectory();
+        juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
+        juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
+        juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
+        juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
+        juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
 
-			juce::File dataFile = dawServerDir.getChildFile("projectData.dat");
-			juce::File pluginsFile = dawServerDir.getChildFile("projectPlugins.dat");
-			juce::File metaFile = dawServerDir.getChildFile("projectMeta.xml");
-			juce::File routingFile = dawServerDir.getChildFile("projectRouting.xml");
-			juce::File bufferFile = dawServerDir.getChildFile("projectTaggedMidiBuffer.xml");
+        DBG("Unzipping Project...");
+        auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
+        {
+            auto index = zip.getIndexOfFileName(fileName);
+            if (index >= 0)
+            {
+                auto* fileStream = zip.createStreamForEntry(index);
+                if (fileStream != nullptr)
+                {
+                    if (destination.exists())
+                        destination.deleteFile();
+                    juce::FileOutputStream outStream(destination);
+                    if (outStream.openedOk())
+                        outStream.writeFromInputStream(*fileStream, -1);
+                    delete fileStream;
+                    return true;
+                }
+            }
+            return false;
+        };
 
-			DBG("Unzipping Project...");
-			auto extractFile = [&](const juce::String& fileName, const juce::File& destination)
-			{
-				auto index = zip.getIndexOfFileName(fileName);
-				if (index >= 0)
-				{
-					auto* fileStream = zip.createStreamForEntry(index);
-					if (fileStream != nullptr)
-					{
-						if (destination.exists())
-							destination.deleteFile();
-						juce::FileOutputStream outStream(destination);
-						if (outStream.openedOk())
-							outStream.writeFromInputStream(*fileStream, -1);
-						delete fileStream;
-						return true;
-					}
-				}
-				return false;
-			};
+        extractFile("projectData.dat", dataFile);
+        extractFile("projectPlugins.dat", pluginsFile);
+        extractFile("projectMeta.xml", metaFile);
+        const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
+        const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
+        DBG("Project Unzipped.");
 
-			DBG("Unzipping Project...");
-			extractFile("projectData.dat", dataFile);
-			extractFile("projectPlugins.dat", pluginsFile);
-			extractFile("projectMeta.xml", metaFile);
-			const bool routingExtracted = extractFile("projectRouting.xml", routingFile);
-			const bool bufferExtracted = extractFile("projectTaggedMidiBuffer.xml", bufferFile);
-			DBG("Project Unzipped.");
+        restoreSucceeded = restoreProjectFromFiles(
+            dataFile,
+            pluginsFile,
+            metaFile,
+            routingFile,
+            routingExtracted,
+            bufferFile,
+            bufferExtracted,
+            append);
 
-			runOnMessageThreadBlocking([this, &dataFile, &pluginsFile, &metaFile, routingExtracted, &routingFile, bufferExtracted, &bufferFile, append, &restoreSucceeded]()
-			{
-				restoreSucceeded = restoreProjectFromFiles(
-					dataFile,
-					pluginsFile,
-					metaFile,
-					routingFile,
-					routingExtracted,
-					bufferFile,
-					bufferExtracted,
-					append);
-			});
+        if (restoreSucceeded)
+        {
+            refreshOrchestraTableUI();
+            const juce::String projectName = zipFile.getFileNameWithoutExtension();
+            DBG("Project Restored: " + projectName);
+            updateProjectNameLabel(projectName);
+            repaint();
+            updateOverdubUI();
+        }
+    }
+    else
+    {
+        DBG("Failed to open file for restoring project states.");
+    }
 
-			runOnMessageThreadBlocking([this, &zipFile]()
-			{
-				refreshOrchestraTableUI();
-				const juce::String projectName = zipFile.getFileNameWithoutExtension();
-				DBG("Project Restored: " + projectName);
-				updateProjectNameLabel(projectName);
-				repaint();
-				updateOverdubUI();
-			});
-
-			restoreSucceeded = true;
-		}
-		else
-		{
-			DBG("Failed to open file for restoring project states.");
-		}
-
-		if (!restoreSucceeded)
-		{
-			runOnMessageThreadBlocking([this]()
-			{
-				repaint();
-				if (auto* top = getTopLevelComponent())
-				{
-					auto w = top->getWidth();
-					auto h = top->getHeight();
-					top->setSize(w + 1, h);
-					top->setSize(w, h);
-				}
-			});
-		}
-	})
-	.detach();
+    if (!restoreSucceeded)
+    {
+        repaint();
+        if (auto* top = getTopLevelComponent())
+        {
+            auto w = top->getWidth();
+            auto h = top->getHeight();
+            top->setSize(w + 1, h);
+            top->setSize(w, h);
+        }
+    }
 }
-
 bool MainComponent::restoreProjectFromFiles(const juce::File& dataFile,
                                             const juce::File& pluginDescFile,
                                             const juce::File& orchestraFile,
