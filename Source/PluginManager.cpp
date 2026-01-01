@@ -1214,10 +1214,9 @@ void PluginManager::debugPrintMasterTaggedMidiBuffer()
 
 void PluginManager::startCapture(double startMs)
 {
-    juce::ignoreUnused(startMs);
     const juce::ScopedLock sl(midiCriticalSection);
     masterTaggedMidiBuffer.clear();
-    captureStartMs = -1.0;
+    captureStartMs = (startMs >= 0.0) ? startMs : -1.0;
     captureEnabled = true;
     previewActive = false;
     previewPaused = false;
@@ -1862,10 +1861,20 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
     const bool rendering = renderInProgress.load();
     const juce::ScopedLock sl(midiCriticalSection); // Lock the critical section to ensure thread safety
 
+    // Live OSC plugins sometimes send timestamp 0. Keep playback scheduling as-is (timestamp 0 = immediate),
+    // but record capture needs a monotonic clock so we stamp it with wall-clock ms when missing.
+    juce::int64 captureTimestamp = adjustedTimestamp;
+    if (captureEnabled && captureTimestamp <= 0)
+    {
+        captureTimestamp = static_cast<juce::int64>(juce::Time::getMillisecondCounterHiRes());
+        if (captureStartMs < 0.0 && masterTaggedMidiBuffer.empty())
+            captureStartMs = static_cast<double>(captureTimestamp);
+    }
+
     if (rendering)
     {
         if (captureEnabled)
-            insertIntoMasterCaptureUnlocked(MyMidiMessage(message, pluginId, adjustedTimestamp));
+            insertIntoMasterCaptureUnlocked(MyMidiMessage(message, pluginId, captureTimestamp));
         return;
     }
 
@@ -1888,7 +1897,7 @@ void PluginManager::addMidiMessage(const juce::MidiMessage& message, const juce:
     }
 
     if (captureEnabled)
-        insertIntoMasterCaptureUnlocked(MyMidiMessage(message, pluginId, adjustedTimestamp));
+        insertIntoMasterCaptureUnlocked(MyMidiMessage(message, pluginId, captureTimestamp));
 	// DBG("Added MIDI message: " << message.getDescription() << " for pluginId: " << pluginId << " at adjusted time: " << juce::String(adjustedTimestamp));
 }
 
