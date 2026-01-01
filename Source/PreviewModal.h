@@ -38,11 +38,17 @@ private:
     juce::TextButton loadCaptureButton{ "Load Capture" };
     juce::TextButton renderButton{ "Render" };
     juce::TextButton openFolderButton{ "Open Folder" };
+    juce::ToggleButton exportWavToggle{ "Export WAV" };
+    juce::ToggleButton exportFlacToggle{ "Export FLAC (24-bit)" };
 
     juce::File lastRenderFolder;
     juce::File lastCaptureFile;
     std::atomic<bool> renderJobRunning{ false };
 
     void handleRenderRequest();
-    void launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds, juce::String projectName);
+    void launchRenderJob(const juce::File& folder,
+        int blockSize,
+        double tailSeconds,
+        juce::String projectName,
+        PluginManager::RenderFormatOptions formatOptions);
 };

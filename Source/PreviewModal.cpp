@@ -102,6 +102,10 @@ PreviewModal::PreviewModal(PluginManager& manager)
             lastRenderFolder.startAsProcess();
         }
     };
+    exportWavToggle.setToggleState(true, juce::dontSendNotification);
+    exportWavToggle.setTooltip("Enable to export the render as WAV (default delivery format).");
+    exportFlacToggle.setToggleState(false, juce::dontSendNotification);
+    exportFlacToggle.setTooltip("Enable to export an additional 24-bit FLAC copy.");
 
     addAndMakeVisible(playButton);
     addAndMakeVisible(pauseButton);
@@ -111,6 +115,8 @@ PreviewModal::PreviewModal(PluginManager& manager)
     addAndMakeVisible(loadCaptureButton);
     addAndMakeVisible(renderButton);
     addAndMakeVisible(openFolderButton);
+    addAndMakeVisible(exportWavToggle);
+    addAndMakeVisible(exportFlacToggle);
 
     refreshSummaryAndState();
     startTimerHz(5);
@@ -144,7 +150,7 @@ void PreviewModal::resized()
     infoGrid.performLayout(infoArea);
 
     bounds.removeFromTop(24);
-    auto buttonArea = bounds.removeFromTop(170);
+    auto buttonArea = bounds.removeFromTop(220);
     juce::Grid buttonGrid;
     buttonGrid.templateColumns = {
         juce::Grid::TrackInfo(juce::Grid::Fr(1)),
@@ -152,6 +158,7 @@ void PreviewModal::resized()
         juce::Grid::TrackInfo(juce::Grid::Fr(1))
     };
     buttonGrid.templateRows = {
+        juce::Grid::TrackInfo(juce::Grid::Px(40)),
         juce::Grid::TrackInfo(juce::Grid::Px(40)),
         juce::Grid::TrackInfo(juce::Grid::Px(40)),
         juce::Grid::TrackInfo(juce::Grid::Px(40))
@@ -166,7 +173,9 @@ void PreviewModal::resized()
         juce::GridItem(loadCaptureButton),
         juce::GridItem(renderButton),
         juce::GridItem(openFolderButton),
-        juce::GridItem(closeButton)
+        juce::GridItem(closeButton),
+        juce::GridItem(exportWavToggle),
+        juce::GridItem(exportFlacToggle)
     };
     buttonGrid.performLayout(buttonArea);
 
@@ -209,10 +218,11 @@ void PreviewModal::refreshSummaryAndState()
     }
 
     const bool hasEvents = summary.totalEvents > 0;
+    const bool hasFormat = exportWavToggle.getToggleState() || exportFlacToggle.getToggleState();
     playButton.setEnabled(hasEvents && (!active || paused));
     pauseButton.setEnabled(active && !paused);
     stopButton.setEnabled(active || paused);
-    renderButton.setEnabled(hasEvents && !renderJobRunning.load());
+    renderButton.setEnabled(hasEvents && !renderJobRunning.load() && hasFormat);
     saveCaptureButton.setEnabled(hasEvents);
     loadCaptureButton.setEnabled(true);
     openFolderButton.setEnabled(lastRenderFolder.exists());
@@ -222,6 +232,15 @@ void PreviewModal::handleRenderRequest()
 {
     if (!pluginManager.hasMasterTaggedMidiData())
         return;
+
+    PluginManager::RenderFormatOptions formatOptions;
+    formatOptions.writeWav = exportWavToggle.getToggleState();
+    formatOptions.writeFlac = exportFlacToggle.getToggleState();
+    if (!formatOptions.writeWav && !formatOptions.writeFlac)
+    {
+        renderInfoLabel.setText("Select WAV and/or FLAC before rendering.", juce::dontSendNotification);
+        return;
+    }
 
     juce::File defaultDir = lastRenderFolder;
     if (!defaultDir.exists())
@@ -236,10 +255,14 @@ void PreviewModal::handleRenderRequest()
     const int blockSize = pluginManager.getCurrentBlockSize();
     constexpr double tailSeconds = 2.0;
     const juce::String projectName = pluginManager.getRenderProjectName();
-    launchRenderJob(lastRenderFolder, blockSize > 0 ? blockSize : 512, tailSeconds, projectName);
+    launchRenderJob(lastRenderFolder, blockSize > 0 ? blockSize : 512, tailSeconds, projectName, formatOptions);
 }
 
-void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, double tailSeconds, juce::String projectName)
+void PreviewModal::launchRenderJob(const juce::File& folder,
+    int blockSize,
+    double tailSeconds,
+    juce::String projectName,
+    PluginManager::RenderFormatOptions formatOptions)
 {
     if (renderJobRunning.load())
         return;
@@ -273,20 +296,28 @@ void PreviewModal::launchRenderJob(const juce::File& folder, int blockSize, doub
     });
     pm.beginExclusiveRender(sampleRate, blockSize);
 
-    std::thread([safeThis, &pm, folder, blockSize, tailSeconds, projectName]()
+    const auto selectedFormats = formatOptions;
+    std::thread([safeThis, &pm, folder, blockSize, tailSeconds, projectName, selectedFormats]()
     {
-        const bool ok = pm.renderMaster(folder, projectName, blockSize, tailSeconds);
+        const bool ok = pm.renderMaster(folder, projectName, blockSize, tailSeconds, selectedFormats);
         pm.clearRenderProgressCallback();
         pm.endExclusiveRender();
-        juce::MessageManager::callAsync([safeThis, ok, folder]()
+        juce::MessageManager::callAsync([safeThis, ok, folder, selectedFormats]()
         {
             if (auto* self = safeThis.getComponent())
             {
                 self->renderJobRunning.store(false);
                 self->lastRenderFolder = folder;
                 if (ok)
-                    self->renderInfoLabel.setText("Render complete. Wav files saved to " + folder.getFullPathName(),
+                {
+                    juce::String formatSummary = "WAV files";
+                    if (selectedFormats.writeWav && selectedFormats.writeFlac)
+                        formatSummary = "WAV and FLAC files";
+                    else if (selectedFormats.writeFlac)
+                        formatSummary = "FLAC files";
+                    self->renderInfoLabel.setText("Render complete. " + formatSummary + " saved to " + folder.getFullPathName(),
                         juce::dontSendNotification);
+                }
                 else
                     self->renderInfoLabel.setText("Render failed. See logs for details.",
                         juce::dontSendNotification);

@@ -101,6 +101,28 @@ std::unique_ptr<juce::AudioFormatWriter> createWavWriter(const juce::File& file,
     stream.release();
     return std::unique_ptr<juce::AudioFormatWriter>(raw);
 }
+
+std::unique_ptr<juce::AudioFormatWriter> createFlacWriter(const juce::File& file,
+    double sampleRate,
+    int numChannels)
+{
+    juce::FlacAudioFormat flac;
+    std::unique_ptr<juce::FileOutputStream> stream(file.createOutputStream());
+    if (stream == nullptr || !stream->openedOk())
+        return {};
+
+    auto* raw = flac.createWriterFor(stream.get(),
+        sampleRate,
+        (unsigned int)juce::jmax(1, numChannels),
+        24,
+        {},
+        0);
+    if (raw == nullptr)
+        return {};
+
+    stream.release();
+    return std::unique_ptr<juce::AudioFormatWriter>(raw);
+}
 }
 
 HostPlayHead hostPlayHead;
@@ -1486,8 +1508,15 @@ void PluginManager::endExclusiveRender()
 bool PluginManager::renderMaster(const juce::File& outFolder,
     const juce::String& projectName,
     int blockSize,
-    double tailSeconds)
+    double tailSeconds,
+    RenderFormatOptions formatOptions)
 {
+    if (!formatOptions.writeWav && !formatOptions.writeFlac)
+    {
+        DBG("RenderMaster: no output formats enabled");
+        return false;
+    }
+
     juce::File targetFolder = outFolder;
     if (!targetFolder.exists())
         targetFolder.createDirectory();
@@ -1534,27 +1563,37 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
         return false;
     }
 
-    const juce::String fileName = sanitiseRenderName(projectName) + "_Master.wav";
-    std::map<juce::String, std::unique_ptr<juce::AudioFormatWriter>> writers;
-    auto addWriter = [&](const juce::String& busName, const juce::String& fileSuffix) -> bool
+    std::map<juce::String, std::vector<std::unique_ptr<juce::AudioFormatWriter>>> writers;
+    auto addWriterForFormat = [&](const juce::String& busName,
+        const juce::String& fileSuffix,
+        std::unique_ptr<juce::AudioFormatWriter>(*factory)(const juce::File&, double, int)) -> bool
     {
         const juce::String busFileName = sanitiseRenderName(projectName) + fileSuffix;
         auto targetFile = targetFolder.getChildFile(busFileName);
         if (targetFile.existsAsFile())
             targetFile.deleteFile();
 
-        auto writer = createWavWriter(targetFile, sampleRate, 2);
+        auto writer = factory(targetFile, sampleRate, 2);
         if (!writer)
         {
             DBG("RenderMaster: failed to create writer for " << targetFile.getFullPathName());
             return false;
         }
 
-        writers.emplace(busName, std::move(writer));
+        writers[busName].push_back(std::move(writer));
         return true;
     };
+    auto addBusWriters = [&](const juce::String& busName, const juce::String& baseSuffix) -> bool
+    {
+        bool added = false;
+        if (formatOptions.writeWav)
+            added = addWriterForFormat(busName, baseSuffix + ".wav", createWavWriter) || added;
+        if (formatOptions.writeFlac)
+            added = addWriterForFormat(busName, baseSuffix + ".flac", createFlacWriter) || added;
+        return added;
+    };
 
-    if (!addWriter("Master", "_Master.wav"))
+    if (!addBusWriters("Master", "_Master"))
         return false;
 
     for (const auto& stem : stemConfigs)
@@ -1562,7 +1601,7 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
         if (!stem.renderEnabled)
             continue;
 
-        if (!addWriter(stem.name, "_" + sanitiseRenderName(stem.name) + ".wav"))
+        if (!addBusWriters(stem.name, "_" + sanitiseRenderName(stem.name)))
             return false;
     }
 
@@ -1622,11 +1661,8 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
             audioRouter.routeAudio(pluginId, pluginBuffer, numSamples);
         }
 
-        for (auto& [busName, writer] : writers)
+        for (auto& [busName, writerList] : writers)
         {
-            if (!writer)
-                continue;
-
             const auto* busBuf = audioRouter.getBusBuffer(busName);
             if (busBuf == nullptr || busBuf->getNumChannels() == 0)
                 continue;
@@ -1636,7 +1672,11 @@ bool PluginManager::renderMaster(const juce::File& outFolder,
                 busBuf->getNumChannels() > 1 ? busBuf->getReadPointer(1) : (busBuf->getNumChannels() > 0 ? busBuf->getReadPointer(0) : nullptr)
             };
 
-            writer->writeFromFloatArrays(channelPointers, 2, numSamples);
+            for (auto& writer : writerList)
+            {
+                if (writer != nullptr)
+                    writer->writeFromFloatArrays(channelPointers, 2, numSamples);
+            }
         }
         float progressValue = static_cast<float>(blockStart) / static_cast<float>(endSample);
         renderProgress.store(progressValue);

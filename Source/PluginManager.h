@@ -73,6 +73,11 @@ public:
         int ccCount = 0;
         int otherCount = 0;
     };
+    struct RenderFormatOptions
+    {
+        bool writeWav = true;
+        bool writeFlac = false;
+    };
     // In PluginManager.h (or wherever you want to define it)
     struct PlayHeadImpl : public juce::AudioPlayHead
     {
@@ -166,7 +171,8 @@ public:
     bool renderMaster(const juce::File& outFolder,
         const juce::String& projectName,
         int blockSize,
-        double tailSeconds = 2.0);
+        double tailSeconds = 2.0,
+        RenderFormatOptions formatOptions = {});
     void setRenderProgressCallback(std::function<void(float)> callback);
     void clearRenderProgressCallback();
     void setRestoreStatusCallback(std::function<void(const juce::String&)> callback);
