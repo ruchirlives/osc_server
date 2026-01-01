@@ -219,13 +219,27 @@ void PreviewModal::refreshSummaryAndState()
 
     const bool hasEvents = summary.totalEvents > 0;
     const bool hasFormat = exportWavToggle.getToggleState() || exportFlacToggle.getToggleState();
-    playButton.setEnabled(hasEvents && (!active || paused));
-    pauseButton.setEnabled(active && !paused);
-    stopButton.setEnabled(active || paused);
-    renderButton.setEnabled(hasEvents && !renderJobRunning.load() && hasFormat);
-    saveCaptureButton.setEnabled(hasEvents);
+    const bool playEnabled = hasEvents && (!active || paused);
+    const bool pauseEnabled = active && !paused;
+    const bool stopEnabled = active || paused;
+    playButton.setEnabled(playEnabled);
+    playButton.setColour(juce::TextButton::buttonColourId, playEnabled ? juce::Colours::green : juce::Colours::lightgrey);
+    pauseButton.setEnabled(pauseEnabled);
+    pauseButton.setColour(juce::TextButton::buttonColourId, pauseEnabled ? juce::Colours::green : juce::Colours::lightgrey);
+    stopButton.setEnabled(stopEnabled);
+    stopButton.setColour(juce::TextButton::buttonColourId, stopEnabled ? juce::Colours::green : juce::Colours::lightgrey);
+    const bool renderEnabled = hasEvents && !renderJobRunning.load() && hasFormat;
+    renderButton.setEnabled(renderEnabled);
+    renderButton.setColour(juce::TextButton::buttonColourId, renderEnabled ? juce::Colours::green : juce::Colours::lightgrey);
+    const bool saveCaptureEnabled = hasEvents;
+    saveCaptureButton.setEnabled(saveCaptureEnabled);
+    saveCaptureButton.setColour(juce::TextButton::buttonColourId, saveCaptureEnabled ? juce::Colours::green : juce::Colours::lightgrey);
     loadCaptureButton.setEnabled(true);
-    openFolderButton.setEnabled(lastRenderFolder.exists());
+    loadCaptureButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
+    const bool openFolderEnabled = lastRenderFolder.exists();
+    openFolderButton.setEnabled(openFolderEnabled);
+    openFolderButton.setColour(juce::TextButton::buttonColourId, openFolderEnabled ? juce::Colours::green : juce::Colours::lightgrey);
+    closeButton.setColour(juce::TextButton::buttonColourId, juce::Colours::green);
 }
 
 void PreviewModal::handleRenderRequest()

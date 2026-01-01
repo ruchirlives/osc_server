@@ -80,7 +80,7 @@ private:
     juce::TextButton recordCaptureButton{ "Start capture" };
     juce::TextButton stopCaptureButton{ "Stop capture" };
     juce::TextButton debugCaptureButton{ "Debug" };
-    juce::TextButton previewButton{ "Preview" };
+    juce::TextButton previewButton{ "Preview & Render" };
     juce::Label captureStatusLabel{ "captureStatusLabel", "Recording: OFF" };
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 };
