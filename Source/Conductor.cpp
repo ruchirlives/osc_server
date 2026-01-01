@@ -698,13 +698,19 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			{
 				if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
 				{
-					// Check plugin compatibility
-					juce::String instanceUid = pluginManager.getPluginUniqueId(instrument.pluginInstanceId);
-					if (instanceUid.contains(presetPluginUid.substring(0, 8)))
+					// Check plugin compatibility by Class ID
+					juce::String instanceClassId = pluginManager.getPluginClassId(instrument.pluginInstanceId);
+					if (instanceClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
 					{
-						if (std::find(matchingPluginIds.begin(), matchingPluginIds.end(), instrument.pluginInstanceId) == matchingPluginIds.end())
+						// Compare Class IDs (case insensitive, first 8-16 chars should match)
+						if (instanceClassId.toUpperCase().contains(presetPluginUid.substring(0, juce::jmin(8, presetPluginUid.length()))) ||
+							presetPluginUid.toUpperCase().contains(instanceClassId.substring(0, juce::jmin(8, instanceClassId.length()))))
 						{
-							matchingPluginIds.push_back(instrument.pluginInstanceId);
+							if (std::find(matchingPluginIds.begin(), matchingPluginIds.end(), instrument.pluginInstanceId) == matchingPluginIds.end())
+							{
+								matchingPluginIds.push_back(instrument.pluginInstanceId);
+								DBG("Found compatible plugin instance: " << instrument.pluginInstanceId);
+							}
 						}
 					}
 				}
@@ -717,36 +723,75 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			DBG("No compatible plugin instance found for tags. Searching for matching plugin...");
 			DBG("Target preset UID: " << presetPluginUid);
 			DBG("Target preset UID (first 8 chars): " << presetPluginUid.substring(0, 8));
-			
+			DBG("Preset filename: " << filename);
+
 			// Search for plugin by UID in known plugins list
 			const auto types = pluginManager.knownPluginList.getTypes();
 			DBG("Scanning " << types.size() << " known plugins:");
-			
+
 			juce::PluginDescription matchingDesc;
 			bool foundPlugin = false;
-			
+
+			// Extract potential plugin name from filename (before .vstpreset)
+			juce::String filenameWithoutExt = filename.upToLastOccurrenceOf(".vstpreset", false, true);
+			juce::String cleanFilename = filenameWithoutExt.fromLastOccurrenceOf("_", false, true).trim();
+
 			for (const auto &desc : types)
 			{
 				juce::String descUid = desc.createIdentifierString();
+				juce::String descUidUpper = descUid.toUpperCase();
+				juce::String presetUidUpper = presetPluginUid.toUpperCase();
+
 				DBG("  - " << desc.name << " (Manufacturer: " << desc.manufacturerName << ")");
 				DBG("    UID: " << descUid);
-				DBG("    File UID: " << desc.fileOrIdentifier);
-				DBG("    Unique ID: " << desc.uniqueId);
-				
-				if (descUid.contains(presetPluginUid.substring(0, 8)))
+				DBG("    File: " << desc.fileOrIdentifier);
+				DBG("    Unique ID (dec): " << desc.uniqueId);
+				DBG("    Unique ID (hex): " << juce::String::toHexString(desc.uniqueId).toUpperCase());
+				DBG("    Deprecated UID: " << desc.deprecatedUid);
+
+				// Try matching against the UID string, unique ID hex, or deprecated UID
+				juce::String uniqueIdHex = juce::String::toHexString(desc.uniqueId).toUpperCase();
+				juce::String deprecatedUidHex = juce::String::toHexString(desc.deprecatedUid).toUpperCase();
+				juce::String fileOrIdUpper = desc.fileOrIdentifier.toUpperCase();
+
+				// Check if preset UID matches any identifier
+				if (descUidUpper.contains(presetUidUpper.substring(0, 8)) ||
+					uniqueIdHex.contains(presetUidUpper.substring(0, 8)) ||
+					presetUidUpper.contains(uniqueIdHex.substring(0, 8)) ||
+					deprecatedUidHex == presetUidUpper ||
+					presetUidUpper.contains(deprecatedUidHex.substring(0, 8)) ||
+					fileOrIdUpper.contains(presetUidUpper.substring(0, 8)))
 				{
 					matchingDesc = desc;
 					foundPlugin = true;
-					DBG("*** MATCH FOUND: " << desc.name << " ***");
+					DBG("*** MATCH FOUND (by UID): " << desc.name << " ***");
 					break;
 				}
+
+				// Fallback: try matching by plugin name from filename
+				if (!foundPlugin && cleanFilename.isNotEmpty())
+				{
+					juce::String descNameUpper = desc.name.toUpperCase();
+					juce::String cleanFilenameUpper = cleanFilename.toUpperCase();
+
+					// Check if plugin name contains the filename or vice versa
+					if (descNameUpper.contains(cleanFilenameUpper) ||
+						cleanFilenameUpper.contains(descNameUpper) ||
+						(cleanFilenameUpper.length() > 5 && descNameUpper.startsWith(cleanFilenameUpper.substring(0, juce::jmin(cleanFilenameUpper.length(), descNameUpper.length())))))
+					{
+						matchingDesc = desc;
+						foundPlugin = true;
+						DBG("*** MATCH FOUND (by filename): " << desc.name << " (matched '" << cleanFilename << "') ***");
+						break;
+					}
+				}
 			}
-			
+
 			if (foundPlugin)
 			{
 				// Create a new plugin instance with the first tag
 				juce::String newPluginId = tags[0] + "_1";
-				
+
 				// Check if this ID already exists and increment
 				int counter = 1;
 				while (pluginManager.hasPluginInstance(newPluginId))
@@ -754,10 +799,37 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 					counter++;
 					newPluginId = tags[0] + "_" + juce::String(counter);
 				}
-				
+
 				// Instantiate the plugin
+				DBG("Instantiating plugin: " << matchingDesc.name << " as " << newPluginId);
 				pluginManager.instantiatePlugin(&matchingDesc, newPluginId);
-				
+
+				// Verify the plugin was instantiated
+				if (!pluginManager.hasPluginInstance(newPluginId))
+				{
+					DBG("Error: Plugin instantiation failed for " << newPluginId);
+					return;
+				}
+
+				DBG("Plugin instantiation verified for " << newPluginId);
+
+				// Verify Class ID matches (if possible)
+				juce::String actualClassId = pluginManager.getPluginClassId(newPluginId);
+				if (actualClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
+				{
+					if (!actualClassId.toUpperCase().contains(presetPluginUid.substring(0, 8)) &&
+						!presetPluginUid.toUpperCase().contains(actualClassId.substring(0, 8)))
+					{
+						DBG("Warning: Class ID mismatch after instantiation.");
+						DBG("  Expected: " << presetPluginUid);
+						DBG("  Actual: " << actualClassId);
+					}
+					else
+					{
+						DBG("Class ID verified: " << actualClassId);
+					}
+				}
+
 				// Add to orchestra with all tags
 				InstrumentInfo newInstrument;
 				newInstrument.instrumentName = matchingDesc.name;
@@ -765,10 +837,10 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				newInstrument.pluginInstanceId = newPluginId;
 				newInstrument.midiChannel = 0; // Default to channel 0
 				newInstrument.tags = tags;
-				
+
 				orchestra.push_back(newInstrument);
 				syncOrchestraWithPluginManager();
-				
+
 				matchingPluginIds.push_back(newPluginId);
 				DBG("Created new plugin instance: " << newPluginId << " with tags: " << tags[0]);
 			}
@@ -779,11 +851,95 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			}
 		}
 
-		// Load preset into all matching plugin instances
+		// Update UI table if we have new plugins
+		if (!matchingPluginIds.empty())
+		{
+			if (mainComponent != nullptr)
+			{
+				juce::MessageManager::callAsync([this]()
+				{ 
+					mainComponent->orchestraTable.updateContent(); 
+				});
+			}
+		}
+
+		// Check if we created any new plugins
+		bool anyNewPlugins = false;
 		for (const auto &pluginId : matchingPluginIds)
 		{
-			DBG("Loading preset " << filename << " from " << filepath << " into " << pluginId);
-			pluginManager.loadPluginData(filepath, filename, pluginId);
+			if (pluginId.contains("_"))
+			{
+				anyNewPlugins = true;
+				break;
+			}
+		}
+
+		// If we created new plugins, give them time to initialize then load preset
+		if (anyNewPlugins)
+		{
+			// Defer preset loading to message thread with user confirmation
+			juce::String capturedFilepath = filepath;
+			juce::String capturedFilename = filename;
+			std::vector<juce::String> capturedPluginIds = matchingPluginIds;
+			
+			juce::MessageManager::callAsync([this, capturedFilepath, capturedFilename, capturedPluginIds]()
+			{
+				juce::String message = "The following plugin instance(s) have been created:\n\n";
+				for (const auto& pluginId : capturedPluginIds)
+				{
+					message += "  - " + pluginId + "\n";
+				}
+				message += "\nPlease ensure the plugin(s) have fully loaded.\n";
+				message += "Click OK when ready to load presets.";
+				
+				bool shouldContinue = juce::AlertWindow::showOkCancelBox(
+					juce::AlertWindow::InfoIcon,
+					"Plugin Instantiation Complete",
+					message,
+					"OK - Load Presets",
+					"Cancel"
+				);
+				
+				if (shouldContinue)
+				{
+					// Load preset into all matching plugin instances
+					for (const auto &pluginId : capturedPluginIds)
+					{
+						DBG("Loading preset " << capturedFilename << " into newly created " << pluginId);
+						bool success = pluginManager.loadPluginData(capturedFilepath, capturedFilename, pluginId);
+						if (success)
+						{
+							DBG("Successfully loaded preset into " << pluginId);
+						}
+						else
+						{
+							DBG("Failed to load preset into " << pluginId);
+						}
+					}
+					DBG("All presets loaded");
+				}
+				else
+				{
+					DBG("User cancelled preset loading");
+				}
+			});
+		}
+		else
+		{
+			// No new plugins, load presets immediately
+			for (const auto &pluginId : matchingPluginIds)
+			{
+				DBG("Loading preset " << filename << " into existing " << pluginId);
+				bool success = pluginManager.loadPluginData(filepath, filename, pluginId);
+				if (success)
+				{
+					DBG("Successfully loaded preset into " << pluginId);
+				}
+				else
+				{
+					DBG("Failed to load preset into " << pluginId);
+				}
+			}
 		}
 	}
 	else

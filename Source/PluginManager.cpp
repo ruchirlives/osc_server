@@ -1055,14 +1055,74 @@ juce::String PluginManager::extractPluginUidFromPreset(const juce::String& dataF
     inputStream.readInt();
     
     // Read Class ID (16 bytes) - this is the plugin UID
-    char classId[17] = {0};
-    inputStream.read(classId, 16);
+    // VST3 preset format stores this as ASCII hex string (32 chars representing 16 bytes)
+    char classIdAscii[17] = {0};
+    inputStream.read(classIdAscii, 16);
     
-    juce::String result(classId, 16);
-    DBG("Extracted plugin UID from preset '" << filename << "': " << result);
-    DBG("  UID as hex: " << juce::String::toHexString(classId, 16));
+    juce::String asciiStr(classIdAscii, 16);
+    
+    // Check if this is ASCII hex characters (0-9, A-F)
+    bool isAsciiHex = true;
+    for (int i = 0; i < asciiStr.length(); ++i)
+    {
+        char c = asciiStr[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
+        {
+            isAsciiHex = false;
+            break;
+        }
+    }
+    
+    juce::String result;
+    if (isAsciiHex && asciiStr.length() >= 16)
+    {
+        // It's stored as ASCII hex - this is the actual Class ID
+        result = asciiStr.toUpperCase();
+        DBG("Extracted plugin Class ID from preset '" << filename << "':");
+        DBG("  Class ID (hex string): " << result);
+        DBG("  First 8 chars: " << result.substring(0, 8));
+    }
+    else
+    {
+        // Raw binary format
+        result = juce::String::toHexString(reinterpret_cast<const unsigned char*>(classIdAscii), 16, 0).toUpperCase();
+        DBG("Extracted plugin Class ID from preset '" << filename << "' (binary):");
+        DBG("  Class ID: " << result);
+    }
     
     return result;
+}
+
+juce::String PluginManager::getPluginClassId(const juce::String& pluginId)
+{
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    auto it = pluginInstances.find(pluginId);
+    if (it == pluginInstances.end() || it->second == nullptr)
+    {
+        DBG("Plugin instance not found: " << pluginId);
+        return {};
+    }
+
+    juce::AudioPluginInstance* plugin = it->second.get();
+    
+    // Try to get the VST3 Class ID from the plugin
+    CustomVST3Visitor visitor;
+    plugin->getExtensions(visitor);
+    
+    // The Class ID should be embedded in the preset data header
+    if (visitor.presetData.getSize() >= 20)
+    {
+        const unsigned char* data = static_cast<const unsigned char*>(visitor.presetData.getData());
+        // Skip "VST3" header (4 bytes) and version (4 bytes) to get to Class ID (16 bytes)
+        if (data[0] == 'V' && data[1] == 'S' && data[2] == 'T' && data[3] == '3')
+        {
+            juce::String classId(reinterpret_cast<const char*>(data + 8), 16);
+            return classId.toUpperCase();
+        }
+    }
+    
+    // Fallback: use the unique identifier
+    return plugin->getPluginDescription().createIdentifierString();
 }
 
 bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
@@ -1102,16 +1162,36 @@ bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce:
         return false;
     }
     
-    // Read the entire preset file into a MemoryBlock
-    juce::int64 fileSize = presetFile.getSize();
-    if (fileSize <= 0 || fileSize > 100 * 1024 * 1024) // Sanity check: max 100MB
+    // Read VST3 preset header
+    char header[4];
+    inputStream.read(header, 4);
+    
+    if (strncmp(header, "VST3", 4) != 0)
     {
-        DBG("Error: Invalid file size: " << fileSize);
+        DBG("Error: Invalid VST3 preset format");
         return false;
     }
     
-    juce::MemoryBlock presetData(static_cast<size_t>(fileSize));
-    inputStream.read(presetData.getData(), static_cast<size_t>(fileSize));
+    // Read version (4 bytes)
+    int version = inputStream.readInt();
+    DBG("VST3 preset version: " << version);
+    
+    // Read Class ID (16 bytes) - skip it
+    char classId[16];
+    inputStream.read(classId, 16);
+    
+    // Read the size of the state data (if present in newer format)
+    // For now, just read the rest of the file as state data
+    juce::int64 remainingSize = presetFile.getSize() - inputStream.getPosition();
+    
+    if (remainingSize <= 0 || remainingSize > 100 * 1024 * 1024)
+    {
+        DBG("Error: Invalid state data size: " << remainingSize);
+        return false;
+    }
+    
+    juce::MemoryBlock stateData(static_cast<size_t>(remainingSize));
+    inputStream.read(stateData.getData(), static_cast<size_t>(remainingSize));
     
     // Get the plugin instance
     juce::AudioPluginInstance* plugin = pluginIt->second.get();
@@ -1128,8 +1208,8 @@ bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce:
     }
     
     // Use JUCE's built-in method to set the state from the preset data
-    // The VST3 format should handle the .vstpreset format automatically
-    plugin->setStateInformation(presetData.getData(), static_cast<int>(presetData.getSize()));
+    DBG("Loading " << stateData.getSize() << " bytes of state data into " << pluginId);
+    plugin->setStateInformation(stateData.getData(), static_cast<int>(stateData.getSize()));
     
     DBG("Plugin preset loaded successfully: " << fullFilePath << " into " << pluginId);
     return true;
