@@ -1102,6 +1102,13 @@ void OrchestraTableModel::selectRow(int row, const juce::ModifierKeys &modifiers
 	// juce::SystemClipboard::copyTextToClipboard(orchestraData[row].tags.empty() ? "" : orchestraData[row].tags[0]);
 }
 
+void OrchestraTableModel::selectedRowsChanged(int lastRowSelected)
+{
+	juce::ignoreUnused(lastRowSelected);
+	if (mainComponent)
+		mainComponent->updateOpenPluginButtonState();
+}
+
 void OrchestraTableModel::renamePluginInstance(int rowNumber)
 {
 	// Get the current plugin instance ID for the selected row

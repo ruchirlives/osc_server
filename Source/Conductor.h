@@ -121,6 +121,7 @@ public:
     void sendTags(int row);
 	int getSelectedMidiChannel();
 	juce::String getSelectedPluginId();
+	void selectedRowsChanged(int lastRowSelected) override;
 
     // Refresh component for editable cells
     juce::Component* refreshComponentForCell(int rowNumber, int columnId, bool isRowSelected,

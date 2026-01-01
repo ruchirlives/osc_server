@@ -32,6 +32,7 @@ public:
     void resized() override;
 
 	void updateOverdubUI();
+	void updateOpenPluginButtonState();
 
 	void handleAudioPortChange();
 
