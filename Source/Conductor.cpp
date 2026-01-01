@@ -93,10 +93,92 @@ Conductor::Conductor(PluginManager &pm, MidiManager &mm, MainComponent *mainComp
 // Destructor
 Conductor::~Conductor()
 {
+	if (presetLoadBatchTimer != nullptr)
+	{
+		delete presetLoadBatchTimer;
+		presetLoadBatchTimer = nullptr;
+	}
 	// Ensure to remove the listener and close the OSC receiver
 	removeListener(this);
 	OSCSender::disconnect();
 	OSCReceiver::disconnect();
+}
+
+void Conductor::processPendingPresetLoads()
+{
+	if (presetLoadBatchTimer != nullptr)
+	{
+		delete presetLoadBatchTimer;
+		presetLoadBatchTimer = nullptr;
+	}
+
+	if (pendingNewPlugins.empty())
+	{
+		// No new plugins, just load presets immediately
+		for (const auto& presetLoad : pendingPresetLoads)
+		{
+			DBG("Loading preset " << presetLoad.filename << " into existing " << presetLoad.pluginId);
+			bool success = pluginManager.loadPluginData(presetLoad.filepath, presetLoad.filename, presetLoad.pluginId);
+			if (success)
+			{
+				DBG("Successfully loaded preset into " << presetLoad.pluginId);
+			}
+			else
+			{
+				DBG("Failed to load preset into " << presetLoad.pluginId);
+			}
+		}
+		pendingPresetLoads.clear();
+		return;
+	}
+
+	// We have new plugins - show confirmation dialog
+	auto capturedNewPlugins = pendingNewPlugins;
+	auto capturedPresetLoads = pendingPresetLoads;
+	
+	pendingNewPlugins.clear();
+	pendingPresetLoads.clear();
+
+	juce::MessageManager::callAsync([this, capturedNewPlugins, capturedPresetLoads]() mutable
+	{
+		juce::String message = "The following plugin instance(s) have been created:\n\n";
+		for (const auto &pluginId : capturedNewPlugins)
+		{
+			message += "  - " + pluginId + "\n";
+		}
+		message += "\nPlease ensure the plugin(s) have fully loaded.\n";
+		message += "Click OK when ready to load presets.";
+
+		bool shouldContinue = juce::AlertWindow::showOkCancelBox(
+			juce::AlertWindow::InfoIcon,
+			"Plugin Instantiation Complete",
+			message,
+			"OK - Load Presets",
+			"Cancel");
+
+		if (shouldContinue)
+		{
+			// Load all pending presets
+			for (const auto &presetLoad : capturedPresetLoads)
+			{
+				DBG("Loading preset " << presetLoad.filename << " into " << presetLoad.pluginId);
+				bool success = pluginManager.loadPluginData(presetLoad.filepath, presetLoad.filename, presetLoad.pluginId);
+				if (success)
+				{
+					DBG("Successfully loaded preset into " << presetLoad.pluginId);
+				}
+				else
+				{
+					DBG("Failed to load preset into " << presetLoad.pluginId);
+				}
+			}
+			DBG("All presets loaded");
+		}
+		else
+		{
+			DBG("User cancelled preset loading");
+		}
+	});
 }
 
 void Conductor::shutdown()
@@ -732,10 +814,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			juce::PluginDescription matchingDesc;
 			bool foundPlugin = false;
 
-			// Extract potential plugin name from filename (before .vstpreset)
-			juce::String filenameWithoutExt = filename.upToLastOccurrenceOf(".vstpreset", false, true);
-			juce::String cleanFilename = filenameWithoutExt.fromLastOccurrenceOf("_", false, true).trim();
-
 			for (const auto &desc : types)
 			{
 				juce::String descUid = desc.createIdentifierString();
@@ -754,7 +832,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				juce::String deprecatedUidHex = juce::String::toHexString(desc.deprecatedUid).toUpperCase();
 				juce::String fileOrIdUpper = desc.fileOrIdentifier.toUpperCase();
 
-				// Check if preset UID matches any identifier
+				// Check if preset UID matches any identifier - ID MATCHING ONLY
 				if (descUidUpper.contains(presetUidUpper.substring(0, 8)) ||
 					uniqueIdHex.contains(presetUidUpper.substring(0, 8)) ||
 					presetUidUpper.contains(uniqueIdHex.substring(0, 8)) ||
@@ -766,24 +844,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 					foundPlugin = true;
 					DBG("*** MATCH FOUND (by UID): " << desc.name << " ***");
 					break;
-				}
-
-				// Fallback: try matching by plugin name from filename
-				if (!foundPlugin && cleanFilename.isNotEmpty())
-				{
-					juce::String descNameUpper = desc.name.toUpperCase();
-					juce::String cleanFilenameUpper = cleanFilename.toUpperCase();
-
-					// Check if plugin name contains the filename or vice versa
-					if (descNameUpper.contains(cleanFilenameUpper) ||
-						cleanFilenameUpper.contains(descNameUpper) ||
-						(cleanFilenameUpper.length() > 5 && descNameUpper.startsWith(cleanFilenameUpper.substring(0, juce::jmin(cleanFilenameUpper.length(), descNameUpper.length())))))
-					{
-						matchingDesc = desc;
-						foundPlugin = true;
-						DBG("*** MATCH FOUND (by filename): " << desc.name << " (matched '" << cleanFilename << "') ***");
-						break;
-					}
 				}
 			}
 
@@ -843,6 +903,12 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 				matchingPluginIds.push_back(newPluginId);
 				DBG("Created new plugin instance: " << newPluginId << " with tags: " << tags[0]);
+				
+				// Track this as a newly created plugin
+				if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
+				{
+					pendingNewPlugins.push_back(newPluginId);
+				}
 			}
 			else
 			{
@@ -863,84 +929,36 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			}
 		}
 
-		// Check if we created any new plugins
-		bool anyNewPlugins = false;
+		// Add all preset loads to the pending queue
 		for (const auto &pluginId : matchingPluginIds)
 		{
-			if (pluginId.contains("_"))
-			{
-				anyNewPlugins = true;
-				break;
-			}
+			PendingPresetLoad presetLoad;
+			presetLoad.filepath = filepath;
+			presetLoad.filename = filename;
+			presetLoad.pluginId = pluginId;
+			pendingPresetLoads.push_back(presetLoad);
 		}
 
-		// If we created new plugins, give them time to initialize then load preset
-		if (anyNewPlugins)
+		// Start or restart the batch timer (500ms window to collect all preset loads)
+		if (presetLoadBatchTimer != nullptr)
 		{
-			// Defer preset loading to message thread with user confirmation
-			juce::String capturedFilepath = filepath;
-			juce::String capturedFilename = filename;
-			std::vector<juce::String> capturedPluginIds = matchingPluginIds;
-			
-			juce::MessageManager::callAsync([this, capturedFilepath, capturedFilename, capturedPluginIds]()
-			{
-				juce::String message = "The following plugin instance(s) have been created:\n\n";
-				for (const auto& pluginId : capturedPluginIds)
-				{
-					message += "  - " + pluginId + "\n";
-				}
-				message += "\nPlease ensure the plugin(s) have fully loaded.\n";
-				message += "Click OK when ready to load presets.";
-				
-				bool shouldContinue = juce::AlertWindow::showOkCancelBox(
-					juce::AlertWindow::InfoIcon,
-					"Plugin Instantiation Complete",
-					message,
-					"OK - Load Presets",
-					"Cancel"
-				);
-				
-				if (shouldContinue)
-				{
-					// Load preset into all matching plugin instances
-					for (const auto &pluginId : capturedPluginIds)
-					{
-						DBG("Loading preset " << capturedFilename << " into newly created " << pluginId);
-						bool success = pluginManager.loadPluginData(capturedFilepath, capturedFilename, pluginId);
-						if (success)
-						{
-							DBG("Successfully loaded preset into " << pluginId);
-						}
-						else
-						{
-							DBG("Failed to load preset into " << pluginId);
-						}
-					}
-					DBG("All presets loaded");
-				}
-				else
-				{
-					DBG("User cancelled preset loading");
-				}
-			});
+			delete presetLoadBatchTimer;
 		}
-		else
+		
+		// Use a custom Timer subclass to call processPendingPresetLoads
+		struct TimerCallback : public juce::Timer
 		{
-			// No new plugins, load presets immediately
-			for (const auto &pluginId : matchingPluginIds)
+			Conductor* conductor;
+			TimerCallback(Conductor* c) : conductor(c) {}
+			void timerCallback() override
 			{
-				DBG("Loading preset " << filename << " into existing " << pluginId);
-				bool success = pluginManager.loadPluginData(filepath, filename, pluginId);
-				if (success)
-				{
-					DBG("Successfully loaded preset into " << pluginId);
-				}
-				else
-				{
-					DBG("Failed to load preset into " << pluginId);
-				}
+				stopTimer();
+				conductor->processPendingPresetLoads();
 			}
-		}
+		};
+		
+		presetLoadBatchTimer = new TimerCallback(this);
+		presetLoadBatchTimer->startTimer(500); // 500ms debounce
 	}
 	else
 	{
