@@ -715,20 +715,29 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		if (matchingPluginIds.empty())
 		{
 			DBG("No compatible plugin instance found for tags. Searching for matching plugin...");
+			DBG("Target preset UID: " << presetPluginUid);
+			DBG("Target preset UID (first 8 chars): " << presetPluginUid.substring(0, 8));
 			
 			// Search for plugin by UID in known plugins list
 			const auto types = pluginManager.knownPluginList.getTypes();
+			DBG("Scanning " << types.size() << " known plugins:");
+			
 			juce::PluginDescription matchingDesc;
 			bool foundPlugin = false;
 			
 			for (const auto &desc : types)
 			{
 				juce::String descUid = desc.createIdentifierString();
+				DBG("  - " << desc.name << " (Manufacturer: " << desc.manufacturerName << ")");
+				DBG("    UID: " << descUid);
+				DBG("    File UID: " << desc.fileOrIdentifier);
+				DBG("    Unique ID: " << desc.uniqueId);
+				
 				if (descUid.contains(presetPluginUid.substring(0, 8)))
 				{
 					matchingDesc = desc;
 					foundPlugin = true;
-					DBG("Found matching plugin: " << desc.name);
+					DBG("*** MATCH FOUND: " << desc.name << " ***");
 					break;
 				}
 			}

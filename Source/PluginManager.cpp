@@ -1058,7 +1058,11 @@ juce::String PluginManager::extractPluginUidFromPreset(const juce::String& dataF
     char classId[17] = {0};
     inputStream.read(classId, 16);
     
-    return juce::String(classId, 16);
+    juce::String result(classId, 16);
+    DBG("Extracted plugin UID from preset '" << filename << "': " << result);
+    DBG("  UID as hex: " << juce::String::toHexString(classId, 16));
+    
+    return result;
 }
 
 bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
