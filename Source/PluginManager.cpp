@@ -1125,6 +1125,46 @@ juce::String PluginManager::getPluginClassId(const juce::String& pluginId)
     return plugin->getPluginDescription().createIdentifierString();
 }
 
+juce::String PluginManager::extractTuidFromVST3File(const juce::String& vst3FilePath)
+{
+    // This method is now deprecated - use getOrCacheTuid instead
+    return {};
+}
+
+juce::String PluginManager::getOrCacheTuid(const juce::PluginDescription& desc)
+{
+    // Check if already in cache
+    auto it = vst3TuidCache.find(desc.fileOrIdentifier);
+    if (it != vst3TuidCache.end() && it->second.isNotEmpty())
+    {
+        DBG("  TUID (cached): " << it->second);
+        return it->second;
+    }
+    
+    // Not in cache - instantiate temporarily to get TUID
+    DBG("  Instantiating temporarily to read TUID...");
+    juce::String tempPluginId = "___TEMP_" + juce::String::toHexString((juce::uint64)this).substring(0, 8) + "___";
+    
+    instantiatePlugin(&desc, tempPluginId);
+    
+    juce::String tuid;
+    if (hasPluginInstance(tempPluginId))
+    {
+        tuid = getPluginClassId(tempPluginId);
+        DBG("  TUID (fresh): " << tuid);
+        resetPlugin(tempPluginId);
+    }
+    else
+    {
+        DBG("  Failed to instantiate for TUID check");
+    }
+    
+    // Cache the result (even if empty, to avoid repeated attempts)
+    vst3TuidCache[desc.fileOrIdentifier] = tuid;
+    
+    return tuid;
+}
+
 bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
 {
     // Construct full file path

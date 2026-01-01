@@ -804,10 +804,9 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		{
 			DBG("No compatible plugin instance found for tags. Searching for matching plugin...");
 			DBG("Target preset UID: " << presetPluginUid);
-			DBG("Target preset UID (first 8 chars): " << presetPluginUid.substring(0, 8));
 			DBG("Preset filename: " << filename);
 
-			// Search for plugin by UID in known plugins list
+			// Search for plugin by TUID in known plugins list
 			const auto types = pluginManager.knownPluginList.getTypes();
 			DBG("Scanning " << types.size() << " known plugins:");
 
@@ -816,33 +815,30 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 			for (const auto &desc : types)
 			{
-				juce::String descUid = desc.createIdentifierString();
-				juce::String descUidUpper = descUid.toUpperCase();
-				juce::String presetUidUpper = presetPluginUid.toUpperCase();
+				// Skip non-VST3 plugins
+				if (desc.pluginFormatName != "VST3")
+				{
+					continue;
+				}
 
 				DBG("  - " << desc.name << " (Manufacturer: " << desc.manufacturerName << ")");
-				DBG("    UID: " << descUid);
 				DBG("    File: " << desc.fileOrIdentifier);
-				DBG("    Unique ID (dec): " << desc.uniqueId);
-				DBG("    Unique ID (hex): " << juce::String::toHexString(desc.uniqueId).toUpperCase());
-				DBG("    Deprecated UID: " << desc.deprecatedUid);
 
-				// Try matching against the UID string, unique ID hex, or deprecated UID
-				juce::String uniqueIdHex = juce::String::toHexString(desc.uniqueId).toUpperCase();
-				juce::String deprecatedUidHex = juce::String::toHexString(desc.deprecatedUid).toUpperCase();
-				juce::String fileOrIdUpper = desc.fileOrIdentifier.toUpperCase();
-
-				// Check if preset UID matches any identifier - ID MATCHING ONLY
-				if (descUidUpper.contains(presetUidUpper.substring(0, 8)) ||
-					uniqueIdHex.contains(presetUidUpper.substring(0, 8)) ||
-					presetUidUpper.contains(uniqueIdHex.substring(0, 8)) ||
-					deprecatedUidHex == presetUidUpper ||
-					presetUidUpper.contains(deprecatedUidHex.substring(0, 8)) ||
-					fileOrIdUpper.contains(presetUidUpper.substring(0, 8)))
+				// Get TUID from cache (instantiates temporarily if not cached)
+				juce::String vst3Tuid = pluginManager.getOrCacheTuid(desc);
+				
+				if (vst3Tuid.isEmpty())
+				{
+					DBG("    Could not get TUID from plugin");
+					continue;
+				}
+				
+				// Direct TUID comparison
+				if (vst3Tuid.equalsIgnoreCase(presetPluginUid))
 				{
 					matchingDesc = desc;
 					foundPlugin = true;
-					DBG("*** MATCH FOUND (by UID): " << desc.name << " ***");
+					DBG("*** MATCH FOUND! " << desc.name << " ***");
 					break;
 				}
 			}

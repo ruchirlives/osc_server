@@ -124,6 +124,7 @@ public:
 	void savePluginData(const juce::String& dataFilePath, const juce:: String & filename, const juce::String& pluginId);
 	juce::String extractPluginUidFromPreset(const juce::String& dataFilePath, const juce::String& filename);
 	juce::String getPluginClassId(const juce::String& pluginId);
+	juce::String extractTuidFromVST3File(const juce::String& vst3FilePath);
 	bool loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId);
 
     juce::String getPluginUniqueId(const juce::String& pluginId);
@@ -266,6 +267,10 @@ private:
 
     void notifyRestoreStatus(const juce::String& message);
     void insertIntoMasterCaptureUnlocked(MyMidiMessage message);
+
+    // TUID cache for VST3 plugins - maps plugin filepath to TUID
+    std::map<juce::String, juce::String> vst3TuidCache;
+    juce::String getOrCacheTuid(const juce::PluginDescription& desc);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };
