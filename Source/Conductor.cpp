@@ -660,6 +660,123 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 		pluginManager.resetPlayback();
 	}
+	else if (messageType == "load_plugin_data")
+	{
+		constexpr const char *context = "load_plugin_data";
+		if (!ensureMinOSCArguments(message, 4, context) ||
+			!ensureStringOSCArgument(message, 1, context) ||
+			!ensureStringOSCArgument(message, 2, context))
+		{
+			return;
+		}
+
+		juce::String filepath = message[1].getString();
+		juce::String filename = message[2].getString();
+
+		// Extract tags starting from index 3
+		std::vector<juce::String> tags = extractTags(message, 3);
+
+		if (tags.empty())
+		{
+			DBG("Warning: load_plugin_data received with no tags");
+			return;
+		}
+
+		// Extract plugin UID from preset file to identify the correct plugin
+		juce::String presetPluginUid = pluginManager.extractPluginUidFromPreset(filepath, filename);
+		if (presetPluginUid.isEmpty())
+		{
+			DBG("Error: Could not extract plugin UID from preset file");
+			return;
+		}
+
+		// Find existing instruments with matching tags AND compatible plugin
+		std::vector<juce::String> matchingPluginIds;
+		for (const auto &tag : tags)
+		{
+			for (const auto &instrument : orchestra)
+			{
+				if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
+				{
+					// Check plugin compatibility
+					juce::String instanceUid = pluginManager.getPluginUniqueId(instrument.pluginInstanceId);
+					if (instanceUid.contains(presetPluginUid.substring(0, 8)))
+					{
+						if (std::find(matchingPluginIds.begin(), matchingPluginIds.end(), instrument.pluginInstanceId) == matchingPluginIds.end())
+						{
+							matchingPluginIds.push_back(instrument.pluginInstanceId);
+						}
+					}
+				}
+			}
+		}
+
+		// If no compatible plugin found, instantiate the correct plugin
+		if (matchingPluginIds.empty())
+		{
+			DBG("No compatible plugin instance found for tags. Searching for matching plugin...");
+			
+			// Search for plugin by UID in known plugins list
+			const auto types = pluginManager.knownPluginList.getTypes();
+			juce::PluginDescription matchingDesc;
+			bool foundPlugin = false;
+			
+			for (const auto &desc : types)
+			{
+				juce::String descUid = desc.createIdentifierString();
+				if (descUid.contains(presetPluginUid.substring(0, 8)))
+				{
+					matchingDesc = desc;
+					foundPlugin = true;
+					DBG("Found matching plugin: " << desc.name);
+					break;
+				}
+			}
+			
+			if (foundPlugin)
+			{
+				// Create a new plugin instance with the first tag
+				juce::String newPluginId = tags[0] + "_1";
+				
+				// Check if this ID already exists and increment
+				int counter = 1;
+				while (pluginManager.hasPluginInstance(newPluginId))
+				{
+					counter++;
+					newPluginId = tags[0] + "_" + juce::String(counter);
+				}
+				
+				// Instantiate the plugin
+				pluginManager.instantiatePlugin(&matchingDesc, newPluginId);
+				
+				// Add to orchestra with all tags
+				InstrumentInfo newInstrument;
+				newInstrument.instrumentName = matchingDesc.name;
+				newInstrument.pluginName = matchingDesc.name;
+				newInstrument.pluginInstanceId = newPluginId;
+				newInstrument.midiChannel = 0; // Default to channel 0
+				newInstrument.tags = tags;
+				
+				orchestra.push_back(newInstrument);
+				syncOrchestraWithPluginManager();
+				
+				matchingPluginIds.push_back(newPluginId);
+				DBG("Created new plugin instance: " << newPluginId << " with tags: " << tags[0]);
+			}
+			else
+			{
+				DBG("Error: No matching plugin found in known plugins list for UID: " << presetPluginUid);
+				return;
+			}
+		}
+
+		// Load preset into all matching plugin instances
+		for (const auto &pluginId : matchingPluginIds)
+		{
+			DBG("Loading preset " << filename << " from " << filepath << " into " << pluginId);
+			pluginManager.loadPluginData(filepath, filename, pluginId);
+		}
+	}
 	else
 	{
 		DBG("Error: Unknown OSC message type");

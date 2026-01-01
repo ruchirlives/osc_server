@@ -122,6 +122,8 @@ public:
     juce::KnownPluginList knownPluginList;
 	void listPluginInstances();
 	void savePluginData(const juce::String& dataFilePath, const juce:: String & filename, const juce::String& pluginId);
+	juce::String extractPluginUidFromPreset(const juce::String& dataFilePath, const juce::String& filename);
+	bool loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId);
 
     juce::String getPluginUniqueId(const juce::String& pluginId);
 

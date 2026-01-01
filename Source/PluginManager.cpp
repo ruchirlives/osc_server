@@ -1014,6 +1014,123 @@ void PluginManager::savePluginData(const juce::String& dataFilePath, const juce:
 	}
 }
 
+juce::String PluginManager::extractPluginUidFromPreset(const juce::String& dataFilePath, const juce::String& filename)
+{
+    // Construct full file path
+    juce::String fullFilePath = dataFilePath;
+    if (!fullFilePath.endsWithChar('/') && !fullFilePath.endsWithChar('\\'))
+        fullFilePath += "/";
+    fullFilePath += filename;
+    
+    // If filename doesn't have .vstpreset extension, add it
+    if (!fullFilePath.endsWithIgnoreCase(".vstpreset"))
+        fullFilePath += ".vstpreset";
+    
+    juce::File presetFile(fullFilePath);
+    
+    if (!presetFile.existsAsFile())
+    {
+        DBG("Error: Preset file not found: " << fullFilePath);
+        return {};
+    }
+    
+    juce::FileInputStream inputStream(presetFile);
+    if (!inputStream.openedOk())
+    {
+        DBG("Error: Failed to open preset file: " << fullFilePath);
+        return {};
+    }
+    
+    // Read VST3 preset header to extract plugin UID
+    char header[4];
+    inputStream.read(header, 4);
+    
+    if (strncmp(header, "VST3", 4) != 0)
+    {
+        DBG("Error: Invalid VST3 preset format");
+        return {};
+    }
+    
+    // Read version (4 bytes)
+    inputStream.readInt();
+    
+    // Read Class ID (16 bytes) - this is the plugin UID
+    char classId[17] = {0};
+    inputStream.read(classId, 16);
+    
+    return juce::String(classId, 16);
+}
+
+bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
+{
+    // Construct full file path
+    juce::String fullFilePath = dataFilePath;
+    if (!fullFilePath.endsWithChar('/') && !fullFilePath.endsWithChar('\\'))
+        fullFilePath += "/";
+    fullFilePath += filename;
+    
+    // If filename doesn't have .vstpreset extension, add it
+    if (!fullFilePath.endsWithIgnoreCase(".vstpreset"))
+        fullFilePath += ".vstpreset";
+    
+    juce::File presetFile(fullFilePath);
+    
+    // Check if file exists
+    if (!presetFile.existsAsFile())
+    {
+        DBG("Error: Preset file not found: " << fullFilePath);
+        return false;
+    }
+    
+    // Check if plugin instance exists
+    const juce::ScopedLock pluginLock(pluginInstanceLock);
+    auto pluginIt = pluginInstances.find(pluginId);
+    if (pluginIt == pluginInstances.end() || pluginIt->second == nullptr)
+    {
+        DBG("Warning: Plugin instance not found: " << pluginId);
+        return false;
+    }
+    
+    juce::FileInputStream inputStream(presetFile);
+    if (!inputStream.openedOk())
+    {
+        DBG("Error: Failed to open preset file: " << fullFilePath);
+        return false;
+    }
+    
+    // Read the entire preset file into a MemoryBlock
+    juce::int64 fileSize = presetFile.getSize();
+    if (fileSize <= 0 || fileSize > 100 * 1024 * 1024) // Sanity check: max 100MB
+    {
+        DBG("Error: Invalid file size: " << fileSize);
+        return false;
+    }
+    
+    juce::MemoryBlock presetData(static_cast<size_t>(fileSize));
+    inputStream.read(presetData.getData(), static_cast<size_t>(fileSize));
+    
+    // Get the plugin instance
+    juce::AudioPluginInstance* plugin = pluginIt->second.get();
+    
+    // Verify plugin compatibility by checking UIDs
+    juce::String presetPluginUid = extractPluginUidFromPreset(dataFilePath, filename);
+    juce::String instancePluginUid = plugin->getPluginDescription().createIdentifierString();
+    
+    if (presetPluginUid.isNotEmpty() && !instancePluginUid.contains(presetPluginUid.substring(0, 8)))
+    {
+        DBG("Warning: Plugin UID mismatch. Preset is for different plugin type.");
+        DBG("Preset UID: " << presetPluginUid << ", Instance UID: " << instancePluginUid);
+        // Continue anyway - sometimes presets can still work across compatible plugins
+    }
+    
+    // Use JUCE's built-in method to set the state from the preset data
+    // The VST3 format should handle the .vstpreset format automatically
+    plugin->setStateInformation(presetData.getData(), static_cast<int>(presetData.getSize()));
+    
+    DBG("Plugin preset loaded successfully: " << fullFilePath << " into " << pluginId);
+    return true;
+}
+
 juce::String PluginManager::getPluginUniqueId(const juce::String& pluginId)
 {
     const juce::ScopedLock pluginLock(pluginInstanceLock);
