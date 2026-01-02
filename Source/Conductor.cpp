@@ -789,21 +789,12 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		DBG("  Preset UID: " << presetPluginUid);
 		DBG("  Number of tracks: " << tracks.size());
 
-		// Collect unique tags from the tracks
-		std::vector<juce::String> uniqueTags;
-		for (const auto &[instrumentName, tag, channel] : tracks)
-		{
-			if (std::find(uniqueTags.begin(), uniqueTags.end(), tag) == uniqueTags.end())
-			{
-				uniqueTags.push_back(tag);
-			}
-		}
-
-		// Find existing plugin instance with compatible plugin type
-		juce::String matchingPluginId;
+		// Find or create a compatible plugin instance
+		juce::String pluginInstanceId;
+		
+		// First check if any existing plugin instance is compatible with this preset
 		for (const auto &instrument : orchestra)
 		{
-			// Check plugin compatibility by Class ID
 			juce::String instanceClassId = pluginManager.getPluginClassId(instrument.pluginInstanceId);
 			if (instanceClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
 			{
@@ -811,15 +802,15 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				if (instanceClassId.toUpperCase().contains(presetPluginUid.substring(0, juce::jmin(8, presetPluginUid.length()))) ||
 					presetPluginUid.toUpperCase().contains(instanceClassId.substring(0, juce::jmin(8, instanceClassId.length()))))
 				{
-					matchingPluginId = instrument.pluginInstanceId;
-					DBG("Found compatible plugin instance: " << matchingPluginId);
+					pluginInstanceId = instrument.pluginInstanceId;
+					DBG("Found compatible existing plugin instance: " << pluginInstanceId);
 					break;
 				}
 			}
 		}
 
-		// If no compatible plugin found, instantiate the correct plugin
-		if (matchingPluginId.isEmpty())
+		// If no compatible plugin instance exists, create a new one
+		if (pluginInstanceId.isEmpty())
 		{
 			DBG("No compatible plugin instance found. Searching for matching plugin...");
 
@@ -873,7 +864,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 					return;
 				}
 
-				matchingPluginId = newPluginId;
+				pluginInstanceId = newPluginId;
 
 				// Track this as a newly created plugin
 				if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
@@ -902,7 +893,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			bool entryExists = false;
 			for (auto &instrument : orchestra)
 			{
-				if (instrument.pluginInstanceId == matchingPluginId &&
+				if (instrument.pluginInstanceId == pluginInstanceId &&
 					instrument.instrumentName == instrumentName &&
 					instrument.midiChannel == channel &&
 					std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
@@ -917,13 +908,13 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				// Create a new orchestra entry for this specific track
 				InstrumentInfo trackEntry;
 				trackEntry.instrumentName = instrumentName;
-				trackEntry.pluginName = matchingPluginId;
-				trackEntry.pluginInstanceId = matchingPluginId;
+				trackEntry.pluginName = pluginInstanceId;
+				trackEntry.pluginInstanceId = pluginInstanceId;
 				trackEntry.midiChannel = channel;
 				trackEntry.tags = {tag};
 
 				orchestra.push_back(trackEntry);
-				DBG("  Added track: " << instrumentName << " (tag: " << tag << ", channel: " << channel << ")");
+				DBG("  Added track: " << instrumentName << " (tag: " << tag << ", channel: " << channel << ", plugin: " << pluginInstanceId << ")");
 			}
 		}
 
@@ -933,8 +924,9 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		PendingPresetLoad presetLoad;
 		presetLoad.filepath = filepath;
 		presetLoad.filename = filename;
-		presetLoad.pluginId = matchingPluginId;
+		presetLoad.pluginId = pluginInstanceId;
 		pendingPresetLoads.push_back(presetLoad);
+		DBG("  Queued preset load for plugin: " << pluginInstanceId);
 
 		// Start or restart the batch timer (500ms window to collect all preset loads)
 		if (presetLoadBatchTimer != nullptr)
