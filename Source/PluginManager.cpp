@@ -1218,66 +1218,13 @@ juce::String PluginManager::getTuidFromPluginList(const juce::String& presetTuid
 
 void PluginManager::updatePluginListWithTuids()
 {
-    DBG("========================================");
-    DBG("Rebuilding TUID cache from presets...");
-    DBG("Load some presets and try again.");
-    DBG("========================================");
-    DBG("As presets are loaded, their TUIDs will be cached automatically.");
+    // TODO: Implement proper TUID extraction from JUCE PluginDescription
+    DBG("Scan not yet implemented");
 }
 
 void PluginManager::updatePluginListWithTuid(const juce::String& pluginName, const juce::String& tuid)
 {
-    DBG("Updating PluginList.xml: " << pluginName << " -> " << tuid);
-    
-    juce::File pluginListFile = juce::File("M:/Desktop/Documents/OSCDawServer/PluginList.xml");
-    
-    if (!pluginListFile.existsAsFile())
-    {
-        DBG("  Warning: PluginList.xml not found");
-        return;
-    }
-    
-    auto xmlDoc = juce::XmlDocument::parse(pluginListFile);
-    if (xmlDoc == nullptr)
-    {
-        DBG("  Error: Failed to parse PluginList.xml");
-        return;
-    }
-    
-    // Find the plugin element and update its tuid attribute
-    for (auto* pluginElement : xmlDoc->getChildIterator())
-    {
-        if (pluginElement->getTagName() != "PLUGIN")
-            continue;
-        
-        if (pluginElement->getStringAttribute("name").equalsIgnoreCase(pluginName))
-        {
-            // Check if already has this TUID
-            if (pluginElement->getStringAttribute("tuid").equalsIgnoreCase(tuid))
-            {
-                DBG("  Already up-to-date");
-                return;
-            }
-            
-            // Update or add the tuid attribute
-            pluginElement->setAttribute("tuid", tuid);
-            DBG("  Added tuid attribute");
-            
-            // Save the updated XML
-            juce::String xmlString = xmlDoc->toString();
-            if (pluginListFile.replaceWithText(xmlString))
-            {
-                DBG("  ✓ Saved to PluginList.xml");
-            }
-            else
-            {
-                DBG("  ✗ Failed to save PluginList.xml");
-            }
-            return;
-        }
-    }
-    
-    DBG("  Warning: Plugin '" << pluginName << "' not found in PluginList.xml");
+    // TODO: Implement TUID storage when proper extraction method is found
 }
 
 bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
