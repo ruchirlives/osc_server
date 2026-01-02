@@ -651,17 +651,17 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	else if (messageType == "save_plugin_data")
 	{
 		constexpr const char *context = "save_plugin_data";
-		if (!ensureMinOSCArguments(message, 3, context) ||
+		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureStringOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context))
+			!ensureStringOSCArgument(message, 2, context) ||
+			!ensureStringOSCArgument(message, 3, context))
 		{
 			return;
 		}
 
 		juce::String filePath = message[1].getString();
 		juce::String filename = message[2].getString();
-		std::vector<juce::String> tags = extractTags(message, 3);
-		juce::String tag = tags.empty() ? "" : tags[0];
+		juce::String tag = message[3].getString();
 
 		for (const auto &instrument : orchestra)
 		{
