@@ -744,7 +744,8 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	else if (messageType == "load_plugin_data")
 	{
 		constexpr const char *context = "load_plugin_data";
-		if (!ensureMinOSCArguments(message, 4, context) ||
+		// Message format: "load_plugin_data", filepath, filename, then triplets of (instrument_name, tag, channel)
+		if (!ensureMinOSCArguments(message, 6, context) ||
 			!ensureStringOSCArgument(message, 1, context) ||
 			!ensureStringOSCArgument(message, 2, context))
 		{
@@ -753,23 +754,26 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 		juce::String filepath = message[1].getString();
 		juce::String filename = message[2].getString();
-		
-		int midiChannel = 1;
-		int tagsStartIndex = 3;
-		
-		// Check if message[3] is a MIDI channel (int) or a tag (string)
-		if (message.size() > 3 && message[3].isInt32())
+
+		// Parse triplets of (instrument_name, tag, channel) starting from index 3
+		// Each triplet should be (string, string, int)
+		std::vector<std::tuple<juce::String, juce::String, int>> tracks;
+		for (int i = 3; i + 2 < message.size(); i += 3)
 		{
-			midiChannel = message[3].getInt32();
-			tagsStartIndex = 4;
+			if (!message[i].isString() || !message[i + 1].isString() || !message[i + 2].isInt32())
+			{
+				DBG("Error: Invalid track triplet at index " << i << " - expected (string, string, int)");
+				continue;
+			}
+			juce::String instrumentName = message[i].getString();
+			juce::String tag = message[i + 1].getString();
+			int channel = message[i + 2].getInt32();
+			tracks.emplace_back(instrumentName, tag, channel);
 		}
 
-		// Extract tags starting from the appropriate index
-		std::vector<juce::String> tags = extractTags(message, tagsStartIndex);
-
-		if (tags.empty())
+		if (tracks.empty())
 		{
-			DBG("Warning: load_plugin_data received with no tags");
+			DBG("Warning: load_plugin_data received with no track triplets");
 			return;
 		}
 
@@ -781,44 +785,46 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			return;
 		}
 
-		// Find existing instruments with matching tags AND compatible plugin
-		std::vector<juce::String> matchingPluginIds;
-		for (const auto &tag : tags)
+		DBG("load_plugin_data: Loading preset from " << filepath << "/" << filename);
+		DBG("  Preset UID: " << presetPluginUid);
+		DBG("  Number of tracks: " << tracks.size());
+
+		// Collect unique tags from the tracks
+		std::vector<juce::String> uniqueTags;
+		for (const auto &[instrumentName, tag, channel] : tracks)
 		{
-			for (const auto &instrument : orchestra)
+			if (std::find(uniqueTags.begin(), uniqueTags.end(), tag) == uniqueTags.end())
 			{
-				if (std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
+				uniqueTags.push_back(tag);
+			}
+		}
+
+		// Find existing plugin instance with compatible plugin type
+		juce::String matchingPluginId;
+		for (const auto &instrument : orchestra)
+		{
+			// Check plugin compatibility by Class ID
+			juce::String instanceClassId = pluginManager.getPluginClassId(instrument.pluginInstanceId);
+			if (instanceClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
+			{
+				// Compare Class IDs (case insensitive, first 8-16 chars should match)
+				if (instanceClassId.toUpperCase().contains(presetPluginUid.substring(0, juce::jmin(8, presetPluginUid.length()))) ||
+					presetPluginUid.toUpperCase().contains(instanceClassId.substring(0, juce::jmin(8, instanceClassId.length()))))
 				{
-					// Check plugin compatibility by Class ID
-					juce::String instanceClassId = pluginManager.getPluginClassId(instrument.pluginInstanceId);
-					if (instanceClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
-					{
-						// Compare Class IDs (case insensitive, first 8-16 chars should match)
-						if (instanceClassId.toUpperCase().contains(presetPluginUid.substring(0, juce::jmin(8, presetPluginUid.length()))) ||
-							presetPluginUid.toUpperCase().contains(instanceClassId.substring(0, juce::jmin(8, instanceClassId.length()))))
-						{
-							if (std::find(matchingPluginIds.begin(), matchingPluginIds.end(), instrument.pluginInstanceId) == matchingPluginIds.end())
-							{
-								matchingPluginIds.push_back(instrument.pluginInstanceId);
-								DBG("Found compatible plugin instance: " << instrument.pluginInstanceId);
-							}
-						}
-					}
+					matchingPluginId = instrument.pluginInstanceId;
+					DBG("Found compatible plugin instance: " << matchingPluginId);
+					break;
 				}
 			}
 		}
 
 		// If no compatible plugin found, instantiate the correct plugin
-		if (matchingPluginIds.empty())
+		if (matchingPluginId.isEmpty())
 		{
-			DBG("No compatible plugin instance found for tags. Searching for matching plugin...");
-			DBG("Target preset UID: " << presetPluginUid);
-			DBG("Preset filename: " << filename);
+			DBG("No compatible plugin instance found. Searching for matching plugin...");
 
 			// Search for plugin by TUID in known plugins list
 			const auto types = pluginManager.knownPluginList.getTypes();
-			DBG("Scanning " << types.size() << " known plugins:");
-
 			juce::PluginDescription matchingDesc;
 			bool foundPlugin = false;
 
@@ -829,9 +835,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				{
 					continue;
 				}
-
-				DBG("  - " << desc.name << " (Manufacturer: " << desc.manufacturerName << ")");
-				DBG("    File: " << desc.fileOrIdentifier);
 
 				// Look up plugin in PluginList.xml by TUID (instant lookup, no instantiation)
 				juce::String matchedPluginName = pluginManager.getTuidFromPluginList(presetPluginUid);
@@ -847,15 +850,16 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 			if (foundPlugin)
 			{
-				// Create a new plugin instance with the first tag
-				juce::String newPluginId = tags[0] + "_1";
+				// Create a new plugin instance using a unique ID based on the filename (without extension)
+				juce::String baseName = filename.upToLastOccurrenceOf(".", false, false);
+				juce::String newPluginId = baseName + "_1";
 
 				// Check if this ID already exists and increment
 				int counter = 1;
 				while (pluginManager.hasPluginInstance(newPluginId))
 				{
 					counter++;
-					newPluginId = tags[0] + "_" + juce::String(counter);
+					newPluginId = baseName + "_" + juce::String(counter);
 				}
 
 				// Instantiate the plugin
@@ -869,43 +873,30 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 					return;
 				}
 
-				DBG("Plugin instantiation verified for " << newPluginId);
+				matchingPluginId = newPluginId;
 
-				// Verify Class ID matches (if possible)
-				juce::String actualClassId = pluginManager.getPluginClassId(newPluginId);
-				if (actualClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
-				{
-					if (!actualClassId.toUpperCase().contains(presetPluginUid.substring(0, 8)) &&
-						!presetPluginUid.toUpperCase().contains(actualClassId.substring(0, 8)))
-					{
-						DBG("Warning: Class ID mismatch after instantiation.");
-						DBG("  Expected: " << presetPluginUid);
-						DBG("  Actual: " << actualClassId);
-					}
-					else
-					{
-						DBG("Class ID verified: " << actualClassId);
-					}
-				}
-
-				// Add to orchestra with all tags
+				// Add single entry to orchestra representing this plugin instance
 				InstrumentInfo newInstrument;
 				newInstrument.instrumentName = matchingDesc.name;
 				newInstrument.pluginName = matchingDesc.name;
 				newInstrument.pluginInstanceId = newPluginId;
-				newInstrument.midiChannel = midiChannel;
-				newInstrument.tags = tags;
+				newInstrument.midiChannel = 1; // Default for display, actual channels come from tracks
+				newInstrument.tags = uniqueTags;
 
 				orchestra.push_back(newInstrument);
 				syncOrchestraWithPluginManager();
-
-				matchingPluginIds.push_back(newPluginId);
-				DBG("Created new plugin instance: " << newPluginId << " with tags: " << tags[0]);
 
 				// Track this as a newly created plugin
 				if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
 				{
 					pendingNewPlugins.push_back(newPluginId);
+				}
+
+				// Update UI
+				if (mainComponent != nullptr)
+				{
+					juce::MessageManager::callAsync([this]()
+													{ mainComponent->orchestraTable.updateContent(); });
 				}
 			}
 			else
@@ -915,25 +906,46 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			}
 		}
 
-		// Update UI table if we have new plugins
-		if (!matchingPluginIds.empty())
+		// Process each track: create orchestra entries with specific channels
+		for (const auto &[instrumentName, tag, channel] : tracks)
 		{
-			if (mainComponent != nullptr)
+			// Check if an entry for this instrument/tag/channel combo already exists
+			bool entryExists = false;
+			for (auto &instrument : orchestra)
 			{
-				juce::MessageManager::callAsync([this]()
-												{ mainComponent->orchestraTable.updateContent(); });
+				if (instrument.pluginInstanceId == matchingPluginId &&
+					instrument.instrumentName == instrumentName &&
+					instrument.midiChannel == channel &&
+					std::find(instrument.tags.begin(), instrument.tags.end(), tag) != instrument.tags.end())
+				{
+					entryExists = true;
+					break;
+				}
+			}
+
+			if (!entryExists)
+			{
+				// Create a new orchestra entry for this specific track
+				InstrumentInfo trackEntry;
+				trackEntry.instrumentName = instrumentName;
+				trackEntry.pluginName = matchingPluginId;
+				trackEntry.pluginInstanceId = matchingPluginId;
+				trackEntry.midiChannel = channel;
+				trackEntry.tags = {tag};
+
+				orchestra.push_back(trackEntry);
+				DBG("  Added track: " << instrumentName << " (tag: " << tag << ", channel: " << channel << ")");
 			}
 		}
 
-		// Add all preset loads to the pending queue
-		for (const auto &pluginId : matchingPluginIds)
-		{
-			PendingPresetLoad presetLoad;
-			presetLoad.filepath = filepath;
-			presetLoad.filename = filename;
-			presetLoad.pluginId = pluginId;
-			pendingPresetLoads.push_back(presetLoad);
-		}
+		syncOrchestraWithPluginManager();
+
+		// Queue the preset load for this plugin instance
+		PendingPresetLoad presetLoad;
+		presetLoad.filepath = filepath;
+		presetLoad.filename = filename;
+		presetLoad.pluginId = matchingPluginId;
+		pendingPresetLoads.push_back(presetLoad);
 
 		// Start or restart the batch timer (500ms window to collect all preset loads)
 		if (presetLoadBatchTimer != nullptr)
