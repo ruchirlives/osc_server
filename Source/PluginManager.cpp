@@ -1116,8 +1116,8 @@ juce::String PluginManager::getPluginClassId(const juce::String& pluginId)
         // Skip "VST3" header (4 bytes) and version (4 bytes) to get to Class ID (16 bytes)
         if (data[0] == 'V' && data[1] == 'S' && data[2] == 'T' && data[3] == '3')
         {
-            juce::String classId(reinterpret_cast<const char*>(data + 8), 16);
-            return classId.toUpperCase();
+            const unsigned char* classIdBytes = data + 8;
+            return juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
         }
     }
     
