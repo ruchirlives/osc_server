@@ -875,17 +875,6 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 				matchingPluginId = newPluginId;
 
-				// Add single entry to orchestra representing this plugin instance
-				InstrumentInfo newInstrument;
-				newInstrument.instrumentName = matchingDesc.name;
-				newInstrument.pluginName = matchingDesc.name;
-				newInstrument.pluginInstanceId = newPluginId;
-				newInstrument.midiChannel = 1; // Default for display, actual channels come from tracks
-				newInstrument.tags = uniqueTags;
-
-				orchestra.push_back(newInstrument);
-				syncOrchestraWithPluginManager();
-
 				// Track this as a newly created plugin
 				if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
 				{
