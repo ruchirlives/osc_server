@@ -1081,7 +1081,21 @@ juce::String PluginManager::getPluginClassId(const juce::String &pluginId)
         if (data[0] == 'V' && data[1] == 'S' && data[2] == 'T' && data[3] == '3')
         {
             const unsigned char *classIdBytes = data + 8;
-            return juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
+            
+            // Check if the bytes are already hex ASCII characters
+            juce::String classIdStr(reinterpret_cast<const char*>(classIdBytes), 16);
+            bool isHexAscii = classIdStr.containsOnly("0123456789ABCDEFabcdef");
+            
+            if (isHexAscii && classIdStr.length() == 16)
+            {
+                // Already in hex format - use directly
+                return classIdStr.toUpperCase();
+            }
+            else
+            {
+                // Binary/ASCII data - convert to hex
+                return juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
+            }
         }
     }
 
@@ -1209,9 +1223,8 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
         
         try
         {
-            // Disable assertions during instantiation - some plugins with copy protection
-            // will trigger jasserts when loaded with a debugger present
-            juce::ScopedAssertionDisabler disableAsserts;
+            // Some plugins with copy protection will trigger assertions when loaded with a debugger
+            // The try-catch will catch any exceptions they throw
             instance = formatManager.createPluginInstance(desc, sampleRate, blockSize, errorMessage);
         }
         catch (const std::exception& e)
@@ -1248,11 +1261,26 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
                 if (data[0] == 'V' && data[1] == 'S' && data[2] == 'T' && data[3] == '3')
                 {
                     // Skip "VST3" header (4 bytes) and version (4 bytes) to get to Class ID (16 bytes)
-                    // Class ID is stored as ASCII characters (e.g., "VSTSndCs" for Soundcase)
                     const unsigned char* classIdBytes = data + 8;
                     
-                    // Convert ASCII characters to hex string
-                    juce::String tuid = juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
+                    // The bytes returned by getPreset() may already be in hex ASCII format
+                    // Check if they're printable ASCII hex characters (0-9, A-F)
+                    juce::String classIdStr(reinterpret_cast<const char*>(classIdBytes), 16);
+                    bool isHexAscii = classIdStr.containsOnly("0123456789ABCDEFabcdef");
+                    
+                    juce::String tuid;
+                    if (isHexAscii && classIdStr.length() == 16)
+                    {
+                        // Already in hex format (16 hex ASCII chars) - use directly
+                        tuid = classIdStr.toUpperCase();
+                        DBG("    TUID from hex ASCII string: " << tuid);
+                    }
+                    else
+                    {
+                        // Binary/ASCII data - convert to hex
+                        tuid = juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
+                        DBG("    TUID from binary conversion: " << tuid);
+                    }
                     
                     // Add TUID to XML element
                     pluginElement->setAttribute("tuid", tuid);
@@ -1260,9 +1288,7 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
                     // Update cache
                     vst3TuidCache[tuid] = pluginName;
                     
-                    // Show both hex and ASCII representation for debugging
-                    juce::String asciiRepresentation = juce::String(reinterpret_cast<const char*>(classIdBytes), 16);
-                    DBG("    Success! TUID: " << tuid << " (ASCII: " << asciiRepresentation << ")");
+                    DBG("    Success! Plugin: " << pluginName << ", TUID: " << tuid);
                     successCount++;
                 }
                 else
@@ -1497,8 +1523,12 @@ void PluginManager::savePluginListToFile()
 
     if (pluginListXml != nullptr)
     {
-        // Enrich plugin entries with TUIDs by temporarily instantiating each plugin
+        // Only enrich with TUIDs in Release builds to avoid debugger-triggered plugin checks
+        #ifdef _DEBUG
+        DBG("Skipping TUID enrichment in Debug build (plugins may have anti-debugger checks)");
+        #else
         enrichPluginListWithTuids(pluginListXml.get());
+        #endif
 
         if (pluginListFile.existsAsFile())
             pluginListFile.deleteFile();
