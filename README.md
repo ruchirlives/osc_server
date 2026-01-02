@@ -60,6 +60,8 @@ The `/midi/message` listener reads a command name as the first string followed b
 - `program_change <programNumber> <timestamp> <tag>...`
 - `save_plugin_data <filePath> <filename> <tag>`  
   Persists plugin settings for the first instrument that matches `<tag>` via `PluginManager::savePluginData`.
+- `load_plugin_data <filePath> <filename> <instrumentName> <tag> <channel>...`  
+  Loads plugin preset from the specified file path and creates or updates orchestra entries. Arguments following filename should be in triplets of (instrumentName, tag, channel). If a matching plugin instance doesn't exist, the host will search for a plugin by UID in the preset file, instantiate it, and then load the preset data. Multiple instrument entries can be created by providing multiple triplets.
 - `request_dawServerData <tag>`  
   Triggers the host to reply with the instrument metadata described below.
 - `sync_request <timestamp>`  
