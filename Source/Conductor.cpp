@@ -166,6 +166,24 @@ void Conductor::processPendingPresetLoads()
 				if (success)
 				{
 					DBG("Successfully loaded preset into " << presetLoad.pluginId);
+					
+					// Update PluginList.xml with the TUID mapping
+					juce::String presetTuid = pluginManager.extractPluginUidFromPreset(presetLoad.filepath, presetLoad.filename);
+					if (presetTuid.isNotEmpty())
+					{
+						// Extract plugin name from pluginId (format: "tag_1", "tag_2", etc.)
+						// We need to find which plugin this is in the orchestra
+						for (const auto& instrument : orchestra)
+						{
+							if (instrument.pluginId == presetLoad.pluginId)
+							{
+								// Found the plugin, now update the XML
+								pluginManager.updatePluginListWithTuid(instrument.pluginName, presetTuid);
+								DBG("  Updated PluginList.xml: " << instrument.pluginName << " -> TUID: " << presetTuid);
+								break;
+							}
+						}
+					}
 				}
 				else
 				{

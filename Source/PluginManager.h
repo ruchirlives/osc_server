@@ -128,6 +128,7 @@ public:
 	juce::String getOrCacheTuid(const juce::PluginDescription& desc);
 	juce::String getTuidFromPluginList(const juce::String& presetTuid);
 	void updatePluginListWithTuids();
+	void updatePluginListWithTuid(const juce::String& pluginName, const juce::String& tuid);
 	bool loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId);
 
     juce::String getPluginUniqueId(const juce::String& pluginId);
