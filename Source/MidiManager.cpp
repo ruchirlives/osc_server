@@ -446,13 +446,18 @@ void MidiManager::getRecorded()
 	const juce::ScopedLock sl(midiCriticalSection);
 
 	processRecordedMidi();
+}
+
+void MidiManager::clearRecordedBuffer()
+{
+	// Lock the MIDI critical section
+	const juce::ScopedLock sl(midiCriticalSection);
 
 	recordBuffer.clear();
 	recordStartTime = juce::Time::getHighResolutionTicks();
 	overdubHistory.clear();
 	isOverdubbing = false;
 	isStripped = false;
-
 }
 
 void MidiManager::sendTestNote()

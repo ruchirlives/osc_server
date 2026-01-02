@@ -34,6 +34,7 @@ public:
 	void stripLeadingSilence();
 	void undoLastOverdub();
 	void getRecorded();
+	void clearRecordedBuffer();
 	void sendTestNote();
 	void bakeOverdubIntoMaster();
 

@@ -134,7 +134,8 @@ private:
     juce::ComboBox audioDeviceList;
     juce::Label audioDeviceLabel{ "Audio Device", "Audio Device" };
 
-	juce::TextButton getRecordedButton{ "Get and Reset" }; // Button to trigger 
+	juce::TextButton getRecordedButton{ "Get" }; // Button to get recorded MIDI
+	juce::TextButton clearRecordedButton{ "Clear" }; // Button to clear recorded buffer
 	juce::TextButton listPluginInstancesButton{ "Plugin Instances" }; // Button to list plugin instances
 	juce::TextButton sendTestNoteButton{ "Send Test Note" }; // Button to send a test note
 
