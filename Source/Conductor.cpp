@@ -744,20 +744,28 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	else if (messageType == "load_plugin_data")
 	{
 		constexpr const char *context = "load_plugin_data";
-		if (!ensureMinOSCArguments(message, 5, context) ||
+		if (!ensureMinOSCArguments(message, 4, context) ||
 			!ensureStringOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context) ||
-			!ensureIntOSCArgument(message, 3, context))
+			!ensureStringOSCArgument(message, 2, context))
 		{
 			return;
 		}
 
 		juce::String filepath = message[1].getString();
 		juce::String filename = message[2].getString();
-		int midiChannel = message[3].getInt32();
+		
+		int midiChannel = 1;
+		int tagsStartIndex = 3;
+		
+		// Check if message[3] is a MIDI channel (int) or a tag (string)
+		if (message.size() > 3 && message[3].isInt32())
+		{
+			midiChannel = message[3].getInt32();
+			tagsStartIndex = 4;
+		}
 
-		// Extract tags starting from index 4
-		std::vector<juce::String> tags = extractTags(message, 4);
+		// Extract tags starting from the appropriate index
+		std::vector<juce::String> tags = extractTags(message, tagsStartIndex);
 
 		if (tags.empty())
 		{
