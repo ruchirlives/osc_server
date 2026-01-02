@@ -267,6 +267,7 @@ private:
 
     void notifyRestoreStatus(const juce::String& message);
     void insertIntoMasterCaptureUnlocked(MyMidiMessage message);
+    void enrichPluginListWithTuids(juce::XmlElement* pluginListXml);
 
     // TUID cache for VST3 plugins - maps plugin filepath to TUID
     std::map<juce::String, juce::String> vst3TuidCache;

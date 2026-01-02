@@ -1178,6 +1178,137 @@ juce::String PluginManager::getTuidFromPluginList(const juce::String &presetTuid
     return {};
 }
 
+void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
+{
+    if (pluginListXml == nullptr)
+        return;
+
+    auto sampleRate = deviceManager.getAudioDeviceSetup().sampleRate;
+    auto blockSize = deviceManager.getAudioDeviceSetup().bufferSize;
+    
+    if (sampleRate <= 0.0)
+        sampleRate = 44100.0;
+    if (blockSize <= 0)
+        blockSize = 512;
+
+    DBG("Enriching plugin list with TUIDs...");
+    int successCount = 0;
+    int failCount = 0;
+
+    for (auto* pluginElement : pluginListXml->getChildIterator())
+    {
+        if (!pluginElement->hasTagName("PLUGIN"))
+            continue;
+
+        juce::String pluginName = pluginElement->getStringAttribute("name");
+        juce::String format = pluginElement->getStringAttribute("format");
+        
+        // Only process VST3 plugins
+        if (format != "VST3")
+            continue;
+
+        // Skip if TUID already exists
+        if (pluginElement->hasAttribute("tuid"))
+        {
+            DBG("  Skipping " << pluginName << " (TUID already present)");
+            continue;
+        }
+
+        DBG("  Processing: " << pluginName);
+
+        // Create plugin description from XML element
+        juce::PluginDescription desc;
+        if (!knownPluginList.restoreFromXml(*pluginElement, desc))
+        {
+            DBG("    Failed to restore description");
+            failCount++;
+            continue;
+        }
+
+        // Try to instantiate the plugin temporarily
+        juce::String errorMessage;
+        std::unique_ptr<juce::AudioPluginInstance> instance;
+        
+        try
+        {
+            instance = formatManager.createPluginInstance(desc, sampleRate, blockSize, errorMessage);
+        }
+        catch (const std::exception& e)
+        {
+            DBG("    Exception during instantiation: " << e.what());
+            failCount++;
+            continue;
+        }
+        catch (...)
+        {
+            DBG("    Unknown exception during instantiation");
+            failCount++;
+            continue;
+        }
+
+        if (instance == nullptr)
+        {
+            DBG("    Failed to instantiate: " << errorMessage);
+            failCount++;
+            continue;
+        }
+
+        // Extract TUID using VST3Visitor
+        try
+        {
+            CustomVST3Visitor visitor;
+            instance->getExtensions(visitor);
+
+            if (visitor.presetData.getSize() >= 20)
+            {
+                const unsigned char* data = static_cast<const unsigned char*>(visitor.presetData.getData());
+                
+                // Check for VST3 preset header
+                if (data[0] == 'V' && data[1] == 'S' && data[2] == 'T' && data[3] == '3')
+                {
+                    // Skip "VST3" header (4 bytes) and version (4 bytes) to get to Class ID (16 bytes)
+                    const unsigned char* classIdBytes = data + 8;
+                    juce::String tuid = juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
+                    
+                    // Add TUID to XML element
+                    pluginElement->setAttribute("tuid", tuid);
+                    
+                    // Update cache
+                    vst3TuidCache[tuid] = pluginName;
+                    
+                    DBG("    Success! TUID: " << tuid);
+                    successCount++;
+                }
+                else
+                {
+                    DBG("    Invalid preset header format");
+                    failCount++;
+                }
+            }
+            else
+            {
+                DBG("    Preset data too small");
+                failCount++;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            DBG("    Exception extracting TUID: " << e.what());
+            failCount++;
+        }
+        catch (...)
+        {
+            DBG("    Unknown exception extracting TUID");
+            failCount++;
+        }
+
+        // Clean up instance
+        instance.reset();
+    }
+
+    DBG("TUID enrichment complete: " << successCount << " succeeded, " << failCount << " failed");
+}
+
 bool PluginManager::loadPluginData(const juce::String &dataFilePath, const juce::String &filename, const juce::String &pluginId)
 {
     // Construct full file path
@@ -1380,6 +1511,9 @@ void PluginManager::savePluginListToFile()
 
     if (pluginListXml != nullptr)
     {
+        // Enrich plugin entries with TUIDs by temporarily instantiating each plugin
+        enrichPluginListWithTuids(pluginListXml.get());
+
         if (pluginListFile.existsAsFile())
             pluginListFile.deleteFile();
 
