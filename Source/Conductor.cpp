@@ -789,27 +789,24 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		DBG("  Preset UID: " << presetPluginUid);
 		DBG("  Number of tracks: " << tracks.size());
 
-		// Find or create a compatible plugin instance
+		// Extract the base name from the filename (without extension) to use as plugin instance identifier
+		juce::String baseFilename = filename.upToLastOccurrenceOf(".", false, false);
+		
+		// Find or create a plugin instance that matches this filename
 		juce::String pluginInstanceId;
 		
-		// First check if any existing plugin instance is compatible with this preset
+		// First check if there's already a plugin instance with this base name
 		for (const auto &instrument : orchestra)
 		{
-			juce::String instanceClassId = pluginManager.getPluginClassId(instrument.pluginInstanceId);
-			if (instanceClassId.isNotEmpty() && presetPluginUid.isNotEmpty())
+			if (instrument.pluginInstanceId.startsWith(baseFilename))
 			{
-				// Compare Class IDs (case insensitive, first 8-16 chars should match)
-				if (instanceClassId.toUpperCase().contains(presetPluginUid.substring(0, juce::jmin(8, presetPluginUid.length()))) ||
-					presetPluginUid.toUpperCase().contains(instanceClassId.substring(0, juce::jmin(8, instanceClassId.length()))))
-				{
-					pluginInstanceId = instrument.pluginInstanceId;
-					DBG("Found compatible existing plugin instance: " << pluginInstanceId);
-					break;
-				}
+				pluginInstanceId = instrument.pluginInstanceId;
+				DBG("Found existing plugin instance for filename '" << baseFilename << "': " << pluginInstanceId);
+				break;
 			}
 		}
 
-		// If no compatible plugin instance exists, create a new one
+		// If no matching plugin instance exists, create a new one
 		if (pluginInstanceId.isEmpty())
 		{
 			DBG("No compatible plugin instance found. Searching for matching plugin...");
