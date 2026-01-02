@@ -125,6 +125,7 @@ public:
 	juce::String extractPluginUidFromPreset(const juce::String& dataFilePath, const juce::String& filename);
 	juce::String getPluginClassId(const juce::String& pluginId);
 	juce::String extractTuidFromVST3File(const juce::String& vst3FilePath);
+	juce::String getOrCacheTuid(const juce::PluginDescription& desc);
 	bool loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId);
 
     juce::String getPluginUniqueId(const juce::String& pluginId);
@@ -270,7 +271,6 @@ private:
 
     // TUID cache for VST3 plugins - maps plugin filepath to TUID
     std::map<juce::String, juce::String> vst3TuidCache;
-    juce::String getOrCacheTuid(const juce::PluginDescription& desc);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginManager)
 };

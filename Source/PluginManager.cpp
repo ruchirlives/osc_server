@@ -1145,7 +1145,8 @@ juce::String PluginManager::getOrCacheTuid(const juce::PluginDescription& desc)
     DBG("  Instantiating temporarily to read TUID...");
     juce::String tempPluginId = "___TEMP_" + juce::String::toHexString((juce::uint64)this).substring(0, 8) + "___";
     
-    instantiatePlugin(&desc, tempPluginId);
+    // Cast away const - safe here since instantiatePlugin just reads the description
+    instantiatePlugin(const_cast<juce::PluginDescription*>(&desc), tempPluginId);
     
     juce::String tuid;
     if (hasPluginInstance(tempPluginId))
@@ -1216,22 +1217,43 @@ bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce:
     int version = inputStream.readInt();
     DBG("VST3 preset version: " << version);
     
-    // Read Class ID (16 bytes) - skip it
+    // Read Class ID (16 bytes)
     char classId[16];
     inputStream.read(classId, 16);
+    juce::String classIdHex = juce::String::toHexString(reinterpret_cast<const unsigned char*>(classId), 16, 0).toUpperCase();
+    DBG("Class ID from file: " << classIdHex);
     
-    // Read the size of the state data (if present in newer format)
-    // For now, just read the rest of the file as state data
-    juce::int64 remainingSize = presetFile.getSize() - inputStream.getPosition();
+    // Check if there's a size field (4 bytes) for the state data
+    int stateDataSize = 0;
+    juce::int64 currentPos = inputStream.getPosition();
     
-    if (remainingSize <= 0 || remainingSize > 100 * 1024 * 1024)
+    // Try reading as little-endian int for state size
+    stateDataSize = inputStream.readInt();
+    juce::int64 fileSize = presetFile.getSize();
+    juce::int64 remainingAfterSize = fileSize - inputStream.getPosition();
+    
+    // Validate if this looks like a valid size
+    if (stateDataSize > 0 && stateDataSize <= 100 * 1024 * 1024 && stateDataSize == remainingAfterSize)
     {
-        DBG("Error: Invalid state data size: " << remainingSize);
+        // This looks like a valid size field
+        DBG("Found size field: " << stateDataSize << " bytes");
+    }
+    else
+    {
+        // No size field, treat everything after class ID as state data
+        inputStream.setPosition(currentPos);
+        stateDataSize = static_cast<int>(fileSize - currentPos);
+        DBG("No size field found, reading remaining " << stateDataSize << " bytes as state");
+    }
+    
+    if (stateDataSize <= 0 || stateDataSize > 100 * 1024 * 1024)
+    {
+        DBG("Error: Invalid state data size: " << stateDataSize);
         return false;
     }
     
-    juce::MemoryBlock stateData(static_cast<size_t>(remainingSize));
-    inputStream.read(stateData.getData(), static_cast<size_t>(remainingSize));
+    juce::MemoryBlock stateData(static_cast<size_t>(stateDataSize));
+    inputStream.read(stateData.getData(), stateDataSize);
     
     // Get the plugin instance
     juce::AudioPluginInstance* plugin = pluginIt->second.get();
@@ -1251,6 +1273,7 @@ bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce:
     DBG("Loading " << stateData.getSize() << " bytes of state data into " << pluginId);
     plugin->setStateInformation(stateData.getData(), static_cast<int>(stateData.getSize()));
     
+    DBG("State information applied to plugin: " << pluginId);
     DBG("Plugin preset loaded successfully: " << fullFilePath << " into " << pluginId);
     return true;
 }

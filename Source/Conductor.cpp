@@ -158,7 +158,7 @@ void Conductor::processPendingPresetLoads()
 
 		if (shouldContinue)
 		{
-			// Load all pending presets
+			// Load all pending presets immediately
 			for (const auto &presetLoad : capturedPresetLoads)
 			{
 				DBG("Loading preset " << presetLoad.filename << " into " << presetLoad.pluginId);
