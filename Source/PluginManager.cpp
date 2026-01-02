@@ -1209,6 +1209,9 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
         
         try
         {
+            // Disable assertions during instantiation - some plugins with copy protection
+            // will trigger jasserts when loaded with a debugger present
+            juce::ScopedAssertionDisabler disableAsserts;
             instance = formatManager.createPluginInstance(desc, sampleRate, blockSize, errorMessage);
         }
         catch (const std::exception& e)
