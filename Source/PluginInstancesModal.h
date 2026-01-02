@@ -24,6 +24,7 @@ private:
 	void handleContextMenu(int row, const juce::MouseEvent& event);
 	void renameInstance(const juce::String& pluginId);
 	void purgeInstance(const juce::String& pluginId);
+	void purgeSelected();
 
 	PluginManager& pluginManager;
 	std::vector<PluginManager::PluginInstanceInfo> instances;
@@ -33,5 +34,6 @@ private:
 	juce::Label countLabel;
 	juce::ListBox instanceList{ "instanceList", this };
 	juce::TextButton refreshButton{ "Refresh" };
+	juce::TextButton purgeSelectedButton{ "Purge Selected" };
 	juce::TextButton closeButton{ "Close" };
 };

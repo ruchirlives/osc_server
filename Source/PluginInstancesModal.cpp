@@ -13,6 +13,7 @@ PluginInstancesModal::PluginInstancesModal(PluginManager& managerRef,
 	addAndMakeVisible(countLabel);
 
 	instanceList.setRowHeight(28);
+	instanceList.setMultipleSelectionEnabled(true);
 	instanceList.setColour(juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
 	addAndMakeVisible(instanceList);
 
@@ -21,6 +22,12 @@ PluginInstancesModal::PluginInstancesModal(PluginManager& managerRef,
 		refreshInstances();
 	};
 	addAndMakeVisible(refreshButton);
+
+	purgeSelectedButton.onClick = [this]()
+	{
+		purgeSelected();
+	};
+	addAndMakeVisible(purgeSelectedButton);
 
 	closeButton.onClick = [this]()
 	{
@@ -91,6 +98,8 @@ void PluginInstancesModal::resized()
 	const int buttonHeight = 28;
 	auto footer = bounds.removeFromBottom(buttonHeight);
 	refreshButton.setBounds(footer.removeFromLeft(110).reduced(0, 2));
+	footer.removeFromLeft(8);
+	purgeSelectedButton.setBounds(footer.removeFromLeft(120).reduced(0, 2));
 	footer.removeFromLeft(8);
 	closeButton.setBounds(footer.removeFromLeft(110).reduced(0, 2));
 
@@ -183,6 +192,49 @@ void PluginInstancesModal::purgeInstance(const juce::String& pluginId)
 	if (shouldPurge)
 	{
 		pluginManager.resetPlugin(pluginId);
+		refreshInstances();
+	}
+}
+
+void PluginInstancesModal::purgeSelected()
+{
+	auto selectedRows = instanceList.getSelectedRows();
+	if (selectedRows.size() == 0)
+	{
+		juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+			"Purge Selected",
+			"No plugin instances selected.");
+		return;
+	}
+
+	juce::String message = "Remove " + juce::String(selectedRows.size()) + " selected plugin instance";
+	if (selectedRows.size() > 1)
+		message += "s";
+	message += " from memory?";
+
+	const bool shouldPurge = juce::AlertWindow::showOkCancelBox(
+		juce::AlertWindow::WarningIcon,
+		"Purge Selected Instances",
+		message,
+		"Purge",
+		"Cancel",
+		this);
+
+	if (shouldPurge)
+	{
+		// Collect plugin IDs from selected rows
+		juce::StringArray pluginIdsToRemove;
+		for (int i = 0; i < selectedRows.size(); ++i)
+		{
+			int row = selectedRows[i];
+			if (isPositiveRow(row))
+				pluginIdsToRemove.add(instances[(size_t)row].pluginId);
+		}
+
+		// Purge all selected instances
+		for (const auto& pluginId : pluginIdsToRemove)
+			pluginManager.resetPlugin(pluginId);
+
 		refreshInstances();
 	}
 }
