@@ -115,7 +115,7 @@ void Conductor::processPendingPresetLoads()
 	if (pendingNewPlugins.empty())
 	{
 		// No new plugins, just load presets immediately
-		for (const auto& presetLoad : pendingPresetLoads)
+		for (const auto &presetLoad : pendingPresetLoads)
 		{
 			DBG("Loading preset " << presetLoad.filename << " into existing " << presetLoad.pluginId);
 			bool success = pluginManager.loadPluginData(presetLoad.filepath, presetLoad.filename, presetLoad.pluginId);
@@ -135,12 +135,12 @@ void Conductor::processPendingPresetLoads()
 	// We have new plugins - show confirmation dialog
 	auto capturedNewPlugins = pendingNewPlugins;
 	auto capturedPresetLoads = pendingPresetLoads;
-	
+
 	pendingNewPlugins.clear();
 	pendingPresetLoads.clear();
 
 	juce::MessageManager::callAsync([this, capturedNewPlugins, capturedPresetLoads]() mutable
-	{
+									{
 		juce::String message = "The following plugin instance(s) have been created:\n\n";
 		for (const auto &pluginId : capturedNewPlugins)
 		{
@@ -177,8 +177,7 @@ void Conductor::processPendingPresetLoads()
 		else
 		{
 			DBG("User cancelled preset loading");
-		}
-	});
+		} });
 }
 
 void Conductor::shutdown()
@@ -745,18 +744,20 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 	else if (messageType == "load_plugin_data")
 	{
 		constexpr const char *context = "load_plugin_data";
-		if (!ensureMinOSCArguments(message, 4, context) ||
+		if (!ensureMinOSCArguments(message, 5, context) ||
 			!ensureStringOSCArgument(message, 1, context) ||
-			!ensureStringOSCArgument(message, 2, context))
+			!ensureStringOSCArgument(message, 2, context) ||
+			!ensureIntOSCArgument(message, 3, context))
 		{
 			return;
 		}
 
 		juce::String filepath = message[1].getString();
 		juce::String filename = message[2].getString();
+		int midiChannel = message[3].getInt32();
 
-		// Extract tags starting from index 3
-		std::vector<juce::String> tags = extractTags(message, 3);
+		// Extract tags starting from index 4
+		std::vector<juce::String> tags = extractTags(message, 4);
 
 		if (tags.empty())
 		{
@@ -826,7 +827,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 				// Look up plugin in PluginList.xml by TUID (instant lookup, no instantiation)
 				juce::String matchedPluginName = pluginManager.getTuidFromPluginList(presetPluginUid);
-				
+
 				if (matchedPluginName.isNotEmpty() && matchedPluginName == desc.name)
 				{
 					matchingDesc = desc;
@@ -884,7 +885,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				newInstrument.instrumentName = matchingDesc.name;
 				newInstrument.pluginName = matchingDesc.name;
 				newInstrument.pluginInstanceId = newPluginId;
-				newInstrument.midiChannel = 0; // Default to channel 0
+				newInstrument.midiChannel = midiChannel;
 				newInstrument.tags = tags;
 
 				orchestra.push_back(newInstrument);
@@ -892,7 +893,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 				matchingPluginIds.push_back(newPluginId);
 				DBG("Created new plugin instance: " << newPluginId << " with tags: " << tags[0]);
-				
+
 				// Track this as a newly created plugin
 				if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
 				{
@@ -912,9 +913,7 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			if (mainComponent != nullptr)
 			{
 				juce::MessageManager::callAsync([this]()
-				{ 
-					mainComponent->orchestraTable.updateContent(); 
-				});
+												{ mainComponent->orchestraTable.updateContent(); });
 			}
 		}
 
@@ -933,19 +932,19 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		{
 			delete presetLoadBatchTimer;
 		}
-		
+
 		// Use a custom Timer subclass to call processPendingPresetLoads
 		struct TimerCallback : public juce::Timer
 		{
-			Conductor* conductor;
-			TimerCallback(Conductor* c) : conductor(c) {}
+			Conductor *conductor;
+			TimerCallback(Conductor *c) : conductor(c) {}
 			void timerCallback() override
 			{
 				stopTimer();
 				conductor->processPendingPresetLoads();
 			}
 		};
-		
+
 		presetLoadBatchTimer = new TimerCallback(this);
 		presetLoadBatchTimer->startTimer(500); // 500ms debounce
 	}
