@@ -1042,41 +1042,17 @@ juce::String PluginManager::extractPluginUidFromPreset(const juce::String &dataF
     // Read version (4 bytes)
     inputStream.readInt();
 
-    // Read Class ID (16 bytes) - this is the plugin UID
-    // VST3 preset format stores this as ASCII hex string (32 chars representing 16 bytes)
-    char classIdAscii[17] = {0};
-    inputStream.read(classIdAscii, 16);
+    // Read Class ID (16 bytes) - VST3 uses ASCII text characters
+    // e.g., "VSTSndCs" for Soundcase, stored as raw ASCII bytes
+    char classIdChars[17] = {0};
+    inputStream.read(classIdChars, 16);
 
-    juce::String asciiStr(classIdAscii, 16);
-
-    // Check if this is ASCII hex characters (0-9, A-F)
-    bool isAsciiHex = true;
-    for (int i = 0; i < asciiStr.length(); ++i)
-    {
-        char c = asciiStr[i];
-        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
-        {
-            isAsciiHex = false;
-            break;
-        }
-    }
-
-    juce::String result;
-    if (isAsciiHex && asciiStr.length() >= 16)
-    {
-        // It's stored as ASCII hex - this is the actual Class ID
-        result = asciiStr.toUpperCase();
-        DBG("Extracted plugin Class ID from preset '" << filename << "':");
-        DBG("  Class ID (hex string): " << result);
-        DBG("  First 8 chars: " << result.substring(0, 8));
-    }
-    else
-    {
-        // Raw binary format
-        result = juce::String::toHexString(reinterpret_cast<const unsigned char *>(classIdAscii), 16, 0).toUpperCase();
-        DBG("Extracted plugin Class ID from preset '" << filename << "' (binary):");
-        DBG("  Class ID: " << result);
-    }
+    // Convert the ASCII characters to hex string
+    juce::String result = juce::String::toHexString(reinterpret_cast<const unsigned char*>(classIdChars), 16, 0).toUpperCase();
+    
+    DBG("Extracted plugin Class ID from preset '" << filename << "':");
+    DBG("  Class ID (hex): " << result);
+    DBG("  Class ID (ASCII): " << juce::String(classIdChars, 16));
 
     return result;
 }
@@ -1218,9 +1194,11 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
 
         // Create plugin description from XML element
         juce::PluginDescription desc;
-        if (!knownPluginList.restoreFromXml(*pluginElement, desc))
+        desc.loadFromXml(*pluginElement);
+        
+        if (desc.name.isEmpty())
         {
-            DBG("    Failed to restore description");
+            DBG("    Failed to load description from XML");
             failCount++;
             continue;
         }
@@ -1259,15 +1237,18 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
             CustomVST3Visitor visitor;
             instance->getExtensions(visitor);
 
-            if (visitor.presetData.getSize() >= 20)
+            if (visitor.presetData.getSize() >= 24)
             {
                 const unsigned char* data = static_cast<const unsigned char*>(visitor.presetData.getData());
                 
-                // Check for VST3 preset header
+                // Check for VST3 preset header: "VST3"
                 if (data[0] == 'V' && data[1] == 'S' && data[2] == 'T' && data[3] == '3')
                 {
                     // Skip "VST3" header (4 bytes) and version (4 bytes) to get to Class ID (16 bytes)
+                    // Class ID is stored as ASCII characters (e.g., "VSTSndCs" for Soundcase)
                     const unsigned char* classIdBytes = data + 8;
+                    
+                    // Convert ASCII characters to hex string
                     juce::String tuid = juce::String::toHexString(classIdBytes, 16, 0).toUpperCase();
                     
                     // Add TUID to XML element
@@ -1276,7 +1257,9 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
                     // Update cache
                     vst3TuidCache[tuid] = pluginName;
                     
-                    DBG("    Success! TUID: " << tuid);
+                    // Show both hex and ASCII representation for debugging
+                    juce::String asciiRepresentation = juce::String(reinterpret_cast<const char*>(classIdBytes), 16);
+                    DBG("    Success! TUID: " << tuid << " (ASCII: " << asciiRepresentation << ")");
                     successCount++;
                 }
                 else
@@ -1287,7 +1270,7 @@ void PluginManager::enrichPluginListWithTuids(juce::XmlElement* pluginListXml)
             }
             else
             {
-                DBG("    Preset data too small");
+                DBG("    Preset data too small (" << visitor.presetData.getSize() << " bytes)");
                 failCount++;
             }
         }
