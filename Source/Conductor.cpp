@@ -824,17 +824,10 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				DBG("  - " << desc.name << " (Manufacturer: " << desc.manufacturerName << ")");
 				DBG("    File: " << desc.fileOrIdentifier);
 
-				// Get TUID from cache (instantiates temporarily if not cached)
-				juce::String vst3Tuid = pluginManager.getOrCacheTuid(desc);
+				// Look up plugin in PluginList.xml by TUID (instant lookup, no instantiation)
+				juce::String matchedPluginName = pluginManager.getTuidFromPluginList(presetPluginUid);
 				
-				if (vst3Tuid.isEmpty())
-				{
-					DBG("    Could not get TUID from plugin");
-					continue;
-				}
-				
-				// Direct TUID comparison
-				if (vst3Tuid.equalsIgnoreCase(presetPluginUid))
+				if (matchedPluginName.isNotEmpty() && matchedPluginName == desc.name)
 				{
 					matchingDesc = desc;
 					foundPlugin = true;

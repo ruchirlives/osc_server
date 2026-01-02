@@ -46,6 +46,9 @@ public:
     void oscAddInstrumentCommand(const juce::OSCMessage& message);
     void oscMessageReceived(const juce::OSCMessage& message) override;
     void oscProcessMIDIMessage(const juce::OSCMessage& message);
+    
+    // Scan all VST3 plugins to populate PluginList.xml with TUIDs (one-time operation)
+    void updatePluginListWithTuids() { pluginManager.updatePluginListWithTuids(); }
 
     juce::int64 getTimestamp(const juce::OSCArgument timestampArg);
 	juce::int64 adjustTimestamp(const juce::OSCArgument timestamp);

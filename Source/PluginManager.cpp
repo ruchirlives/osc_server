@@ -1133,7 +1133,14 @@ juce::String PluginManager::extractTuidFromVST3File(const juce::String& vst3File
 
 juce::String PluginManager::getOrCacheTuid(const juce::PluginDescription& desc)
 {
-    // Check if already in cache
+    // First try to find in PluginList.xml using the uniqueId
+    juce::String tuidFromList = getTuidFromPluginList("");
+    if (tuidFromList.isNotEmpty())
+    {
+        return tuidFromList;
+    }
+    
+    // Fallback to cache lookup (for non-PluginList plugins)
     auto it = vst3TuidCache.find(desc.fileOrIdentifier);
     if (it != vst3TuidCache.end() && it->second.isNotEmpty())
     {
@@ -1141,29 +1148,204 @@ juce::String PluginManager::getOrCacheTuid(const juce::PluginDescription& desc)
         return it->second;
     }
     
-    // Not in cache - instantiate temporarily to get TUID
-    DBG("  Instantiating temporarily to read TUID...");
-    juce::String tempPluginId = "___TEMP_" + juce::String::toHexString((juce::uint64)this).substring(0, 8) + "___";
+    return {};
+}
+
+juce::String PluginManager::getTuidFromPluginList(const juce::String& presetTuid)
+{
+    // Search PluginList.xml for a plugin matching the preset TUID
+    juce::File pluginListFile = juce::File("M:/Desktop/Documents/OSCDawServer/PluginList.xml");
     
-    // Cast away const - safe here since instantiatePlugin just reads the description
-    instantiatePlugin(const_cast<juce::PluginDescription*>(&desc), tempPluginId);
-    
-    juce::String tuid;
-    if (hasPluginInstance(tempPluginId))
+    if (!pluginListFile.existsAsFile())
     {
-        tuid = getPluginClassId(tempPluginId);
-        DBG("  TUID (fresh): " << tuid);
-        resetPlugin(tempPluginId);
+        // Try relative path from executable directory
+        pluginListFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+            .getParentDirectory()
+            .getChildFile("PluginList.xml");
+    }
+    
+    if (!pluginListFile.existsAsFile())
+    {
+        DBG("Warning: PluginList.xml not found");
+        return {};
+    }
+    
+    auto xmlDoc = juce::XmlDocument::parse(pluginListFile);
+    if (xmlDoc == nullptr)
+    {
+        DBG("Error: Failed to parse PluginList.xml");
+        return {};
+    }
+    
+    // Search for TUID in plugin entries
+    for (auto* pluginElement : xmlDoc->getChildIterator())
+    {
+        if (pluginElement->getTagName() != "PLUGIN")
+            continue;
+        
+        juce::String pluginName = pluginElement->getStringAttribute("name");
+        
+        // First try: check if plugin has tuid attribute (populated by updatePluginListWithTuids)
+        juce::String storedTuid = pluginElement->getStringAttribute("tuid");
+        if (storedTuid.isNotEmpty() && storedTuid.equalsIgnoreCase(presetTuid))
+        {
+            DBG("  Found matching plugin in PluginList: " << pluginName << " (tuid: " << storedTuid << ")");
+            return pluginName;
+        }
+        
+        // Fallback: use uniqueId (last 4 bytes / 8 hex chars of TUID)
+        juce::String uniqueId = pluginElement->getStringAttribute("uniqueId");
+        if (presetTuid.endsWithIgnoreCase(uniqueId))
+        {
+            DBG("  Found matching plugin in PluginList (via uniqueId): " << pluginName << " (uniqueId: " << uniqueId << ")");
+            return pluginName; // Return plugin name for instantiation
+        }
+    }
+    
+    DBG("  No matching plugin found in PluginList for TUID: " << presetTuid);
+    return {};
+}
+
+void PluginManager::updatePluginListWithTuids()
+{
+    DBG("========================================");
+    DBG("Updating PluginList.xml with VST3 TUIDs...");
+    DBG("========================================");
+    
+    juce::File pluginListFile = juce::File("M:/Desktop/Documents/OSCDawServer/PluginList.xml");
+    
+    if (!pluginListFile.existsAsFile())
+    {
+        DBG("ERROR: PluginList.xml not found at: " << pluginListFile.getFullPathName());
+        return;
+    }
+    
+    DBG("Found PluginList.xml at: " << pluginListFile.getFullPathName());
+    
+    auto xmlDoc = juce::XmlDocument::parse(pluginListFile);
+    if (xmlDoc == nullptr)
+    {
+        DBG("ERROR: Failed to parse PluginList.xml");
+        return;
+    }
+    
+    DBG("Successfully parsed PluginList.xml");
+    
+    int updatedCount = 0;
+    int skippedCount = 0;
+    int errorCount = 0;
+    
+    // Iterate through XML plugins
+    for (auto* pluginElement : xmlDoc->getChildIterator())
+    {
+        if (pluginElement->getTagName() != "PLUGIN")
+            continue;
+        
+        juce::String pluginName = pluginElement->getStringAttribute("name");
+        juce::String pluginFormat = pluginElement->getStringAttribute("format");
+        
+        // Only process VST3 plugins
+        if (pluginFormat != "VST3")
+        {
+            skippedCount++;
+            continue;
+        }
+        
+        // Check if already has TUID
+        if (pluginElement->hasAttribute("tuid") && pluginElement->getStringAttribute("tuid").isNotEmpty())
+        {
+            DBG("  [SKIP] " << pluginName << " already has TUID: " << pluginElement->getStringAttribute("tuid"));
+            skippedCount++;
+            continue;
+        }
+        
+        // Find this plugin in knownPluginList
+        juce::PluginDescription* foundDesc = nullptr;
+        for (const auto& desc : knownPluginList.getTypes())
+        {
+            if (desc.name == pluginName && desc.pluginFormatName == "VST3")
+            {
+                foundDesc = const_cast<juce::PluginDescription*>(&desc);
+                break;
+            }
+        }
+        
+        if (foundDesc == nullptr)
+        {
+            DBG("  [ERROR] " << pluginName << " not found in knownPluginList");
+            errorCount++;
+            continue;
+        }
+        
+        // Instantiate plugin to get TUID
+        DBG("  [SCAN] Getting TUID for " << pluginName << "...");
+        juce::String tempPluginId = "___TEMP_TUID_" + juce::String::toHexString((juce::uint64)this).substring(0, 8) + "___";
+        
+        try
+        {
+            instantiatePlugin(foundDesc, tempPluginId);
+            
+            if (hasPluginInstance(tempPluginId))
+            {
+                juce::String tuid = getPluginClassId(tempPluginId);
+                if (tuid.isNotEmpty())
+                {
+                    pluginElement->setAttribute("tuid", tuid);
+                    DBG("        ✓ Added TUID: " << tuid);
+                    updatedCount++;
+                }
+                else
+                {
+                    DBG("        ✗ Failed to extract TUID - moving to next");
+                    errorCount++;
+                }
+                resetPlugin(tempPluginId);
+            }
+            else
+            {
+                DBG("        ✗ Failed to instantiate - moving to next");
+                errorCount++;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            DBG("        ✗ Exception: " << e.what() << " - moving to next");
+            errorCount++;
+            // Continue to next plugin
+        }
+        catch (...)
+        {
+            DBG("        ✗ Unknown exception - moving to next");
+            errorCount++;
+            // Continue to next plugin
+        }
+    }
+    
+    // Save updated XML
+    DBG("========================================");
+    DBG("Results: Updated=" << updatedCount << ", Skipped=" << skippedCount << ", Errors=" << errorCount);
+    DBG("========================================");
+    
+    if (updatedCount > 0)
+    {
+        juce::String xmlString = xmlDoc->toString();
+        if (pluginListFile.replaceWithText(xmlString))
+        {
+            DBG("✓ SUCCESS: Updated PluginList.xml with " << updatedCount << " TUIDs");
+        }
+        else
+        {
+            DBG("✗ ERROR: Failed to save updated PluginList.xml");
+        }
+    }
+    else if (errorCount > 0)
+    {
+        DBG("✗ ERROR: No TUIDs could be extracted from plugins (" << errorCount << " errors)");
     }
     else
     {
-        DBG("  Failed to instantiate for TUID check");
+        DBG("⊘ No new TUIDs to add (all plugins already have TUIDs)");
     }
-    
-    // Cache the result (even if empty, to avoid repeated attempts)
-    vst3TuidCache[desc.fileOrIdentifier] = tuid;
-    
-    return tuid;
 }
 
 bool PluginManager::loadPluginData(const juce::String& dataFilePath, const juce::String& filename, const juce::String& pluginId)
