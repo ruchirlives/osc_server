@@ -1042,17 +1042,30 @@ juce::String PluginManager::extractPluginUidFromPreset(const juce::String &dataF
     // Read version (4 bytes)
     inputStream.readInt();
 
-    // Read Class ID (16 bytes) - VST3 uses ASCII text characters
-    // e.g., "VSTSndCs" for Soundcase, stored as raw ASCII bytes
+    // Read Class ID (16 bytes)
     char classIdChars[17] = {0};
     inputStream.read(classIdChars, 16);
 
-    // Convert the ASCII characters to hex string
-    juce::String result = juce::String::toHexString(reinterpret_cast<const unsigned char*>(classIdChars), 16, 0).toUpperCase();
+    // Check if the bytes are already hex ASCII characters
+    juce::String classIdStr(classIdChars, 16);
+    bool isHexAscii = classIdStr.containsOnly("0123456789ABCDEFabcdef");
     
-    DBG("Extracted plugin Class ID from preset '" << filename << "':");
-    DBG("  Class ID (hex): " << result);
-    DBG("  Class ID (ASCII): " << juce::String(classIdChars, 16));
+    juce::String result;
+    if (isHexAscii && classIdStr.length() == 16)
+    {
+        // Already in hex format (16 hex ASCII chars) - use directly
+        result = classIdStr.toUpperCase();
+        DBG("Extracted plugin Class ID from preset '" << filename << "' (hex ASCII format):");
+        DBG("  TUID: " << result);
+    }
+    else
+    {
+        // Binary/ASCII data - convert to hex
+        result = juce::String::toHexString(reinterpret_cast<const unsigned char*>(classIdChars), 16, 0).toUpperCase();
+        DBG("Extracted plugin Class ID from preset '" << filename << "' (binary format):");
+        DBG("  TUID: " << result);
+        DBG("  ASCII: " << classIdStr);
+    }
 
     return result;
 }
