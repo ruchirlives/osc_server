@@ -1391,38 +1391,6 @@ bool PluginManager::loadPluginData(const juce::String &dataFilePath, const juce:
     juce::String classIdHex = juce::String::toHexString(reinterpret_cast<const unsigned char *>(classId), 16, 0).toUpperCase();
     DBG("Class ID from file: " << classIdHex);
 
-    // Check if there's a size field (4 bytes) for the state data
-    int stateDataSize = 0;
-    juce::int64 currentPos = inputStream.getPosition();
-
-    // Try reading as little-endian int for state size
-    stateDataSize = inputStream.readInt();
-    juce::int64 fileSize = presetFile.getSize();
-    juce::int64 remainingAfterSize = fileSize - inputStream.getPosition();
-
-    // Validate if this looks like a valid size
-    if (stateDataSize > 0 && stateDataSize <= 100 * 1024 * 1024 && stateDataSize == remainingAfterSize)
-    {
-        // This looks like a valid size field
-        DBG("Found size field: " << stateDataSize << " bytes");
-    }
-    else
-    {
-        // No size field, treat everything after class ID as state data
-        inputStream.setPosition(currentPos);
-        stateDataSize = static_cast<int>(fileSize - currentPos);
-        DBG("No size field found, reading remaining " << stateDataSize << " bytes as state");
-    }
-
-    if (stateDataSize <= 0 || stateDataSize > 100 * 1024 * 1024)
-    {
-        DBG("Error: Invalid state data size: " << stateDataSize);
-        return false;
-    }
-
-    juce::MemoryBlock stateData(static_cast<size_t>(stateDataSize));
-    inputStream.read(stateData.getData(), stateDataSize);
-
     // Get the plugin instance
     juce::AudioPluginInstance *plugin = pluginIt->second.get();
 
@@ -1437,13 +1405,43 @@ bool PluginManager::loadPluginData(const juce::String &dataFilePath, const juce:
         // Continue anyway - sometimes presets can still work across compatible plugins
     }
 
-    // Use JUCE's built-in method to set the state from the preset data
-    DBG("Loading " << stateData.getSize() << " bytes of state data into " << pluginId);
-    plugin->setStateInformation(stateData.getData(), static_cast<int>(stateData.getSize()));
+    // Load the entire .vstpreset file into memory
+    inputStream.setPosition(0);
+    juce::int64 fileSize = presetFile.getSize();
+    juce::MemoryBlock presetData(static_cast<size_t>(fileSize));
+    inputStream.read(presetData.getData(), fileSize);
 
-    DBG("State information applied to plugin: " << pluginId);
-    DBG("Plugin preset loaded successfully: " << fullFilePath << " into " << pluginId);
-    return true;
+    // Use VST3Client to load the preset properly
+    CustomVST3Visitor visitor;
+    plugin->getExtensions(visitor);
+    
+    // Access the VST3Client to call setPreset
+    class VST3PresetLoader : public juce::ExtensionsVisitor
+    {
+    public:
+        juce::MemoryBlock presetToLoad;
+        bool success = false;
+
+        void visitVST3Client(const VST3Client& client) override
+        {
+            success = const_cast<VST3Client&>(client).setPreset(presetToLoad);
+        }
+    };
+
+    VST3PresetLoader loader;
+    loader.presetToLoad = presetData;
+    plugin->getExtensions(loader);
+
+    if (loader.success)
+    {
+        DBG("VST3 preset loaded successfully via setPreset(): " << fullFilePath << " into " << pluginId);
+        return true;
+    }
+    else
+    {
+        DBG("Failed to load VST3 preset via setPreset()");
+        return false;
+    }
 }
 
 juce::String PluginManager::getPluginUniqueId(const juce::String &pluginId)
