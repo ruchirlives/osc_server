@@ -779,22 +779,25 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 
 		// Extract plugin UID from preset file to identify the correct plugin
 		juce::String presetPluginUid = pluginManager.extractPluginUidFromPreset(filepath, filename);
-		if (presetPluginUid.isEmpty())
-		{
-			DBG("Error: Could not extract plugin UID from preset file");
-			return;
-		}
+		bool hasValidPreset = !presetPluginUid.isEmpty();
 
-		DBG("load_plugin_data: Loading preset from " << filepath << "/" << filename);
-		DBG("  Preset UID: " << presetPluginUid);
+		if (!hasValidPreset)
+		{
+			DBG("Warning: Could not extract plugin UID from preset file: " << filepath << "/" << filename);
+		}
+		else
+		{
+			DBG("load_plugin_data: Loading preset from " << filepath << "/" << filename);
+			DBG("  Preset UID: " << presetPluginUid);
+		}
 		DBG("  Number of tracks: " << tracks.size());
 
 		// Extract the base name from the filename (without extension) to use as plugin instance identifier
 		juce::String baseFilename = filename.upToLastOccurrenceOf(".", false, false);
-		
+
 		// Find or create a plugin instance that matches this filename
 		juce::String pluginInstanceId;
-		
+
 		// First check if there's already a plugin instance with this base name
 		for (const auto &instrument : orchestra)
 		{
@@ -806,8 +809,8 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			}
 		}
 
-		// If no matching plugin instance exists, create a new one
-		if (pluginInstanceId.isEmpty())
+		// If no matching plugin instance exists and we have a valid preset, try to create one
+		if (pluginInstanceId.isEmpty() && hasValidPreset)
 		{
 			DBG("No compatible plugin instance found. Searching for matching plugin...");
 
@@ -858,29 +861,37 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 				if (!pluginManager.hasPluginInstance(newPluginId))
 				{
 					DBG("Error: Plugin instantiation failed for " << newPluginId);
-					return;
+					hasValidPreset = false;
 				}
-
-				pluginInstanceId = newPluginId;
-
-				// Track this as a newly created plugin
-				if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
+				else
 				{
-					pendingNewPlugins.push_back(newPluginId);
-				}
+					pluginInstanceId = newPluginId;
 
-				// Update UI
-				if (mainComponent != nullptr)
-				{
-					juce::MessageManager::callAsync([this]()
-													{ mainComponent->orchestraTable.updateContent(); });
+					// Track this as a newly created plugin
+					if (std::find(pendingNewPlugins.begin(), pendingNewPlugins.end(), newPluginId) == pendingNewPlugins.end())
+					{
+						pendingNewPlugins.push_back(newPluginId);
+					}
+
+					// Update UI
+					if (mainComponent != nullptr)
+					{
+						juce::MessageManager::callAsync([this]()
+														{ mainComponent->orchestraTable.updateContent(); });
+					}
 				}
 			}
 			else
 			{
 				DBG("Error: No matching plugin found in known plugins list for UID: " << presetPluginUid);
-				return;
+				hasValidPreset = false;
 			}
+		}
+
+		// If we still don't have a plugin instance, we'll create orchestra entries without preset data
+		if (pluginInstanceId.isEmpty())
+		{
+			DBG("Warning: No plugin instance available. Orchestra entries will be created without plugin instantiation");
 		}
 
 		// Process each track: create orchestra entries with specific channels
