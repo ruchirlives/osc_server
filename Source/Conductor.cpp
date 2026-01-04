@@ -888,10 +888,12 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 			}
 		}
 
-		// If we still don't have a plugin instance, we'll create orchestra entries without preset data
+		// If we still don't have a plugin instance, create a placeholder ID based on filename
 		if (pluginInstanceId.isEmpty())
 		{
-			DBG("Warning: No plugin instance available. Orchestra entries will be created without plugin instantiation");
+			DBG("Warning: No plugin instance available. Creating placeholder orchestration with filename-based ID");
+			juce::String baseName = filename.upToLastOccurrenceOf(".", false, false);
+			pluginInstanceId = baseName + "_placeholder";
 		}
 
 		// Process each track: create orchestra entries with specific channels
@@ -935,6 +937,13 @@ void Conductor::oscProcessMIDIMessage(const juce::OSCMessage &message)
 		presetLoad.pluginId = pluginInstanceId;
 		pendingPresetLoads.push_back(presetLoad);
 		DBG("  Queued preset load for plugin: " << pluginInstanceId);
+
+		// Refresh the orchestra table UI to show the newly created/modified entries
+		if (mainComponent != nullptr)
+		{
+			juce::MessageManager::callAsync([this]()
+											{ mainComponent->orchestraTable.updateContent(); });
+		}
 
 		// Start or restart the batch timer (500ms window to collect all preset loads)
 		if (presetLoadBatchTimer != nullptr)
